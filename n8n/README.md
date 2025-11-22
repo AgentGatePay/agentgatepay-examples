@@ -180,38 +180,14 @@ Save the API keys returned in the response (shown only once).
 
 ---
 
-### Step 2: Add Wallet Addresses
-
-**Add Buyer Wallet:**
-```bash
-curl -X POST https://api.agentgatepay.com/v1/users/wallets/add \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_BUYER_API_KEY" \
-  -d '{
-    "wallet_address": "0xYourBuyerWallet..."
-  }'
-```
-
-**Add Seller Wallet:**
-```bash
-curl -X POST https://api.agentgatepay.com/v1/users/wallets/add \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_SELLER_API_KEY" \
-  -d '{
-    "wallet_address": "0xYourSellerWallet..."
-  }'
-```
-
----
-
 ### Step 3: Deploy Transaction Signing Service
 
 **Option A: Render (Recommended - Free tier available)**
 
-1. Fork repository: https://github.com/agentgatepay/transaction-signing-service
+1. Fork repository: [https://github.com/agentgatepay/transaction-signing-service](https://github.com/AgentGatePay/TX)
 2. Create new Web Service on Render.com
 3. Connect your GitHub repository
-4. Add environment variable: `PRIVATE_KEY=0xYourBuyerPrivateKey...`
+4. Add environment variables.
 5. Deploy (takes ~2 minutes)
 6. Save service URL: `https://your-app.onrender.com`
 
@@ -856,3 +832,4 @@ Found a bug or have a feature request?
 **Questions?** Contact support@agentgatepay.com or join our Discord community.
 
 **Ready to get started?** Follow Step 1 above and have your first autonomous agent payment running in under 10 minutes!
+
