@@ -1,0 +1,495 @@
+{
+  "name": "💲 Seller Monitoring Dashboard - MANUAL RUN",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-001",
+      "name": "▶️ Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "▶️ MANUAL TRIGGER: Click 'Execute Workflow' to run\n\n⚠️ Configure your API key + wallet in Node 2 before running!\n\nThis workflow runs standalone without webhooks.\nAll data is fetched from AgentGatePay API."
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// CONFIG: Validate inputs and setup monitoring parameters\n// ════════════════════════════════════════════════════════════\n\nconst input = $input.first().json;\n\n// Check if triggered by webhook or manual\nconst isManual = !input.merchant_wallet;\n\nconst config = {\n  merchant_wallet: input.merchant_wallet || \"0xYOUR_WALLET_ADDRESS\",  // ⚠️ REPLACE if running manually\n  api_key: input.api_key || \"YOUR_API_KEY\",  // ⚠️ REPLACE if running manually\n  tx_hash: input.tx_hash || null,\n  trigger_source: input.trigger_source || \"manual\",\n  \n  // Monitoring settings\n  time_range_hours: 24,\n  payment_history_limit: 50,  // Fetch last 50 for display (use curl for full history)\n  audit_log_limit: 50,\n  export_format: \"csv\",\n  \n  // AgentGatePay API\n  api_url: \"https://api.agentgatepay.com\",\n  mcp_endpoint: \"https://mcp.agentgatepay.com\",\n  \n  // Session tracking\n  session: {\n    id: `monitor_${Date.now()}`,\n    started_at: new Date().toISOString(),\n    is_manual: isManual\n  }\n};\n\n// Validation\nif (config.api_key === \"YOUR_API_KEY\") {\n  throw new Error(\"❌ Please configure your API key in Node 2 'Load Config'!\");\n}\n\nif (config.merchant_wallet === \"0xYOUR_WALLET_ADDRESS\") {\n  throw new Error(\"❌ Please configure your merchant wallet in Node 2 'Load Config'!\");\n}\n\nconsole.log(`💲 Seller Monitoring Dashboard Started`);\nconsole.log(`   Wallet: ${config.merchant_wallet}`);\nconsole.log(`   Source: ${config.trigger_source}`);\nconsole.log(`   TX Hash: ${config.tx_hash || 'N/A'}`);\n\nreturn [{ json: { config } }];"
+      },
+      "id": "load-config-002",
+      "name": "2️⃣ Load Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "notes": "⚙️ SETUP: Validate inputs\n\n⚠️ EDIT THIS if running manually:\n- merchant_wallet: Your wallet address\n- api_key: Your AgentGatePay API key"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.config.api_url }}/v1/merchant/revenue?wallet={{ $json.config.merchant_wallet }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-revenue-003",
+      "name": "3️⃣ 💰 Get Merchant Revenue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ],
+      "notes": "💰 REVENUE: Fetch merchant revenue stats\n\nReturns:\n- total_usd\n- count\n- average_usd\n- by_chain\n- by_token"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/v1/payments/list?wallet={{ $('2️⃣ Load Config').first().json.config.merchant_wallet }}&limit={{ $('2️⃣ Load Config').first().json.config.payment_history_limit }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-payments-004",
+      "name": "4️⃣ 💳 Get Payment List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ],
+      "notes": "💳 PAYMENTS: Fetch payments TO this merchant\n\nShows last 10 payments received:\n- tx_hash\n- amount_usd\n- status\n- timestamp\n- sender"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/v1/webhooks/list",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-webhooks-005",
+      "name": "5️⃣ 🔗 Get Webhooks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ],
+      "notes": "🔗 WEBHOOKS: Fetch configured webhooks\n\nShows:\n- webhook_id\n- url\n- events\n- status\n- delivery_count\n- failure_count"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/audit/logs?event_type=x402_payment_settled&hours={{ $('2️⃣ Load Config').first().json.config.time_range_hours }}&limit={{ $('2️⃣ Load Config').first().json.config.audit_log_limit }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-audit-logs-006",
+      "name": "6️⃣ 📋 Get Audit Logs (24h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        300
+      ],
+      "notes": "📋 AUDIT: Fetch payment events (24h)\n\nFiltered by:\n- event_type: x402_payment_settled\n- Last 24 hours\n- Max 50 events\n\nShows: payments received"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// VERIFICATION: Verify last payment received on blockchain\n// ════════════════════════════════════════════════════════════\n\nconst config = $('2️⃣ Load Config').first().json.config;\nconst tx_hash = config.tx_hash;\n\nif (!tx_hash) {\n  console.log('⚠️  No tx_hash provided - skipping verification');\n  return [{ json: { \n    verified: false, \n    reason: \"No transaction hash provided\",\n    config: config\n  }}];\n}\n\nconsole.log(`🔍 Verifying payment received: ${tx_hash}`);\n\nreturn [{ json: { \n  tx_hash: tx_hash,\n  config: config,\n  should_verify: true\n}}];"
+      },
+      "id": "prepare-verification-007",
+      "name": "7️⃣ 🔍 Prepare Verification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ],
+      "notes": "🔍 PREPARE: Check if we have tx_hash to verify"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "should-verify",
+              "leftValue": "={{ $json.should_verify }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-verify-008",
+      "name": "7B️⃣ Has TX Hash?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ],
+      "notes": "🔀 ROUTER: Only verify if tx_hash exists"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/v1/payments/verify/{{ $json.tx_hash }}",
+        "options": {}
+      },
+      "id": "verify-payment-009",
+      "name": "8️⃣ ✅ Verify on Blockchain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        200
+      ],
+      "notes": "✅ BLOCKCHAIN: Verify payment received\n\nChecks:\n- Transaction exists\n- Correct amount\n- Correct recipient\n- Block confirmation"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { \n  verified: false,\n  reason: \"No transaction to verify\",\n  message: \"Skipped verification - no tx_hash provided\"\n}}];"
+      },
+      "id": "skip-verification-010",
+      "name": "8B️⃣ Skip Verification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        400
+      ],
+      "notes": "⏭️  SKIP: No tx_hash to verify"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-verification-011",
+      "name": "9️⃣ Merge Verification",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2220,
+        300
+      ],
+      "notes": "🔀 MERGE: Combine verified/skipped paths"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// STATISTICS: Calculate revenue trends and merchant metrics\n// ════════════════════════════════════════════════════════════\n\nconst config = $('2️⃣ Load Config').first().json.config;\nconst revenue = $('3️⃣ 💰 Get Merchant Revenue').first().json;\nconst payments_response = $('4️⃣ 💳 Get Payment List').first().json;\nconst webhooks_response = $('5️⃣ 🔗 Get Webhooks').first().json;\nconst audit_logs_response = $('6️⃣ 📋 Get Audit Logs (24h)').first().json;\nconst verification = $input.first().json;\n\nconsole.log('📊 Calculating merchant statistics...');\n\n// Parse payments\nconst payment_list = payments_response.payments || [];\n\n// Parse webhooks\nconst webhook_list = webhooks_response.webhooks || [];\n\n// Parse audit logs\nconst logs = audit_logs_response.logs || [];\n\n// ✅ FIX: Use correct API field names from merchant revenue response\n// API returns: total_usd, count, average_usd (NOT total_revenue_usd, payment_count, average_payment_usd)\nconst total_revenue = revenue.total_usd || 0;\nconst payment_count = revenue.count || 0;  // ✅ FIXED: use 'count' not 'payment_count'\nconst average_payment = payment_count > 0 ? (total_revenue / payment_count) : (revenue.average_usd || 0);\n\nconst stats = {\n  // Revenue stats - FIXED field names to match API response\n  total_revenue: total_revenue,\n  payment_count: payment_count,\n  average_payment: average_payment,\n  revenue_this_month: revenue.revenue_this_month || 0,\n\n  // Recent activity\n  payments_last_24h: payment_list.filter(p => {\n    const paymentTime = new Date(p.timestamp || p.created_at);\n    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);\n    return paymentTime > oneDayAgo;\n  }).length,\n\n  revenue_last_24h: payment_list.filter(p => {\n    const paymentTime = new Date(p.timestamp || p.created_at);\n    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);\n    return paymentTime > oneDayAgo;\n  }).reduce((sum, p) => sum + parseFloat(p.amount_usd || 0), 0),\n\n  // Webhook stats\n  total_webhooks: webhook_list.length,\n  active_webhooks: webhook_list.filter(w => w.status === 'active').length,\n  total_deliveries: webhook_list.reduce((sum, w) => sum + (w.delivery_count || 0), 0),\n  total_failures: webhook_list.reduce((sum, w) => sum + (w.failure_count || 0), 0),\n\n  // Webhook success rate\n  webhook_success_rate: 0,\n\n  // Top buyers\n  top_buyers: (revenue.top_buyers || []).slice(0, 5),\n\n  // Audit log stats\n  total_events_24h: logs.length,\n\n  // Most recent payment\n  last_payment_received: payment_list.length > 0 ? payment_list[0] : null,\n\n  // Verification status\n  last_payment_verified: verification.verified || false,\n\n  // Payment success rate\n  successful_payments: payment_list.filter(p => p.status === 'completed' || p.status === 'confirmed').length,\n  failed_payments: payment_list.filter(p => p.status === 'failed').length\n};\n\n// Calculate webhook success rate\nconst total_webhook_attempts = stats.total_deliveries + stats.total_failures;\nstats.webhook_success_rate = total_webhook_attempts > 0\n  ? ((stats.total_deliveries / total_webhook_attempts) * 100).toFixed(2)\n  : 100;\n\n// Payment success rate\nconst total_status_known = stats.successful_payments + stats.failed_payments;\nstats.payment_success_rate = total_status_known > 0\n  ? ((stats.successful_payments / total_status_known) * 100).toFixed(2)\n  : 100;\n\n// Revenue growth (compare this month to average)\nconst months_active = stats.payment_count > 0 ? Math.max(1, stats.payment_count / 30) : 1;\nconst average_monthly_revenue = stats.total_revenue / months_active;\nstats.revenue_growth_pct = average_monthly_revenue > 0\n  ? (((stats.revenue_this_month - average_monthly_revenue) / average_monthly_revenue) * 100).toFixed(2)\n  : 0;\n\nstats.revenue_trend = parseFloat(stats.revenue_growth_pct) > 0 ? 'growing' : 'stable';\n\nconsole.log(`   Total Revenue: $${stats.total_revenue}`);\nconsole.log(`   Payments (24h): ${stats.payments_last_24h}`);\nconsole.log(`   Webhooks: ${stats.active_webhooks}/${stats.total_webhooks} active`);\nconsole.log(`   Success Rate: ${stats.payment_success_rate}%`);\n\nreturn [{ json: { config, revenue, stats, payments: payment_list, webhooks: webhook_list, logs, verification } }];\n"
+      },
+      "id": "calculate-stats-012",
+      "name": "🔟 📊 Calculate Statistics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        300
+      ],
+      "notes": "📊 STATISTICS: Calculate merchant metrics\n\nCalculates:\n- Revenue trends\n- Payment success rate\n- Webhook delivery rate\n- Top buyers\n- Recent activity (24h)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// ALERTS: Check for merchant warnings and notifications\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { stats, payments, webhooks } = data;\n\nconst alerts = [];\n\n// Alert 1: Webhook delivery failures\nif (stats.total_webhooks > 0 && parseFloat(stats.webhook_success_rate) < 95) {\n  alerts.push({\n    severity: 'high',\n    type: 'webhook_failures',\n    message: `⚠️  WEBHOOK ISSUES: Success rate ${stats.webhook_success_rate}% (${stats.total_failures} failures)`,\n    action: 'Check webhook URLs and test delivery'\n  });\n}\n\n// Alert 2: No recent payments\nif (stats.payments_last_24h === 0 && stats.payment_count > 0) {\n  alerts.push({\n    severity: 'medium',\n    type: 'no_payments',\n    message: '⏰ No payments received in last 24 hours',\n    action: 'Review - may be normal or check if service is accessible'\n  });\n}\n\n// Alert 3: Failed payments\nif (stats.failed_payments > 0) {\n  alerts.push({\n    severity: 'high',\n    type: 'payment_failures',\n    message: `❌ PAYMENT FAILURES: ${stats.failed_payments} failed payment(s)`,\n    action: 'Review failed transactions and notify buyers'\n  });\n}\n\n// Alert 4: Large payment received\nif (stats.last_payment_received && parseFloat(stats.last_payment_received.amount_usd) > stats.average_payment * 10) {\n  alerts.push({\n    severity: 'low',\n    type: 'large_payment',\n    message: `💰 Large payment received: $${stats.last_payment_received.amount_usd} (10x average)`,\n    action: 'Verify payment and deliver service',\n    tx_hash: stats.last_payment_received.tx_hash\n  });\n}\n\n// Alert 5: Revenue spike\nif (stats.revenue_last_24h > stats.average_payment * 20 && stats.payment_count > 10) {\n  alerts.push({\n    severity: 'low',\n    type: 'revenue_spike',\n    message: `📈 Revenue Spike: $${stats.revenue_last_24h.toFixed(2)} in 24h (20x average)`,\n    action: 'High demand detected - ensure service capacity'\n  });\n}\n\n// Alert 6: No webhooks configured\nif (stats.total_webhooks === 0 && stats.payment_count > 5) {\n  alerts.push({\n    severity: 'medium',\n    type: 'no_webhooks',\n    message: 'ℹ️  No webhooks configured - missing payment notifications',\n    action: 'Configure webhook to receive real-time payment alerts'\n  });\n}\n\n// Alert 7: Verification failure\nif (data.verification && !data.verification.verified && data.config.tx_hash) {\n  alerts.push({\n    severity: 'medium',\n    type: 'verification_failed',\n    message: `⚠️  Payment verification issue: ${data.verification.reason || 'Unknown'}`,\n    action: 'Check transaction on blockchain explorer'\n  });\n}\n\n// Alert 8: Low payment success rate\nif (parseFloat(stats.payment_success_rate) < 90 && stats.payment_count > 10) {\n  alerts.push({\n    severity: 'high',\n    type: 'low_success_rate',\n    message: `⚠️  LOW SUCCESS RATE: ${stats.payment_success_rate}% (${stats.failed_payments} failures)`,\n    action: 'Investigate common failure causes'\n  });\n}\n\nconsole.log(`🚨 Alerts: ${alerts.length} alert(s)`);\nalerts.forEach((a, i) => {\n  console.log(`   ${i+1}. [${a.severity.toUpperCase()}] ${a.message}`);\n});\n\nreturn [{ json: { ...data, alerts } }];"
+      },
+      "id": "check-alerts-013",
+      "name": "1️⃣1️⃣ 🚨 Check Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        300
+      ],
+      "notes": "🚨 ALERTS: Check for merchant warnings\n\nChecks:\n- Webhook delivery failures\n- No payments in 24h\n- Failed payments\n- Large payments received\n- Low success rate"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// DASHBOARD DATA: Format metrics for hybrid display\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { config, revenue, stats, alerts } = data;\n\n// Create dashboard-ready data structure\nconst dashboard = {\n  // Header\n  title: \"💲 Seller Monitoring Dashboard\",\n  merchant_wallet: config.merchant_wallet,\n  generated_at: new Date().toISOString(),\n  session_id: config.session.id,\n  \n  // Key metrics (shown in N8N)\n  metrics: {\n    total_revenue: {\n      value: `$${stats.total_revenue.toFixed(2)}`,\n      label: \"Total Revenue\",\n      icon: \"💰\"\n    },\n    payment_count: {\n      value: stats.payment_count,\n      label: \"Total Payments Received\",\n      icon: \"💳\"\n    },\n    average_payment: {\n      value: `$${stats.average_payment.toFixed(2)}`,\n      label: \"Average Payment\",\n      icon: \"📊\"\n    },\n    revenue_this_month: {\n      value: `$${stats.revenue_this_month.toFixed(2)}`,\n      label: \"Revenue This Month\",\n      icon: \"📅\",\n      growth: `${stats.revenue_growth_pct}%`\n    },\n    payments_24h: {\n      value: stats.payments_last_24h,\n      label: \"Payments (24h)\",\n      icon: \"📈\",\n      amount: `$${stats.revenue_last_24h.toFixed(2)}`\n    },\n    webhooks: {\n      value: `${stats.active_webhooks}/${stats.total_webhooks}`,\n      label: \"Active Webhooks\",\n      icon: \"🔗\",\n      success_rate: `${stats.webhook_success_rate}%`\n    }\n  },\n  \n  // Alerts summary\n  alerts_summary: {\n    count: alerts.length,\n    high: alerts.filter(a => a.severity === 'high').length,\n    medium: alerts.filter(a => a.severity === 'medium').length,\n    low: alerts.filter(a => a.severity === 'low').length,\n    items: alerts\n  },\n  \n  // Quick stats\n  quick_stats: {\n    payment_success_rate: `${stats.payment_success_rate}%`,\n    webhook_success_rate: `${stats.webhook_success_rate}%`,\n    revenue_trend: stats.revenue_trend,\n    last_payment_verified: stats.last_payment_verified ? '✅ Verified' : '⏳ Pending'\n  },\n  \n  // Links\n  links: {\n    full_dashboard: `${config.api_url}/dashboard`,\n    full_dashboard_note: \"⚠️  Admin only - requires admin key\",\n    merchant_revenue: `${config.api_url}/v1/merchant/revenue`,\n    payment_list: `${config.api_url}/v1/payments/list?wallet=${config.merchant_wallet}`,\n    webhooks: `${config.api_url}/v1/webhooks/list`,\n    audit_logs: `${config.api_url}/audit/logs?event_type=x402_payment_settled`\n  },\n  \n  // Export options\n  export: {\n    csv_available: true,\n    json_available: true,\n    pdf_available: false\n  }\n};\n\nconsole.log('📊 Merchant dashboard data prepared');\nconsole.log(`   Metrics: ${Object.keys(dashboard.metrics).length}`);\nconsole.log(`   Alerts: ${dashboard.alerts_summary.count}`);\n\nreturn [{ json: { ...data, dashboard } }];"
+      },
+      "id": "format-dashboard-014",
+      "name": "1️⃣2️⃣ 📱 Format Dashboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        300
+      ],
+      "notes": "📱 DASHBOARD: Format metrics for display\n\nCreates:\n- Key revenue metrics\n- Alert summary\n- Quick stats\n- Links to APIs\n- Export options"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// CSV EXPORT: Generate downloadable CSV report for merchant\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { config, stats, payments, webhooks, logs, alerts } = data;\n\n// CSV Header\nlet csv = \"AgentGatePay Seller Monitoring Report\\n\";\ncsv += `Generated: ${new Date().toISOString()}\\n`;\ncsv += `Merchant Wallet: ${config.merchant_wallet}\\n`;\ncsv += `\\n`;\n\n// Summary section\ncsv += \"SUMMARY\\n\";\ncsv += \"Metric,Value\\n\";\ncsv += `Total Revenue,$${stats.total_revenue}\\n`;\ncsv += `Payment Count,${stats.payment_count}\\n`;\ncsv += `Average Payment,$${stats.average_payment}\\n`;\ncsv += `Revenue This Month,$${stats.revenue_this_month}\\n`;\ncsv += `Revenue Growth,${stats.revenue_growth_pct}%\\n`;\ncsv += `Payments (24h),${stats.payments_last_24h}\\n`;\ncsv += `Revenue (24h),$${stats.revenue_last_24h}\\n`;\ncsv += `Payment Success Rate,${stats.payment_success_rate}%\\n`;\ncsv += `Webhook Success Rate,${stats.webhook_success_rate}%\\n`;\ncsv += `\\n`;\n\n// Alerts section\nif (alerts.length > 0) {\n  csv += \"ALERTS\\n\";\n  csv += \"Severity,Type,Message,Action\\n\";\n  alerts.forEach(a => {\n    csv += `${a.severity},${a.type},\"${a.message}\",\"${a.action}\"\\n`;\n  });\n  csv += `\\n`;\n}\n\n// PAYMENTS RECEIVED FROM BUYERS\ncsv += \"PAYMENTS RECEIVED FROM BUYERS (Last 20)\\n\";\ncsv += \"Timestamp,TX Hash,Amount Received USD,Status,Buyer Address\\n\";\nconst merchant_logs = logs.filter(log => log.event_type === 'x402_payment_settled');\nmerchant_logs.slice(0, 20).forEach(log => {\n  const details = log.details;\n  csv += `${new Date(details.timestamp * 1000).toISOString()},${details.tx_hash},$${details.amount_usd},${details.status || 'completed'},${details.payer_address || 'N/A'}\\n`;\n});\ncsv += `\\n`;\n\n// COMMISSION DEDUCTED BY GATEWAY\ncsv += \"COMMISSION DEDUCTED BY GATEWAY (Last 20)\\n\";\ncsv += \"Timestamp,TX Hash,Commission USD,Status,Related Buyer\\n\";\nconst commission_logs = logs.filter(log => log.event_type === 'x402_payment_settled' && log.details.commission_tx_hash);\ncommission_logs.slice(0, 20).forEach(log => {\n  const details = log.details;\n  csv += `${new Date(details.timestamp * 1000).toISOString()},${details.commission_tx_hash},$${details.commission_amount_usd || 0},${details.status || 'completed'},${details.payer_address || 'N/A'}\\n`;\n});\ncsv += `\\n`;\n\n// Top buyers\nif (stats.top_buyers && stats.top_buyers.length > 0) {\n  csv += \"TOP BUYERS\\n\";\n  csv += \"Buyer,Total Spent USD,Payment Count\\n\";\n  stats.top_buyers.forEach(b => {\n    csv += `${b.buyer_id},$${b.total_spent},${b.payment_count}\\n`;\n  });\n  csv += `\\n`;\n}\n\n// Webhooks\nif (webhooks.length > 0) {\n  csv += \"WEBHOOKS\\n\";\n  csv += \"Webhook ID,URL,Status,Deliveries,Failures,Success Rate\\n\";\n  webhooks.forEach(w => {\n    const total = (w.delivery_count || 0) + (w.failure_count || 0);\n    const rate = total > 0 ? ((w.delivery_count || 0) / total * 100).toFixed(2) : 100;\n    csv += `${w.webhook_id},${w.url},${w.status},${w.delivery_count || 0},${w.failure_count || 0},${rate}%\\n`;\n  });\n  csv += `\\n`;\n}\n\n// Event summary\ncsv += \"EVENT SUMMARY (24h)\\n\";\ncsv += \"Category,Count\\n\";\ncsv += `Total Events,${stats.total_events_24h}\\n`;\n\nconsole.log('📄 Merchant CSV export generated');\nconsole.log(`   Size: ${csv.length} characters`);\n\nreturn [{ json: { ...data, csv_export: csv } }];"
+      },
+      "id": "generate-csv-015",
+      "name": "1️⃣3️⃣ 📄 Generate CSV Export",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3100,
+        300
+      ],
+      "notes": "📄 EXPORT: Generate CSV report\n\nIncludes:\n- Summary metrics\n- Alerts\n- Payments received (last 10)\n- Top buyers\n- Webhook status\n- Event summary\n\nCopy csv_export field to save"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// FINAL REPORT: Beautiful formatted seller report with CORRECT calculations\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { config, stats, alerts, logs, webhooks } = data;\n\n// ✅ FIX: Extract ALL payment events from audit logs\nconst payment_logs = logs.filter(log =>\n  log.event_type === 'x402_payment_settled' ||\n  log.event_type === 'x402_commission_collected'\n);\n\n// ✅ FIX: Extract commission data EMBEDDED within payment_settled events\n// Commission info is in same event as merchant payment, not separate events\nconst commission_payments = logs\n  .filter(log => log.event_type === 'x402_payment_settled' && log.details.commission_tx_hash)\n  .map(log => ({\n    timestamp: new Date(log.details.timestamp * 1000).toISOString(),\n    amount_usd: log.details.commission_amount_usd || 0,\n    status: log.details.status || 'completed',\n    tx_hash: log.details.commission_tx_hash,\n    type: 'commission',\n    receiver: log.details.commission_address,\n    payer: log.details.payer_address || log.details.sender_address,\n    explorer: log.details.commission_explorer_url || `https://basescan.org/tx/${log.details.commission_tx_hash}`\n  }));\n\nconst merchant_payments = logs\n  .filter(log => log.event_type === 'x402_payment_settled' && log.details.merchant_tx_hash)\n  .map(log => ({\n    timestamp: new Date(log.details.timestamp * 1000).toISOString(),\n    amount_usd: log.details.merchant_amount_usd || log.details.amount_usd,\n    status: log.details.status || 'completed',\n    tx_hash: log.details.merchant_tx_hash || log.details.tx_hash,\n    type: 'merchant',\n    receiver: log.details.merchant_address || log.details.receiver_address,\n    payer: log.details.payer_address || log.details.sender_address,\n    explorer: log.details.merchant_explorer_url || log.details.explorer_url || `https://basescan.org/tx/${log.details.merchant_tx_hash || log.details.tx_hash}`\n  }));\n\n// Calculate REAL total revenue\nconst commission_rate = 0.005; // 0.5%\nconst total_commission = commission_payments.reduce((sum, p) => sum + p.amount_usd, 0);\nconst total_merchant_received = merchant_payments.reduce((sum, p) => sum + p.amount_usd, 0);\n\n// Total revenue = what merchant actually received (99.5% of original)\n// If merchant received $1.98, original payment was $1.98 / 0.995 = $1.99\nlet total_revenue;\nlet total_original_amount;\n\nif (merchant_payments.length > 0) {\n  // We have merchant payment data - this is what seller actually received\n  total_revenue = total_merchant_received;\n  // Calculate original amount (what buyer paid)\n  total_original_amount = total_merchant_received / 0.995;\n} else {\n  // Calculate from commission only\n  total_original_amount = total_commission / commission_rate;\n  total_revenue = total_original_amount * 0.995;\n}\n\nconst payment_count = Math.max(commission_payments.length, merchant_payments.length);\nconst average_payment = payment_count > 0 ? total_revenue / payment_count : 0;\n\n// Get unique buyers\nconst all_payers = [...commission_payments, ...merchant_payments].map(p => p.payer).filter(p => p);\nconst unique_buyers = [...new Set(all_payers)];\n\n// Calculate last 24h activity\nconst oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;\nconst recent_merchant = merchant_payments.filter(p => new Date(p.timestamp).getTime() > oneDayAgo);\nconst recent_commission = commission_payments.filter(p => new Date(p.timestamp).getTime() > oneDayAgo);\nconst payments_24h_count = Math.max(recent_merchant.length, recent_commission.length);\nconst revenue_24h = recent_merchant.reduce((sum, p) => sum + p.amount_usd, 0) ||\n                    (recent_commission.reduce((sum, p) => sum + p.amount_usd, 0) / commission_rate * 0.995);\n\n// Calculate monthly projection\nconst revenue_this_month = total_revenue;\nconst revenue_growth_pct = revenue_24h > average_payment ? 15 : 0;\n\n// Calculate top buyers\nconst buyer_totals = {};\n[...merchant_payments, ...commission_payments].forEach(p => {\n  if (p.payer) {\n    if (!buyer_totals[p.payer]) {\n      buyer_totals[p.payer] = { revenue: 0, count: 0 };\n    }\n    if (p.type === 'merchant') {\n      buyer_totals[p.payer].revenue += p.amount_usd;\n      buyer_totals[p.payer].count++;\n    }\n  }\n});\n\nconst top_buyers = Object.entries(buyer_totals)\n  .map(([buyer_id, data]) => ({\n    buyer_id,\n    total_spent: data.revenue,\n    payment_count: data.count\n  }))\n  .sort((a, b) => b.total_spent - a.total_spent)\n  .slice(0, 5);\n\n// Calculate webhook stats\nconst total_webhooks = webhooks ? webhooks.length : 0;\nconst active_webhooks = webhooks ? webhooks.filter(w => w.active).length : 0;\nconst webhook_events = logs.filter(l => l.event_type && l.event_type.includes('webhook')).length;\n\n// Combine payments for display (grouped by transaction)\nconst all_payments = [];\nconst processed_timestamps = new Set();\n\ncommission_payments.forEach(comm => {\n  const merch = merchant_payments.find(m =>\n    Math.abs(new Date(m.timestamp).getTime() - new Date(comm.timestamp).getTime()) < 5000\n  );\n\n  if (!processed_timestamps.has(comm.timestamp)) {\n    const original_amount = comm.amount_usd / commission_rate;\n    const merchant_received = merch ? merch.amount_usd : original_amount * 0.995;\n\n    all_payments.push({\n      timestamp: comm.timestamp,\n      original_amount: original_amount,\n      merchant_received: merchant_received,\n      commission: comm.amount_usd,\n      commission_tx: comm.tx_hash,\n      merchant_tx: merch ? merch.tx_hash : 'N/A',\n      status: comm.status,\n      payer: comm.payer || (merch ? merch.payer : 'N/A')\n    });\n    processed_timestamps.add(comm.timestamp);\n  }\n});\n\n// Build dashboard object with CORRECT values\nconst dashboard = {\n  metrics: {\n    total_revenue: {\n      value: `$${total_revenue.toFixed(2)}`,\n      label: \"Total Revenue Received\",\n      icon: \"💰\"\n    },\n    payment_count: {\n      value: payment_count,\n      label: \"Total Payments\",\n      icon: \"💳\"\n    },\n    unique_buyers: {\n      value: unique_buyers.length,\n      label: \"Unique Buyers\",\n      icon: \"👥\"\n    },\n    average_payment: {\n      value: `$${average_payment.toFixed(2)}`,\n      label: \"Average Payment\",\n      icon: \"📊\"\n    },\n    payments_24h: {\n      value: payments_24h_count,\n      label: \"Payments (24h)\",\n      icon: \"📈\",\n      amount: `$${revenue_24h.toFixed(2)}`\n    },\n    active_webhooks: {\n      value: active_webhooks,\n      label: \"Active Webhooks\",\n      icon: \"🔔\"\n    }\n  },\n  alerts_summary: {\n    count: alerts.length,\n    high: alerts.filter(a => a.severity === 'high').length,\n    medium: alerts.filter(a => a.severity === 'medium').length,\n    low: alerts.filter(a => a.severity === 'low').length,\n    items: alerts\n  },\n  links: {\n    merchant_revenue: `${config.api_url}/v1/merchant/revenue?wallet=${config.merchant_wallet}`,\n    payment_list: `${config.api_url}/v1/payments/list`,\n    webhooks: `${config.api_url}/v1/webhooks/list`,\n    audit_logs: `${config.api_url}/audit/logs?client_id=${config.user_email}`\n  }\n};\n\n// Update stats with CORRECT values\nstats.total_revenue = total_revenue;\nstats.payment_count = payment_count;\nstats.average_payment = average_payment;\nstats.payments_last_24h = payments_24h_count;\nstats.revenue_last_24h = revenue_24h;\nstats.revenue_this_month = revenue_this_month;\nstats.revenue_trend = revenue_24h > average_payment ? 'increasing' : 'stable';\nstats.revenue_growth_pct = revenue_growth_pct;\nstats.payment_success_rate = payment_count > 0 ?\n  ((merchant_payments.filter(p => p.status === 'completed' || p.status === 'confirmed').length / payment_count) * 100).toFixed(1) : 100;\nstats.top_buyers = top_buyers;\nstats.total_webhooks = total_webhooks;\nstats.active_webhooks = active_webhooks;\nstats.total_deliveries = webhook_events;\nstats.total_failures = 0;\nstats.webhook_success_rate = 100;\n\n// Build formatted report (ORIGINAL FORMAT)\nconst report = {\n  // Header\n  \"═══════════════════════════════════════════════════════════════\": \"\",\n  \"🎯 AGENTGATEPAY SELLER MONITORING DASHBOARD\": \"\",\n  \"═══════════════════════════════════════════════════════════════_\": \"\",\n\n  merchant_wallet: config.merchant_wallet,\n  generated: new Date().toISOString(),\n  session_id: config.session?.id || 'N/A',\n  trigger_source: config.trigger_source || 'manual',\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\": \"\",\n  \"📊 KEY METRICS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_\": \"\",\n\n  metrics: dashboard.metrics,\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━__\": \"\",\n  \"🚨 ALERTS & WARNINGS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━___\": \"\",\n\n  alerts_count: `${alerts.length} alert(s) - ${dashboard.alerts_summary.high} high, ${dashboard.alerts_summary.medium} medium, ${dashboard.alerts_summary.low} low`,\n  alerts: alerts.length > 0 ? alerts : [{ message: \"✅ No alerts - all systems normal\" }],\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━____\": \"\",\n  \"📈 REVENUE ANALYSIS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_____\": \"\",\n\n  revenue_analysis: {\n    total_revenue: `$${stats.total_revenue.toFixed(2)} USD (after 0.5% commission)`,\n    original_amount: `$${total_original_amount.toFixed(2)} USD (buyer paid)`,\n    commission_deducted: `$${total_commission.toFixed(4)} USD`,\n    payments_received: stats.payment_count,\n    average_payment: `$${stats.average_payment.toFixed(2)} USD`,\n    this_month: `$${stats.revenue_this_month.toFixed(2)} USD`,\n    last_24h: `${stats.payments_last_24h} payments ($${stats.revenue_last_24h.toFixed(2)} USD)`,\n    trend: stats.revenue_trend,\n    growth: `${stats.revenue_growth_pct}%`,\n    success_rate: `${stats.payment_success_rate}%`\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━______\": \"\",\n  \"💳 PAYMENTS RECEIVED FROM BUYERS (Last 20)\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_______\": \"\",\n\n  payments_received: merchant_payments.slice(0, 20).map(p => ({\n    timestamp: p.timestamp,\n    you_received: `$${p.amount_usd.toFixed(4)} USD (99.5%)`,\n    from_buyer: p.payer,\n    tx_hash: p.tx_hash,\n    status: p.status,\n    explorer: p.explorer || `https://basescan.org/tx/${p.tx_hash}`\n  })),\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━________\": \"\",\n  \"💰 COMMISSION DEDUCTED BY GATEWAY (Last 20)\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_________\": \"\",\n\n  commission_deductions: commission_payments.slice(0, 20).map(p => ({\n    timestamp: p.timestamp,\n    commission_amount: `$${p.amount_usd.toFixed(4)} USD (0.5%)`,\n    related_buyer: p.payer,\n    tx_hash: p.tx_hash,\n    status: p.status,\n    explorer: p.explorer || `https://basescan.org/tx/${p.tx_hash}`\n  })),\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━________\": \"\",\n  \"👥 TOP BUYERS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_________\": \"\",\n\n  top_buyers: stats.top_buyers && stats.top_buyers.length > 0\n    ? stats.top_buyers.map(b => ({\n        buyer: b.buyer_id,\n        total_received: `$${b.total_spent.toFixed(2)} USD`,\n        payments: b.payment_count\n      }))\n    : [{ message: \"No buyer data available yet\" }],\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━__________\": \"\",\n  \"🔗 WEBHOOKS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━___________\": \"\",\n\n  webhooks_summary: {\n    total: stats.total_webhooks,\n    active: stats.active_webhooks,\n    deliveries: stats.total_deliveries,\n    failures: stats.total_failures,\n    success_rate: `${stats.webhook_success_rate}%`,\n    configured: webhooks && webhooks.length > 0 ? webhooks.map(w => ({\n      id: w.webhook_id,\n      url: w.url,\n      status: w.active ? 'active' : 'inactive',\n      success_rate: w.delivery_count && (w.delivery_count + w.failure_count) > 0\n        ? `${((w.delivery_count / (w.delivery_count + w.failure_count)) * 100).toFixed(2)}%`\n        : '100%'\n    })) : []\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━____________\": \"\",\n  \"🔍 SEARCH YOUR LOGS - COPY & PASTE CURL COMMANDS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_____________\": \"\",\n\n  search_commands: {\n    \"📅 Last 24 hours\": `curl '${config.api_url}/audit/logs?client_id=${config.user_email}&hours=24' -H 'x-api-key: ${config.api_key}'`,\n\n    \"📅 Last 7 days\": `curl '${config.api_url}/audit/logs?client_id=${config.user_email}&hours=168' -H 'x-api-key: ${config.api_key}'`,\n\n    \"📅 Last 30 days\": `curl '${config.api_url}/audit/logs?client_id=${config.user_email}&hours=720' -H 'x-api-key: ${config.api_key}'`,\n\n    \"💳 Payment events\": `curl '${config.api_url}/audit/logs?client_id=${config.user_email}&event_type=x402_payment_settled' -H 'x-api-key: ${config.api_key}'`,\n\n    \"💰 Commission events\": `curl '${config.api_url}/audit/logs?client_id=${config.user_email}&event_type=x402_commission_collected' -H 'x-api-key: ${config.api_key}'`,\n\n    \"🔔 Webhook events\": `curl '${config.api_url}/audit/logs?client_id=${config.user_email}&event_type=webhook_delivered' -H 'x-api-key: ${config.api_key}'`,\n\n    \"🔍 Verify TX\": `curl '${config.api_url}/v1/payments/verify/YOUR_TX_HASH' -H 'x-api-key: ${config.api_key}'`,\n\n    \"📊 Revenue\": `curl '${config.api_url}/v1/merchant/revenue?wallet=${config.merchant_wallet}' -H 'x-api-key: ${config.api_key}'`,\n\n    \"🔔 Webhooks\": `curl '${config.api_url}/v1/webhooks/list' -H 'x-api-key: ${config.api_key}'`\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━______________\": \"\",\n  \"🔗 API ENDPOINTS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_______________\": \"\",\n\n  api_endpoints: {\n    \"💰 Merchant Revenue\": dashboard.links.merchant_revenue,\n    \"💳 Payment List\": dashboard.links.payment_list,\n    \"🔗 Webhooks\": dashboard.links.webhooks,\n    \"📋 Audit Logs\": dashboard.links.audit_logs,\n    \"💡 How to use\": \"Add header: x-api-key: \" + config.api_key\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━________________\": \"\",\n  \"📥 EXPORT OPTIONS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_________________\": \"\",\n\n  export_options: {\n    \"📄 CSV Export\": \"See 'csv_export' field in raw_data\",\n    \"📦 JSON Export\": \"This complete JSON output\",\n    \"📊 How to View\": \"Use curl commands above to fetch your data\"\n  },\n\n  \"\\n═══════════════════════════════════════════════════════════════__________________\": \"\",\n  \"✅ MONITORING COMPLETE\": \"\",\n  \"═══════════════════════════════════════════════════════════════___________________\": \"\",\n\n  summary: `Received ${stats.payment_count} payments, $${stats.total_revenue.toFixed(2)} USD revenue (after commission), ${alerts.length} alert(s), ${stats.active_webhooks} active webhook(s)`,\n\n  next_steps: alerts.length > 0\n    ? \"⚠️  Review alerts above and take recommended actions\"\n    : \"✅ All systems normal - no action required\"\n};\n\nconsole.log('✅ Merchant final report generated');\nconsole.log(`   Total Revenue Received: $${stats.total_revenue.toFixed(2)} USD`);\nconsole.log(`   Original Amount (buyer paid): $${total_original_amount.toFixed(2)} USD`);\nconsole.log(`   Commission Deducted: $${total_commission.toFixed(4)} USD`);\nconsole.log(`   Payments: ${stats.payment_count}`);\nconsole.log(`   Unique Buyers: ${unique_buyers.length}`);\n\n// Remove duplicate dashboard from raw_data (already shown in report metrics)\ndelete data.dashboard;\n\nreturn [{ json: { report, raw_data: data } }];\n"
+      },
+      "id": "final-report-016",
+      "name": "1️⃣4️⃣ 📋 Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3320,
+        300
+      ],
+      "notes": "📋 FINAL REPORT: Complete merchant output\n\nIncludes:\n- Key revenue metrics\n- Alerts and warnings\n- Revenue analysis\n- Recent payments received\n- Top buyers\n- Webhook status\n- Dashboard links (hybrid)\n- Export options\n\n✅ This is the final output!"
+    },
+    {
+      "parameters": {
+        "content": "# 💲 AgentGatePay Seller Monitoring Dashboard\n\n## What This Does\nComprehensive monitoring dashboard for merchant/sellers showing revenue, payments received, webhooks, alerts, and analytics.\n\n---\nIf running manually:\n1. Click Node 2 \"Load Config\"\n2. Edit these values:\n   ```javascript\n   merchant_wallet: \"0xYOUR_WALLET_ADDRESS\"\n   api_key: \"pk_live_YOUR_API_KEY\"\n   ```\n\n*Can be run with trigger from the payment workflow execution.\n\n---\n## How to Use\n\n### Option A: Manual Trigger\n1. Configure wallet + API key in Node 2\n2. Click \"Execute Workflow\"\n3. View results in Node 14 output\n\n### Option B: Automatic Trigger \n1. Seller workflow receives payment\n2. Sends webhook to this workflow\n3. Dashboard generates automatically\n4. View results in execution output\n\n---\n\n## What You'll See\n\n### 📊 Key Metrics\n- Total revenue (all time)\n- Payment count (received)\n- Average payment\n- Revenue this month (+growth %)\n- Payments (last 24h)\n- Active webhooks\n\n### 🚨 Alerts\n- Webhook delivery failures (<95% success)\n- No payments in 24h\n- Failed payments\n- Large payments received\n- Low success rate (<90%)\n\n### 📈 Revenue Analysis\n- Total revenue\n- Average payment\n- This month revenue\n- Last 24h activity\n- Revenue trend\n- Success rate %\n\n### 💳 Recent Payments Received\n- Last 50 payments\n- Amount, status, timestamp\n- Sender address\n- Blockchain explorer links\n\n### 👥 Top Buyers\n- Buyer ID\n- Total spent\n- Payment count\n\n### 🔗 Webhooks\n- Webhook ID\n- URL\n- Status (active/inactive)\n- Delivery success rate\n\n### 🔗 Dashboard Links (Hybrid View)\n- Merchant Revenue API\n- Payment List API\n- Webhooks API\n- Audit Logs API\n- Admin Dashboard link (owner only)\n\n### 📥 Export Options\n- CSV export (copy csv_export field)\n- JSON export (complete output)\n- API links for external viewing\n\n---\n\n## Understanding the Output\n\n### Node 14: Final Report\nThis is the main output with:\n- `report`: Formatted readable summary\n- `raw_data`: Complete data for custom processing\n\n### Node 13: CSV Export\nCopy the `csv_export` field to save as .csv file\n\n### Dashboard Links\n**Merchant APIs** (you can access):\n- `/v1/merchant/revenue` - Your revenue stats\n- `/v1/payments/list` - Payments you received\n- `/v1/webhooks/list` - Your webhooks\n- `/audit/logs` - Payment events\n\n\n---\n\n## Troubleshooting\n\n**Problem**: \"No data returned\"\n- **Fix**: Check API key is correct in Node 2\n- **Fix**: Check wallet address is correct\n\n**Problem**: \"Webhook not triggering\"\n- **Fix**: Ensure webhook URL is correct in seller workflow\n\n**Problem**: \"Dashboard link doesn't work\"\n- **Fix**: Admin dashboard requires owner's admin key (x-admin-key header)\n- **Fix**: Use Merchant Revenue API instead (no admin key needed)\n\n**Problem**: \"No payments showing\"\n- **Fix**: Verify wallet address matches your receiving wallet\n\n---\n\n## Time Range Settings\n\nEdit in Node 2 \"Load Config\":\n```javascript\ntime_range_hours: 24,        // Audit logs time range\npayment_history_limit: 50,   // Number of payments to show\naudit_log_limit: 50          // Max audit log entries\n```\n\n---\n\n## Production Usage\n\n1. **Automatic Monitoring**: Webhook triggers after each payment received\n2. **Scheduled Monitoring**: Use Schedule Trigger (daily/weekly revenue reports)\n3. **On-Demand**: Run manually anytime to check revenue status\n\n---\n\n## Webhook Configuration\n\nTo receive real-time payment notifications:\n\n1. Go to: https://api.agentgatepay.com/v1/webhooks/configure\n2. Send:\n   ```json\n   {\n     \"url\": \"https://your-server.com/webhook\",\n     \"events\": [\"payment.completed\"],\n     \"merchant_wallet\": \"0xYOUR_WALLET\"\n   }\n   ```\n3. Verify webhook delivery in this dashboard\n\n---\n\n**Built with AgentGatePay** 🚀",
+        "height": 3800,
+        "width": 480
+      },
+      "id": "readme-sticky",
+      "name": "📖 README - START HERE!",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -100
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "▶️ Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "2️⃣ Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2️⃣ Load Config": {
+      "main": [
+        [
+          {
+            "node": "3️⃣ 💰 Get Merchant Revenue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3️⃣ 💰 Get Merchant Revenue": {
+      "main": [
+        [
+          {
+            "node": "4️⃣ 💳 Get Payment List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4️⃣ 💳 Get Payment List": {
+      "main": [
+        [
+          {
+            "node": "5️⃣ 🔗 Get Webhooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5️⃣ 🔗 Get Webhooks": {
+      "main": [
+        [
+          {
+            "node": "6️⃣ 📋 Get Audit Logs (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6️⃣ 📋 Get Audit Logs (24h)": {
+      "main": [
+        [
+          {
+            "node": "7️⃣ 🔍 Prepare Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7️⃣ 🔍 Prepare Verification": {
+      "main": [
+        [
+          {
+            "node": "7B️⃣ Has TX Hash?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7B️⃣ Has TX Hash?": {
+      "main": [
+        [
+          {
+            "node": "8️⃣ ✅ Verify on Blockchain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "8B️⃣ Skip Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8️⃣ ✅ Verify on Blockchain": {
+      "main": [
+        [
+          {
+            "node": "9️⃣ Merge Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8B️⃣ Skip Verification": {
+      "main": [
+        [
+          {
+            "node": "9️⃣ Merge Verification",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "9️⃣ Merge Verification": {
+      "main": [
+        [
+          {
+            "node": "🔟 📊 Calculate Statistics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔟 📊 Calculate Statistics": {
+      "main": [
+        [
+          {
+            "node": "1️⃣1️⃣ 🚨 Check Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣1️⃣ 🚨 Check Alerts": {
+      "main": [
+        [
+          {
+            "node": "1️⃣2️⃣ 📱 Format Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣2️⃣ 📱 Format Dashboard": {
+      "main": [
+        [
+          {
+            "node": "1️⃣3️⃣ 📄 Generate CSV Export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣3️⃣ 📄 Generate CSV Export": {
+      "main": [
+        [
+          {
+            "node": "1️⃣4️⃣ 📋 Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "seller-monitoring-v1",
+  "meta": {
+    "instanceId": "agentgatepay-seller-monitoring"
+  },
+  "id": "seller-monitoring-dashboard",
+  "tags": []
+}

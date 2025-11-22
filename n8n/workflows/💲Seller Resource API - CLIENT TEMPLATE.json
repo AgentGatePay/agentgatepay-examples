@@ -1,0 +1,355 @@
+{
+  "name": "💲Seller Resource API - CLIENT TEMPLATE",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "resource/:resourceId",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "0523a01d-c41d-4df0-8a9a-814da0bee979",
+      "name": "📡 GET /resource/{id}",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        432,
+        112
+      ],
+      "webhookId": "c30628ad-035b-4a23-a57d-9daed4a3c1f8",
+      "notes": "PUBLIC ENDPOINT\n\n✅ NO EDITS NEEDED\n\nCopy webhook URL after activating!"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// 📋 SELLER CONFIGURATION (EDIT THESE 2 VALUES!)\n// ═══════════════════════════════════════════════════════\n\nconst SELLER_CONFIG = {\n  merchant: {\n    name: \"DataBot Pro\",\n    company: \"MarketInsights AI Ltd.\",\n    email: \"n8n-merchant-demo@example.com\",\n    \n    // YOUR BASE WALLET ADDRESS (where you receive USDC)\n    wallet_address: \"YOUR_WALLET_ADDRESS\",\n    \n    // YOUR AGENTGATEPAY API KEY\n    api_key: \"YOUR_AGENTPAY_API_KEY\"\n  },\n  \n  payment: {\n    token: \"USDC\",\n    chain: \"base\"\n  },\n  \n  catalog: {\n    \"saas-competitors-2025\": {\n      id: \"saas-competitors-2025\",\n      title: \"Top 5 SaaS Competitors Analysis 2025\",\n      price_usd: 0.01,\n      preview: \"Salesforce (19.8%), HubSpot (8.5%), Zendesk (6.2%)...\"\n    }\n  }\n};\n\n// ═══════════════════════════════════════════════════════\n// VALIDATION (DO NOT EDIT)\n// ═══════════════════════════════════════════════════════\n\nconst errors = [];\n\nif (SELLER_CONFIG.merchant.wallet_address === \"0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB\") {\n  errors.push(\"❌ wallet_address not configured\");\n}\n\nif (SELLER_CONFIG.merchant.api_key === \"YOUR_AGENTPAY_API_KEY\") {\n  errors.push(\"❌ api_key not configured\");\n}\n\nif (errors.length > 0) {\n  return [{\n    json: {\n      route: \"error_config\",\n      http_response: {\n        statusCode: 500,\n        message: \"Seller configuration incomplete\",\n        errors: errors\n      }\n    }\n  }];\n}\n\n// ═══════════════════════════════════════════════════════\n// PARSE REQUEST (DO NOT EDIT)\n// ═══════════════════════════════════════════════════════\n\nconst request = $input.first().json;\nconst resource_id = request.params?.resourceId || request.query?.resourceId;\nconst headers = request.headers || {};\n\nconst payment_tx_hash = headers['x-payment'] || headers['X-Payment'];\nconst agent_id = headers['x-agent-id'] || headers['X-Agent-Id'];\n\nconst resource = SELLER_CONFIG.catalog[resource_id];\n\nif (!resource) {\n  return [{\n    json: {\n      route: \"error_404\",\n      http_response: {\n        statusCode: 404,\n        message: \"Resource not found\",\n        resource_id: resource_id,\n        available: Object.keys(SELLER_CONFIG.catalog)\n      }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    config: SELLER_CONFIG,\n    resource: resource,\n    request: {\n      resource_id: resource_id,\n      agent_id: agent_id,\n      payment_tx_hash: payment_tx_hash,\n      has_payment: !!payment_tx_hash\n    },\n    route: payment_tx_hash ? \"verify_payment\" : \"return_402\"\n  }\n}];"
+      },
+      "id": "717a4a00-6c56-4484-bfd0-205b19aa7f7c",
+      "name": "1️⃣ Parse Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        112
+      ],
+      "notes": "🔧 EDIT THIS NODE!\n\nReplace 2 values:\n1. wallet_address\n2. api_key"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-payment",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "verify_payment",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ee478703-17c5-4749-9b16-41278eb453d2",
+      "name": "2️⃣ Has Payment?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        832,
+        112
+      ],
+      "notes": "✅ NO EDITS NEEDED"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst config = data.config;\nconst resource = data.resource;\n\nconst token_decimals = config.payment.token === \"DAI\" ? 18 : 6;\nconst amount = Math.floor(resource.price_usd * Math.pow(10, token_decimals));\nconst nonce = `nonce_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\n\nconst response_402 = {\n  statusCode: 402,\n  message: \"Payment Required\",\n  protocol: \"x402\",\n  \n  payTo: config.merchant.wallet_address,\n  amount: amount.toString(),\n  token: config.payment.token,\n  chain: config.payment.chain,\n  priceUsd: resource.price_usd.toString(),\n  nonce: nonce,\n  \n  resource: {\n    id: resource.id,\n    title: resource.title,\n    preview: resource.preview\n  },\n  \n  merchant: {\n    name: config.merchant.name,\n    email: config.merchant.email\n  },\n  \n  instructions: [\n    `1. Send ${amount} ${config.payment.token} to ${config.merchant.wallet_address}`,\n    `2. Wait for confirmation`,\n    `3. Retry with header: x-payment: {tx_hash}`\n  ]\n};\n\nreturn [{\n  json: {\n    http_response: response_402\n  }\n}];"
+      },
+      "id": "87a30aea-746d-440a-bd86-adcc1c1bbfdf",
+      "name": "3️⃣ Generate 402",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "notes": "✅ NO EDITS NEEDED"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.http_response) }}",
+        "options": {}
+      },
+      "id": "b7110ff0-1eab-48bc-a6fa-7eab81f4ff04",
+      "name": "4️⃣ Send 402",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        0
+      ],
+      "notes": "✅ NO EDITS NEEDED"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.agentgatepay.com/v1/payments/verify/{{ $('1️⃣ Parse Request').first().json.request.payment_tx_hash }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('1️⃣ Parse Request').first().json.config.merchant.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c73f448-f393-4b9d-b348-17129b6ccf6a",
+      "name": "5️⃣ Verify Payment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        208
+      ],
+      "notes": "✅ NO EDITS NEEDED"
+    },
+    {
+      "parameters": {
+        "jsCode": "const request_data = $('1️⃣ Parse Request').first().json;\n  const verification = $input.first().json;\n  const config = request_data.config;\n  const resource = request_data.resource;\n\n// Check if verification succeeded\n  if (!verification.verified) {\n    return [{\n      json: {\n        route: \"validation_failed\",\n        http_response: {\n          statusCode: 400,\n          error: \"Payment verification failed\",\n          verified: verification.verified,\n          details: verification.error || \"Payment not found\"\n        }\n      }\n    }];\n  }\n\n  const recipient_ok = verification.to_address.toLowerCase() === config.merchant.wallet_address.toLowerCase();\n  if (!recipient_ok) {\n    return [{\n      json: {\n        route: \"validation_failed\",\n        http_response: {\n          statusCode: 400,\n          error: \"Wrong recipient\",\n          expected: config.merchant.wallet_address,\n          received: verification.to_address\n        }\n      }\n    }];\n  }\n\n  const amount_ok = Math.abs(verification.amount_usd - resource.price_usd) < 0.01;\n  if (!amount_ok) {\n    return [{\n      json: {\n        route: \"validation_failed\",\n        http_response: {\n          statusCode: 400,\n          error: \"Wrong amount\",\n          expected_usd: resource.price_usd,\n          received_usd: verification.amount_usd\n        }\n      }\n    }];\n  }\n\n  return [{\n    json: {\n      ...request_data,\n      verification: verification,\n      route: \"validation_passed\"\n    }\n  }];"
+      },
+      "id": "23d63db3-978a-484c-9272-98c9f2da96d3",
+      "name": "6️⃣ Validate Payment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        208
+      ],
+      "notes": "🧪 TEST MODE ACTIVE!\n\nBypasses AgentGatePay verification.\nALWAYS returns validation_passed.\n\n⚠️ REMOVE BEFORE PRODUCTION!"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "validation-passed",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "validation_passed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f421b554-a788-40e9-aa4e-2a01f0fad04f",
+      "name": "6B️⃣ Route: Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        208
+      ],
+      "notes": "✅ NEW v3.2:\nRoutes valid payments to resource delivery"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst resource = data.resource;\nconst verification = data.verification;\n\nconst full_data = {\n  success: true,\n  resource_id: resource.id,\n  title: resource.title,\n  price_paid_usd: verification.amountUsd,\n  \n  data: {\n    competitors: [\n      {\n        rank: 1,\n        name: \"Salesforce\",\n        market_share: \"19.8%\",\n        revenue_2024: \"$34.9B\"\n      },\n      {\n        rank: 2,\n        name: \"HubSpot\",\n        market_share: \"8.5%\",\n        revenue_2024: \"$2.2B\"\n      },\n      {\n        rank: 3,\n        name: \"Zendesk\",\n        market_share: \"6.2%\",\n        revenue_2024: \"$1.7B\"\n      },\n      {\n        rank: 4,\n        name: \"Freshworks\",\n        market_share: \"4.1%\",\n        revenue_2024: \"$596M\"\n      },\n      {\n        rank: 5,\n        name: \"Zoho CRM\",\n        market_share: \"3.8%\",\n        revenue_2024: \"$1.1B\"\n      }\n    ],\n    market_analysis: {\n      total_market_size_2024: \"$69.8B\",\n      cagr: \"13.3%\",\n      key_trends: [\n        \"AI-powered insights\",\n        \"Mobile-first experiences\",\n        \"Unified customer data platforms\"\n      ]\n    }\n  },\n  \n  payment: {\n    tx_hash: verification.txHash,\n    verified: true,\n    paid_by: verification.sender,\n    amount_usd: verification.amountUsd\n  },\n  \n  delivered_at: new Date().toISOString()\n};\n\nreturn [{\n  json: {\n    http_response: full_data\n  }\n}];"
+      },
+      "id": "e6b84ce2-4a4c-47aa-a708-91e7c2e7619b",
+      "name": "7️⃣ Deliver Resource",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        112
+      ],
+      "notes": "✅ v3.2:\nCreates full resource response"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.http_response) }}",
+        "options": {}
+      },
+      "id": "af62e6eb-84ae-4e31-a7a0-f665343e7126",
+      "name": "8️⃣ Send 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1872,
+        112
+      ],
+      "notes": "✅ Sends success response with body"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.http_response) }}",
+        "options": {}
+      },
+      "id": "3cbb0656-2bd2-4699-8e48-b97b89cba4a6",
+      "name": "9️⃣ Send Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1664,
+        304
+      ],
+      "notes": "✅ Sends error response with body"
+    },
+    {
+      "parameters": {
+        "content": "## 💲SELLER RESOURCE API - Quick Setup Guide\n\n### What This Workflow Does\n**Sells digital resources to AI agents using AgentGatePay payment gateway**\n\nWhen an AI agent requests your resource:\n1. **First Request** → Returns 402 Payment Required (with payment details)\n2. **Second Request** (with payment proof) → Verifies payment → Delivers resource\n\n---\n\n## 🚀 Quick Setup (3 Steps)\n\n### Step 1: Configure Your Details (Node 1)\n**Click Node 1 \"Parse Request\"** and edit these 3 values:\n\n```javascript\nmerchant: {\n  email: \"YOUR_MERCHANT_EMAIL@example.com\",\n  wallet_address: \"YOUR_BASE_WALLET_ADDRESS\",  // Where you receive USDC\n  api_key: \"YOUR_AGENTPAY_API_KEY\"            // From signup\n}\n```\n\n**How to get these:**\n- **Email**: Any email you want to use\n- **Wallet Address**: Your Base network wallet (e.g., Coinbase Wallet, MetaMask)\n- **API Key**: Signup at https://api.agentgatepay.com/v1/users/signup\n\n### Step 2: Activate Workflow\n1. Click **\"Active\"** toggle in top-right\n2. Workflow starts listening for requests\n\n### Step 3: Copy Webhook URL\n1. Click **Node \"📡 GET /resource/{id}\"**\n2. Copy the **Production URL**\n3. Share this URL with buyer agents\n\nExample URL format:\n```\nhttps://YOUR-N8N-INSTANCE.app.n8n.cloud/webhook/seller-resource-api/myresource/saas-competitors-2025\n```\n\n---\n\n**Open Node 6 \"Validate Payment\":**\n- ✅ Payment exists in AgentGatePay\n- ✅ Correct recipient wallet\n- ✅ Correct payment amount ($0.01)\n- ✅ Transaction confirmed on blockchain\n\n---\n\n## 📦 What Resource Gets Delivered?\n\n**Edit Node 7 \"Deliver Resource\"** to change the data:\n\nCurrent resource (SaaS competitors analysis):\n- Top 5 competitors (Salesforce, HunbSpot, Zendesk, etc.)\n- Market share percentages\n- Revenue data\n- Market analysis\n\n**Replace with your own data:**\n```javascript\ndata: {\n  // Your custom resource data here\n  your_field: \"your_value\",\n  products: [...],\n  analysis: {...}\n}\n```\n---\n## 🧪 How to Test\n\n### Test 1: Payment Required Response\ncurl -i https://YOUR-N8N-URL/webhook/seller-resource-api/myresource/saas-competitors-2025\n\n# Expected: HTTP 402 with payment details\n```\n\n### Test 2: Resource Delivery (Test Mode)\ncurl -i -H \"x-payment: 0xANYTHING\" \\\n  https://YOUR-N8N-URL/webhook/seller-resource-api/myresource/saas-competitors-2025\n\n# Expected: HTTP 200 with full resource data\n```\n\n### Test 3: Run Buyer Workflow\n1. Give your webhook URL to buyer agent\n2. Buyer agent runs their workflow\n3. Check N8N execution logs to see payment flow\n\n---\n## 💰 How Payments Work\n\n### Payment Flow\n1. **Buyer Agent** sends coins to your wallet on crypto network\n2. **Buyer Agent** submits payment proof (tx_hash) to AgentGatePay\n3. **Your Workflow** asks AgentGatePay: \"Is this payment valid?\"\n4. **AgentGatePay** checks blockchain + validates amount/recipient\n5. **Your Workflow** delivers resource if valid\n\n### You Receive\n- **99.5%** of payment → Your wallet\n- **0.5%** commission → AgentGatePay (platform fee)\n\n**Example**: $0.01 resource = You get $0.00995, AgentGatePay gets $0.00005\n\n---\n## ⚙️ Customization Options\n\n### Change Resource Price\n**Edit Node 1:**\n```javascript\n\"saas-competitors-2025\": {\n  price_usd: 0.01,  // Change to: 0.05, 0.10, 1.00, etc.\n  ...\n}\n```\n\n### Add More Resources\n**Edit Node 1 catalog:**\n```javascript\ncatalog: {\n  \"resource-1\": {\n    id: \"resource-1\",\n    title: \"First Resource\",\n    price_usd: 0.01,\n    preview: \"Preview text...\"\n  },\n  \"resource-2\": {\n    id: \"resource-2\",\n    title: \"Second Resource\",\n    price_usd: 0.05,\n    preview: \"Another preview...\"\n  }\n}\n```\n\n### Change Token/Chain\n**Edit Node 1:**\n```javascript\npayment: {\n  token: \"USDC\",  // Options: USDC, USDT, DAI\n  chain: \"base\"   // Options: base, ethereum, polygon, arbitrum\n}\n```\n\n---\n\n## 🆘 Troubleshooting\n\n**Problem**: \"Seller configuration incomplete\" error\n- **Fix**: Edit Node 1 and replace all 3 placeholder values\n\n**Problem**: Workflow not receiving requests\n- **Fix**: Make sure workflow is **Active** (toggle in top-right)\n\n**Problem**: Wrong amount received\n- **Fix**: Check `price_usd` in Node 1 catalog matches what buyer expects\n\n---\n\n## 📊 Monitor Your Workflow\n\n**View Executions:**\n1. Go to: **Executions** tab\n2. Click any execution to see:\n   - Request details\n   - Payment verification results\n   - Resource delivery status\n   - Any errors\n\n**Common Execution Results:**\n- ✅ HTTP 402 → Buyer needs to pay\n- ✅ HTTP 200 → Payment verified, resource delivered\n- ❌ HTTP 400 → Invalid payment\n- ❌ HTTP 404 → Resource not found\n\n---\n\n## 📝 Summary\n**3 Required Edits:**\n1. Node 1 → merchant.email\n2. Node 1 → merchant.wallet_address  \n3. Node 1 → merchant.api_key\n\n**Optional Edits:**\n- Node 7 → Change resource data\n- Node 1 → Add more resources to catalog\n- Node 1 → Change price\n---\n\n**Questions?** Check AgentGatePay docs: https://agentgatepay.com\n**Need Help?** Email: support@agentgatepay.com\n",
+        "height": 4580,
+        "width": 500
+      },
+      "id": "40c36862-8188-435d-8e89-538e0da65577",
+      "name": "📖 README v3.2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        96
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "📡 GET /resource/{id}": {
+      "main": [
+        [
+          {
+            "node": "1️⃣ Parse Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣ Parse Request": {
+      "main": [
+        [
+          {
+            "node": "2️⃣ Has Payment?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "9️⃣ Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2️⃣ Has Payment?": {
+      "main": [
+        [
+          {
+            "node": "5️⃣ Verify Payment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "3️⃣ Generate 402",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3️⃣ Generate 402": {
+      "main": [
+        [
+          {
+            "node": "4️⃣ Send 402",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5️⃣ Verify Payment": {
+      "main": [
+        [
+          {
+            "node": "6️⃣ Validate Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6️⃣ Validate Payment": {
+      "main": [
+        [
+          {
+            "node": "6B️⃣ Route: Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6B️⃣ Route: Valid?": {
+      "main": [
+        [
+          {
+            "node": "7️⃣ Deliver Resource",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "9️⃣ Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7️⃣ Deliver Resource": {
+      "main": [
+        [
+          {
+            "node": "8️⃣ Send 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2733a26f-e5ca-4906-b017-985ef276e5de",
+  "meta": {
+    "instanceId": "89b251c2077923dfcf09df1af042f7170f6404c508d45b4769b8a7966f5bd226"
+  },
+  "id": "4tppz8a5iNwPPbVD",
+  "tags": []
+}

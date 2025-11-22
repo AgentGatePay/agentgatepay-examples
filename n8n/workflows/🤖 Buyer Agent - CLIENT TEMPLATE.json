@@ -1,0 +1,729 @@
+{
+  "name": "🤖 Buyer Agent - CLIENT TEMPLATE",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "3b8b8c66-030f-4c4e-9959-f0d5bb6f0108",
+      "name": "▶️ START",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        432,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const CONFIG = {\n  buyer: {\n    name: \"Research Assistant AI\",\n    company: \"Your Company\",\n    email: \"YOUR_BUYER_EMAIL@example.com\",  // ⚠️ REPLACE: Your buyer agent email\n    task: \"Analyze top 5 competitors in SaaS market\",\n    api_key: \"YOUR_AGENTGATEPAY_API_KEY\",  // ⚠️ REPLACE: From AgentGatePay signup\n    budget_usd: 100,\n    mandate_ttl_days: 7,\n    mandate_scope: \"resource.read payment.execute\"\n  },\n  seller: {\n    name: \"DataBot Pro\",\n    company: \"MarketInsights AI Ltd.\",\n    email: \"seller@marketinsights.ai\",\n    service: \"Premium Market Research Reports\",\n    api_url: \"https://YOUR_N8N.app.n8n.cloud/webhook/seller-resource-api-test\",  // ⚠️ REPLACE: Seller webhook URL\n    selected_resource_id: \"saas-competitors-2025\"\n  },\n  render: {\n    service_url: \"https://YOUR_RENDER_APP.onrender.com\"\n  },\n  blockchain: {\n    chain: \"base\",\n    token: \"USDC\",\n    rpc_url: \"https://mainnet.base.org\"\n  },\n  agentgatepay: {\n    api_url: \"https://api.agentgatepay.com\",\n    mcp_endpoint: \"https://mcp.agentgatepay.com\"\n  }\n};\n\nreturn [{json: {config: CONFIG, session: {id: `session_${Date.now()}`, started_at: new Date().toISOString(), agent: CONFIG.buyer.email}}}];"
+      },
+      "id": "783980cf-c3e5-44d4-bede-f0ae11142b03",
+      "name": "1️⃣ Load Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "KxYZV5OKkHcmDdk1",
+          "mode": "list",
+          "cachedResultName": "AgentPay_Mandates",
+          "cachedResultUrl": "/projects/GOObnU0xb1t9CpEF/datatables/KxYZV5OKkHcmDdk1"
+        },
+        "returnAll": true
+      },
+      "id": "bc3192f6-29b7-451e-a879-ae5895f5952e",
+      "name": "2️⃣ 📊 Get Mandate Token",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        848,
+        224
+      ],
+      "alwaysOutputData": true,
+      "continueOnFail": true,
+      "notes": "🔍 CHECK: Does mandate exist?\n\n⚠️ CONFIGURE: You MUST select 'AgentPay_Mandates' from dropdown!\n\nClick this node → Data table dropdown → Select AgentPay_Mandates → Save"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize Data Table output\n// When table is empty, create empty object\n// When table has row, pass it through\n\nconst config = $('1️⃣ Load Config').first().json.config;\n\nif ($input.all().length === 0) {\n  // Table is empty - return EMPTY STRING (not null)\n  console.log('📊 Data Table is empty - returning empty string');\n  return [{ json: { mandate_token: '', config: config } }];\n}\n\n// Table has data - pass it through with config\nconst allRows = $input.all();\nconsole.log(`📊 Data Table returned ${allRows.length} row(s)`);\n\nif (allRows.length > 1) {\n  console.warn('⚠️ WARNING: Multiple rows found! Using first row only.');\n}\n\nconst tableData = $input.first().json;\nconsole.log(`   mandate_token: ${tableData.mandate_token ? tableData.mandate_token.substring(0, 30) + '...' : 'EMPTY/NULL'}`);\n\nreturn [{ json: { ...tableData, config: config } }];"
+      },
+      "id": "71098d60-5010-4829-8d5f-888254df4a31",
+      "name": "2B️⃣ Normalize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        224
+      ],
+      "notes": "🔄 NORMALIZE: Handle empty table\n\nIf table empty → Pass { mandate_token: null }\nIf table has row → Pass the row data\n\nThis ensures Node 3 always receives data!"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-token",
+              "leftValue": "={{ $json.mandate_token }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a465e06a-9cae-4a5a-ba4f-76ad5f23899a",
+      "name": "3️⃣ Has Token?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        224
+      ],
+      "notes": "🔀 ROUTER:\n\nTRUE → Token exists → Verify it\nFALSE → No token → Create new mandate"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('1️⃣ Load Config').first().json.config.agentgatepay.mcp_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('1️⃣ Load Config').first().json.config.buyer.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 3,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"agentpay_verify_mandate\",\n    \"arguments\": {\n      \"mandate_token\": \"{{ $json.mandate_token }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "5f9f1661-c120-40c9-b061-08e1351c84b1",
+      "name": "4️⃣ ✅ Verify Existing Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        80
+      ],
+      "notes": "🔒 ASK GATEWAY: Is this token still valid?\n\nGateway checks:\n✅ Signature valid?\n✅ Not expired?\n✅ Budget remaining?\n✅ Scope correct?\n\nGateway = Source of Truth!"
+    },
+    {
+      "parameters": {
+        "jsCode": "const verify_response = $input.first().json;\nconst config = $('1️⃣ Load Config').first().json.config;\nconst stored_token = $('2️⃣ 📊 Get Mandate Token').first().json.mandate_token;\n\n// Parse MCP response\nif (!verify_response.result || !verify_response.result.content) {\n  throw new Error('❌ Gateway verification failed - invalid response');\n}\n\nconst text = verify_response.result.content[0].text;\nconst verification = JSON.parse(text);\n\n// ═══════════════════════════════════════════════════════\n// 🚨 MANDATE EXPIRED OR INVALID - SHOW CLEAR INSTRUCTIONS\n// ═══════════════════════════════════════════════════════\n\nif (!verification.valid) {\n  const errorMsg = `\n🚨 MANDATE EXPIRED OR INVALID!\n\n${verification.error || 'Mandate is no longer valid'}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 TO CREATE NEW MANDATE (2 STEPS):\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n1️⃣ Delete the token from storage:\n   • Go to: Data → AgentPay_Mandates\n   • Click the row\n   • Click Delete (trash icon)\n   • Click Confirm\n\n2️⃣ Run this workflow again:\n   • Will automatically create fresh mandate\n   • New $${config.buyer.budget_usd} budget allocated\n   • 7-day validity period\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 WHY THIS HAPPENS:\nMandates have limited budget/time by design.\nThis is a SECURITY FEATURE to prevent unlimited spending.\n\nWhen budget depleted or time expired, you must\nmanually approve a new mandate.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n  `;\n  \n  throw new Error(errorMsg);\n}\n\n// ═══════════════════════════════════════════════════════\n// ✅ MANDATE VALID - CONTINUE WITH EXISTING TOKEN\n// ═══════════════════════════════════════════════════════\n\nconsole.log('♻️ REUSING EXISTING MANDATE!');\nconsole.log(`   Budget Remaining: $${verification.budget_remaining}`);\nconsole.log(`   TTL Remaining: ${verification.ttl_remaining_hours} hours`);\nconsole.log(`   Status: ${verification.status}`);\n\nconst mandate = {\n  token: stored_token,\n  id: verification.mandate_id || 'unknown',\n  budget_remaining: verification.budget_remaining,\n  ttl_hours: verification.ttl_remaining_hours,\n  status: verification.status\n};\n\nreturn [{\n  json: {\n    config,\n    mandate,\n    verification,\n    was_reused: true,\n    source: 'existing_token',\n    message: `♻️ REUSING MANDATE!\\n\\nBudget: $${verification.budget_remaining}\\nTTL: ${verification.ttl_remaining_hours} hours\\nStatus: ${verification.status}`\n  }\n}];"
+      },
+      "id": "975d3ae0-0e77-4a2d-bbe7-7bcdd1c746cf",
+      "name": "4B️⃣ Check Verification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        80
+      ],
+      "notes": "🔍 PARSE GATEWAY RESPONSE:\n\n✅ Valid → Continue with existing mandate\n❌ Invalid → ERROR with clear renewal instructions\n\nNEVER auto-renews! Security by design!"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('1️⃣ Load Config').first().json.config.agentgatepay.mcp_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('1️⃣ Load Config').first().json.config.buyer.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"agentpay_issue_mandate\",\n    \"arguments\": {\n      \"subject\": \"{{ $('1️⃣ Load Config').first().json.config.buyer.email }}\",\n      \"budget_usd\": {{ $('1️⃣ Load Config').first().json.config.buyer.budget_usd }},\n      \"scope\": \"{{ $('1️⃣ Load Config').first().json.config.buyer.mandate_scope }}\",\n      \"ttl_minutes\": {{ $('1️⃣ Load Config').first().json.config.buyer.mandate_ttl_days * 1440 }}\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "37585345-34e1-426e-979d-16bbfe72ae3e",
+      "name": "5️⃣ 🆕 Create New Mandate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        368
+      ],
+      "notes": "🆕 CREATE: New mandate via Gateway API\n\nOnly runs when:\n- First time (no token in table)\n- OR user deleted token (manual renewal)\n\nNEVER auto-creates on expiry!"
+    },
+    {
+      "parameters": {
+        "jsCode": "const api_response = $input.first().json;\nconst config = $('1️⃣ Load Config').first().json.config;\n\nif (!api_response.result || !api_response.result.content) {\n  throw new Error('❌ Failed to create mandate - invalid API response');\n}\n\nconst text = api_response.result.content[0].text;\nconst result = JSON.parse(text);\n\nif (!result.mandate_token) {\n  throw new Error('❌ API did not return mandate_token');\n}\n\nconsole.log('🆕 NEW MANDATE CREATED!');\nconsole.log(`   Mandate ID: ${result.mandate_id}`);\nconsole.log(`   Token: ${result.mandate_token.substring(0, 20)}...`);\nconsole.log(`   Budget: $${result.budget_remaining || config.buyer.budget_usd}`);\nconsole.log(`   Expires: ${result.expires_at}`);\nconsole.log('   ✅ Will be saved to table');\n\nconst mandate = {\n  token: result.mandate_token,\n  id: result.mandate_id,\n  budget_remaining: parseFloat(result.budget_remaining || config.buyer.budget_usd),\n  expires_at: result.expires_at\n};\n\nreturn [{\n  json: {\n    config,\n    mandate,\n    verification: {\n      valid: true,\n      budget_remaining: mandate.budget_remaining,\n      status: 'active'\n    },\n    was_reused: false,\n    source: 'new_mandate',\n    message: `🆕 NEW MANDATE!\\n\\nID: ${mandate.id}\\nBudget: $${mandate.budget_remaining}\\nExpires: ${mandate.expires_at}`\n  }\n}];"
+      },
+      "id": "ff5ba31b-d036-4438-a1d8-d49dfc755ceb",
+      "name": "5B️⃣ Parse New Mandate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        368
+      ],
+      "notes": "📦 EXTRACT: Token from API response\n\nNext: VERIFY this new token works before saving!"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('1️⃣ Load Config').first().json.config.agentgatepay.mcp_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('1️⃣ Load Config').first().json.config.buyer.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 4,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"agentpay_verify_mandate\",\n    \"arguments\": {\n      \"mandate_token\": \"{{ $json.mandate.token }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "872dafff-8c8a-4837-957f-a200a1209178",
+      "name": "6️⃣ ✅ Verify New Mandate",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1936,
+        368
+      ],
+      "notes": "🔒 VERIFY: New mandate works!\n\nDon't save broken tokens to table.\nGateway confirms it's valid before we store it."
+    },
+    {
+      "parameters": {
+        "jsCode": "const verify_response = $input.first().json;\nconst parsed_data = $('5B️⃣ Parse New Mandate').first().json;\nconst config = $('1️⃣ Load Config').first().json.config;\n\n// Parse MCP response\nif (!verify_response.result || !verify_response.result.content) {\n  throw new Error('❌ Gateway verification failed - invalid response');\n}\n\nconst text = verify_response.result.content[0].text;\nconst verification = JSON.parse(text);\n\nif (!verification.valid) {\n  throw new Error(`❌ New mandate is INVALID: ${verification.error || 'Unknown error'}`);\n}\n\nconst token = parsed_data.mandate.token;\n\n// ═══════════════════════════════════════════════════════\n// 🛡️ STRICT VALIDATION - PREVENT NULL/INVALID TOKENS\n// ═══════════════════════════════════════════════════════\n\n// Check 1: Exists and is a string\nif (!token || typeof token !== 'string') {\n  throw new Error('❌ BLOCKED: Token is missing or not a string!');\n}\n\n// Check 2: Not literal 'null' or 'undefined' strings\nif (token === 'null' || token === 'undefined' || token === '') {\n  throw new Error('❌ BLOCKED: Token is null, undefined, or empty string!');\n}\n\n// Check 3: Minimum length (JWT tokens are 100+ chars)\nif (token.length < 50) {\n  throw new Error(`❌ BLOCKED: Token too short (${token.length} chars) - likely invalid!`);\n}\n\n// Check 4: Must contain periods (JWT format: header.payload.signature)\nif (!token.includes('.')) {\n  throw new Error('❌ BLOCKED: Token is not in JWT format (missing periods)!');\n}\n\nconsole.log('✅ New mandate verified successfully!');\nconsole.log(`   Token: ${token.substring(0, 30)}...`);\nconsole.log(`   Token length: ${token.length} chars`);\nconsole.log(`   Budget: $${verification.budget_remaining}`);\nconsole.log(`   Status: ${verification.status}`);\nconsole.log('   🛡️ Validation: ALL CHECKS PASSED');\n\n// Prepare for saving to table\nreturn [{\n  json: {\n    mandate_token: token,\n    _original_data: parsed_data  // Keep for Node 7B\n  }\n}];"
+      },
+      "id": "6a1752c3-8901-4be9-99f4-e90804bf5d1c",
+      "name": "6B️⃣ Check New Mandate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        368
+      ],
+      "notes": "✅ CHECK: New mandate is valid\n\nIf invalid → ERROR (don't save)\nIf valid → Prepare token for saving"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "KxYZV5OKkHcmDdk1",
+          "mode": "list",
+          "cachedResultName": "AgentPay_Mandates",
+          "cachedResultUrl": "/projects/GOObnU0xb1t9CpEF/datatables/KxYZV5OKkHcmDdk1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "mandate_token": "={{ $json.mandate_token }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "mandate_token",
+              "displayName": "mandate_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b2d342fb-218b-481b-9ae2-3fad428d61d2",
+      "name": "7️⃣ 💾 Insert Token",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2352,
+        368
+      ],
+      "notes": "💾 INSERT: Verified token to table\n\nReceives: { mandate_token: \"...\" }\nAuto-maps to table column\n\nOnly saves tokens that passed verification!\n\n⚠️ IMPORTANT: RE-SELECT 'AgentPay_Mandates' from dropdown!"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Restore original data for merge node\nconst table_response = $input.first().json;\nconst original_data = $('6B️⃣ Check New Mandate').first().json._original_data;\n\nconsole.log('✅ Token saved to table successfully!');\n\n// Return original mandate data for Node 8\nreturn [{ json: original_data }];"
+      },
+      "id": "7f3b1943-31e7-4123-ad5e-a3f462fb445c",
+      "name": "7B️⃣ Restore Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2544,
+        368
+      ],
+      "notes": "🔄 RESTORE: Original data structure\n\nNode 7 returns table response\nNode 8 needs original mandate data\n\nThis bridges the gap."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Both paths merge here (existing token or new token)\nconst data = $input.first().json;\n\nconst config = data.config;\nconst session = $('1️⃣ Load Config').first().json.session;\nconst mandate = data.mandate;\nconst verification = data.verification;\n\nconst merchant = config.seller;\n\nconst selected_resource = {\n  id: merchant.selected_resource_id,\n  title: \"SaaS Competitor Analysis 2025\",\n  description: \"Top 5 competitors analysis\"\n};\n\nconst resource_request = {\n  from: config.buyer.email,\n  to: merchant.email,\n  resource_id: selected_resource.id,\n  resource_title: selected_resource.title,\n  mandate_token: mandate.token,\n  timestamp: new Date().toISOString()\n};\n\nreturn [{\n  json: {\n    config,\n    session,\n    mandate,\n    verification,\n    was_reused: data.was_reused,\n    merchant: merchant,\n    selected_resource: selected_resource,\n    resource_request: resource_request,\n    message: `✅ Mandate Ready!\\n\\nSource: ${data.was_reused ? 'Reused existing ♻️' : 'Created new 🆕'}\\nBudget: $${verification.budget_remaining}\\n\\nMerchant: ${merchant.name}\\nResource: ${selected_resource.title}`\n  }\n}];"
+      },
+      "id": "e9207501-da5a-4715-939c-3c8011c3b097",
+      "name": "8️⃣ 🔀 Merge Paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        80
+      ],
+      "notes": "🔀 MERGE: Both paths converge here\n\nPath 1: Verified existing token ♻️\nPath 2: Created new token 🆕\n\nBoth continue with same flow"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.config.seller.api_url }}/resource/{{ $json.config.seller.selected_resource_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-agent-id",
+              "value": "={{ $json.config.buyer.email }}"
+            },
+            {
+              "name": "x-mandate",
+              "value": "={{ $json.mandate.token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4d4e786e-1f9d-4f34-a333-a1f070235f10",
+      "name": "9️⃣ Request Resource (x402)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2144,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst body = response.body || response;\n\nif (response.statusCode !== 402 && body.statusCode !== 402) {\n  throw new Error(`Expected 402 Payment Required, got ${response.statusCode || body.statusCode}`);\n}\n\nconst payment_required = body;\nconst data = $('8️⃣ 🔀 Merge Paths').first().json;\n\nreturn [{\n  json: {\n    ...data,\n    payment_required: payment_required,\n    message: `💰 402 Received!\\n\\nWallet: ${payment_required.payTo}\\nAmount: $${payment_required.priceUsd}\\nToken: ${payment_required.token}\\nChain: ${payment_required.chain}`\n  }\n}];"
+      },
+      "id": "0401fd2d-700c-4d21-bb1d-da813a2aab36",
+      "name": "9B️⃣ Parse 402 Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2352,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('8️⃣ 🔀 Merge Paths').item.json.config.render.service_url }}/sign-payment",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('8️⃣ 🔀 Merge Paths').item.json.config.buyer.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"merchant_address\": \"{{ $json.payment_required.payTo }}\",\n  \"total_amount\": \"{{ $json.payment_required.amount }}\",\n  \"token\": \"{{ $json.payment_required.token }}\",\n  \"chain\": \"{{ $json.payment_required.chain }}\"\n}",
+        "options": {}
+      },
+      "id": "7c1e5709-9dca-45c5-8fbf-ac8a9acc9434",
+      "name": "🔟 🔒 Sign Payment (Render)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2544,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const render_response = $input.first().json;\nconst data = $('9B️⃣ Parse 402 Response').first().json;\n\nif (!render_response.success) {\n  throw new Error(`Render signing failed: ${render_response.error || 'Unknown error'}`);\n}\n\nif (!render_response.tx_hash || !render_response.tx_hash_commission) {\n  throw new Error('Missing transaction hashes from Render');\n}\n\nreturn [{\n  json: {\n    ...data,\n    payment_proof: {\n      tx_hash: render_response.tx_hash,\n      tx_hash_commission: render_response.tx_hash_commission,\n      status: 'confirmed',\n      from: render_response.from,\n      merchant: data.payment_required.payTo,\n      commission_address: render_response.commission_address,\n      total_usd: render_response.total_usd,\n      merchant_usd: render_response.merchant_usd,\n      commission_usd: render_response.commission_usd,\n      token: data.payment_required.token,\n      chain: data.payment_required.chain,\n      merchant_url: `https://basescan.org/tx/${render_response.tx_hash}`,\n      commission_url: `https://basescan.org/tx/${render_response.tx_hash_commission}`\n    }\n  }\n}];"
+      },
+      "id": "710394a0-73a8-4cfa-91a6-4e01eb57580e",
+      "name": "1️⃣1️⃣ Extract TX Hashes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.config.agentgatepay.mcp_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('8️⃣ 🔀 Merge Paths').first().json.config.buyer.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"agentpay_submit_payment\",\n    \"arguments\": {\n      \"mandate_token\": \"{{ $json.mandate.token }}\",\n      \"tx_hash\": \"{{ $json.payment_proof.tx_hash }}\",\n      \"tx_hash_commission\": \"{{ $json.payment_proof.tx_hash_commission }}\",\n      \"chain\": \"{{ $json.payment_required.chain }}\",\n      \"token\": \"{{ $json.payment_required.token }}\",\n      \"price_usd\": \"{{ $json.payment_required.priceUsd }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "22600da6-22a5-4cac-a822-0046e3ac4c16",
+      "name": "1️⃣2️⃣ Submit Payment (MCP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2960,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('9B️⃣ Parse 402 Response').first().json.config.seller.api_url }}/resource/{{ $('9B️⃣ Parse 402 Response').first().json.config.seller.selected_resource_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-payment",
+              "value": "={{ $('1️⃣1️⃣ Extract TX Hashes').first().json.payment_proof.tx_hash }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "0718f2ef-6d1c-4b3e-8edb-34f9cd284a87",
+      "name": "1️⃣3️⃣ Receive Resource",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3168,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resource_http_response = $input.first().json;\nconst payment_data = $('1️⃣1️⃣ Extract TX Hashes').first().json;\nconst merge_data = $('8️⃣ 🔀 Merge Paths').first().json;\n\nconst resource_body = resource_http_response.body || resource_http_response;\nlet resource_data = typeof resource_body === 'object' ? resource_body : { raw: resource_body };\n\nconst spent = parseFloat(payment_data.payment_required.priceUsd);\nconst budget_before = merge_data.verification.budget_remaining;\nconst budget_after = budget_before - spent;\n\nreturn [{\n  json: {\n    config: merge_data.config,\n    session: merge_data.session,\n    resource_data: resource_data,\n    resource_http_status: resource_http_response.statusCode,\n    payment_proof: payment_data.payment_proof,\n    summary: {\n      task: merge_data.config.buyer.task,\n      status: \"COMPLETED\",\n      mandate_source: merge_data.was_reused ? \"Reused (♻️)\" : \"Created New (🆕)\",\n      mandate_storage: \"Data Tables (1 column!)\",\n      budget_before_payment: budget_before,\n      budget_spent: spent,\n      budget_remaining: budget_after,\n      merchant_tx: payment_data.payment_proof.tx_hash,\n      commission_tx: payment_data.payment_proof.tx_hash_commission,\n      completed_at: new Date().toISOString()\n    },\n    message: `🎉 TASK COMPLETED !\\n\\n✅ Task: \"${merge_data.config.buyer.task}\"\\n✅ Resource Received (HTTP ${resource_http_response.statusCode})\\n\\n🔒 Mandate: ${merge_data.was_reused ? 'REUSED ♻️' : 'CREATED NEW 🆕'}\\n📊 Storage: Data Tables (just 1 column!)\\n\\n💰 Budget:\\n   - Before: $${budget_before}\\n   - Spent: $${spent}\\n   - After: $${budget_after}\\n\\n🔗 TX: ${payment_data.payment_proof.tx_hash}\\n\\n✅ v3.7 = ULTRA SIMPLE!\\n   - 1 column table (not 9!)\\n   - Gateway is source of truth\\n   - Clear error messages\\n   - No auto-renewal (security!)\\n   - Easy manual renewal (delete row)`\n  }\n}];"
+      },
+      "id": "d8ad8eb8-93ba-48d0-b322-211e1b576f27",
+      "name": "1️⃣4️⃣ Complete Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3376,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# AgentGatePay Buyer Workflow - User Guide\n\n## What This Does\nAutomated buyer agent that purchases resources from sellers using AgentPay Gateway. Reuses the same mandate token across multiple runs to save budget.\n---\n\n## Setup (One-Time, 2 Minutes)\n\n### Step 1: Create Data Table\n1. Go to: **Data** → **+ Create New** → **Data Table**\n2. Name: `AgentPay_Mandates`\n3. Add column: `mandate_token` (type: String)\n4. Save\n\n### Step 2: Inside the workflow:\n1. **IMPORTANT**: Click Node 2 \"Get Mandate Token\"\n2. Re-select table: `AgentPay_Mandates` from dropdown\n3. Click Node 7 \"Insert Token\"\n4. Re-select table: `AgentPay_Mandates` from dropdown\n5. Save workflow\n\n### Step 3: Configure Settings (Node 1)\nEdit these values in Node 1 \"Load Config\":\n```javascript\nbuyer_agent_email: \"buyer-agent@example.com\"  // Your agent email\nseller_api_url: \"https://mcp.agentgatepay.com\"  // Seller URL\nmandate_budget_usd: 100  // Total allowed spent budget  ($100)\nmandate_ttl_days: 7 // How long mandate lasts (7 days)\n```\n---\n## How to Use\n\n### First Run\n1. Go to: **Data** → **AgentPay_Mandates**\n2. Click **Execute Workflow**\n3. Wait ~15 seconds\n4. Check table: Should have **exactly 1 row** with long token\n\n### Second+ Runs\n1. Just click **Execute Workflow** again\n2. It reuses the same mandate token\n3. Budget decreases each time: $100 → $99.99 → $99.98\n\n---\n## Check Remaining Budget (3 Ways)\n\n### Option 1: Console Logs (Fastest)\nAfter workflow runs, look at **Node 4B** console:\n```\n♻️ REUSING EXISTING MANDATE!\n   Budget Remaining: $99.87  ← HERE!\n```\n\n### Option 2: Node 8 Output\nClick **Node 8** after run → Check JSON:\n```json\n{\"verification\": {\"budget_remaining\": 99.87}}\n```\n\n### Option 3: Node 14 Summary\nClick **Node 14** after run → Check JSON:\n```json\n{\"summary\": {\"budget_remaining\": 99.87}}\n```\n\n---\n## Renew Mandate (3 Steps)\n\nWhen budget runs out or mandate expires:\n\n1. **Edit Config** (Node 1) - if changing budget/TTL:\n   ```javascript\n   mandate_budget_usd: 200  // New budget\n   mandate_ttl_days: 14     // New expiry\n   ```\n\n2. **Delete Token**:\n   - Go to: **Data** → **AgentPay_Mandates**\n   - Click the row → **Delete**\n\n3. **Run Workflow**:\n   - Creates new mandate with new settings\n   - Fresh $200 budget (or whatever you set)\n\n---\n## Testing Checklist\n\n### Test 1: Fresh Start\n- **Action**: Delete all table rows → Execute workflow\n- **Expected**: Creates 1 row with valid token (100+ chars)\n\n### Test 2: Reuse\n- **Action**: Execute workflow again (don't delete row!)\n- **Expected**: STILL 1 row (same token), budget $99.99\n- **Failed if**: Creates new row OR budget stays $100\n\n### Test 3: Multiple Runs\n- **Action**: Execute 5 times total\n- **Expected**: Always 1 row, budget decreases each time\n- **Failed if**: Row count increases OR budget doesn't decrease\n\n### Test 4: Renewal\n- **Action**: Delete row → Execute workflow\n- **Expected**: Creates new mandate, fresh $100 budget\n\n---\n## Troubleshooting\n\n**Problem**: \"Table not found\" error after import\n- **Fix**: Click Node 2 and Node 7, re-select table from dropdown\n\n**Problem**: Creates new token every run\n- **Fix**: Table must have exactly 1 row with valid token\n\n**Problem**: Budget doesn't decrease\n- **Fix**: Check Gateway URL in Node 1 config\n\n---\n## Quick Reference\n\n- **Nodes**: 17 total\n- **Setup Time**: 2 minutes (one-time)\n- **Price per run**: $0.01 --> Seller Agent request\n- **Runs per $100**: 10,000 transactions\n- **Data Table**: 1 row max (reused)\n- **Mandate Duration**: 30 days default (configurable)\n",
+        "height": 3144,
+        "width": 532
+      },
+      "id": "2391e6f9-882f-449f-813e-f38e35cebdc1",
+      "name": "📖 README - START HERE!1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -176,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "▶️ START": {
+      "main": [
+        [
+          {
+            "node": "1️⃣ Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣ Load Config": {
+      "main": [
+        [
+          {
+            "node": "2️⃣ 📊 Get Mandate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2️⃣ 📊 Get Mandate Token": {
+      "main": [
+        [
+          {
+            "node": "2B️⃣ Normalize Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2B️⃣ Normalize Result": {
+      "main": [
+        [
+          {
+            "node": "3️⃣ Has Token?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3️⃣ Has Token?": {
+      "main": [
+        [
+          {
+            "node": "4️⃣ ✅ Verify Existing Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5️⃣ 🆕 Create New Mandate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4️⃣ ✅ Verify Existing Token": {
+      "main": [
+        [
+          {
+            "node": "4B️⃣ Check Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4B️⃣ Check Verification": {
+      "main": [
+        [
+          {
+            "node": "8️⃣ 🔀 Merge Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5️⃣ 🆕 Create New Mandate": {
+      "main": [
+        [
+          {
+            "node": "5B️⃣ Parse New Mandate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5B️⃣ Parse New Mandate": {
+      "main": [
+        [
+          {
+            "node": "6️⃣ ✅ Verify New Mandate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6️⃣ ✅ Verify New Mandate": {
+      "main": [
+        [
+          {
+            "node": "6B️⃣ Check New Mandate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6B️⃣ Check New Mandate": {
+      "main": [
+        [
+          {
+            "node": "7️⃣ 💾 Insert Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7️⃣ 💾 Insert Token": {
+      "main": [
+        [
+          {
+            "node": "7B️⃣ Restore Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7B️⃣ Restore Data": {
+      "main": [
+        [
+          {
+            "node": "8️⃣ 🔀 Merge Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8️⃣ 🔀 Merge Paths": {
+      "main": [
+        [
+          {
+            "node": "9️⃣ Request Resource (x402)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9️⃣ Request Resource (x402)": {
+      "main": [
+        [
+          {
+            "node": "9B️⃣ Parse 402 Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "9B️⃣ Parse 402 Response": {
+      "main": [
+        [
+          {
+            "node": "🔟 🔒 Sign Payment (Render)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔟 🔒 Sign Payment (Render)": {
+      "main": [
+        [
+          {
+            "node": "1️⃣1️⃣ Extract TX Hashes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣1️⃣ Extract TX Hashes": {
+      "main": [
+        [
+          {
+            "node": "1️⃣2️⃣ Submit Payment (MCP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣2️⃣ Submit Payment (MCP)": {
+      "main": [
+        [
+          {
+            "node": "1️⃣3️⃣ Receive Resource",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣3️⃣ Receive Resource": {
+      "main": [
+        [
+          {
+            "node": "1️⃣4️⃣ Complete Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4c95ea42-e688-485c-a786-cf8bad381d52",
+  "meta": {
+    "instanceId": "89b251c2077923dfcf09df1af042f7170f6404c508d45b4769b8a7966f5bd226"
+  },
+  "id": "jv9pcIEHelm4cHcv",
+  "tags": []
+}

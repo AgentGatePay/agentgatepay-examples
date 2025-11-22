@@ -1,0 +1,222 @@
+# AgentGatePay Examples - .gitignore
+
+# ============================================
+# Secrets and Credentials (NEVER COMMIT)
+# ============================================
+.env
+.env.*
+*.key
+*.pem
+*_private_key*
+*secret*
+config/secrets.json
+credentials.json
+wallet.json
+
+# API Keys
+*api_key*
+*apikey*
+
+# AWS
+.aws/
+*.aws
+
+# ============================================
+# Operating System Files
+# ============================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+
+# ============================================
+# IDEs and Editors
+# ============================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# JetBrains (PyCharm, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.pytest_cache/
+
+# ============================================
+# Node.js / JavaScript
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# TypeScript
+*.tsbuildinfo
+
+# Optional caches
+.npm
+.eslintcache
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn
+.yarn-integrity
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+
+# ============================================
+# Temporary Files
+# ============================================
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*.orig
+*.rej
+
+# ============================================
+# Build Artifacts
+# ============================================
+dist/
+build/
+out/
+target/
+
+# ============================================
+# Testing
+# ============================================
+.coverage
+coverage/
+test-results/
+
+# ============================================
+# Blockchain / Wallet (NEVER COMMIT)
+# ============================================
+keystore/
+wallets/
+*.keystore
+mnemonic.txt
+seed.txt
+
+# ============================================
+# AgentGatePay Examples Specific
+# ============================================
+# Local test data
+test_data/
+local_config.json
+
+# N8N exports with credentials
+n8n/**/credentials_*.json
+n8n/**/*_with_secrets.json
+
+# Backup files
+*.backup
+backups/
+
+# Local development
+.local/
+local/
+
+# User-specific configuration
+my_config.json
+my_*.json
+
+# ============================================
+# Keep These (Force Include)
+# ============================================
+!.gitkeep
+!.github/
+!.gitignore

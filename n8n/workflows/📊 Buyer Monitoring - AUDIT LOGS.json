@@ -1,0 +1,502 @@
+{
+  "name": "📊 Buyer Monitoring Dashboard - MANUAL RUN",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger-001",
+      "name": "▶️ Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "▶️ MANUAL TRIGGER: Click 'Execute Workflow' to run\n\n⚠️ Configure your API key in Node 2 before running!\n\nThis workflow runs standalone without webhooks.\nAll data is fetched from AgentGatePay API."
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// CONFIG: Validate inputs and setup monitoring parameters\n// ════════════════════════════════════════════════════════════\n\nconst input = $input.first().json;\n\n// Check if triggered by webhook or manual\nconst isManual = !input.user_email;\n\nconst config = {\n  user_email: input.user_email || \"YOUR_BUYER_EMAIL@example.com\",  // ⚠️ REPLACE if running manually\n  api_key: input.api_key || \"YOUR_API_KEY\",  // ⚠️ REPLACE if running manually\n  buyer_wallet: input.buyer_wallet || \"YOUR_WALLET_ADDRESS\",  // ⚠️ REPLACE with your wallet (0x...)\n  tx_hash: input.tx_hash || null,\n  trigger_source: input.trigger_source || \"manual\",\n  \n  // Monitoring settings\n  time_range_hours: 24,\n  payment_history_limit: 50,  // Fetch last 50 for display (use curl for full history)\n  audit_log_limit: 50,\n  export_format: \"csv\",\n  \n  // AgentGatePay API\n  api_url: \"https://api.agentgatepay.com\",\n  mcp_endpoint: \"https://mcp.agentgatepay.com\",\n  \n  // Session tracking\n  session: {\n    id: `monitor_${Date.now()}`,\n    started_at: new Date().toISOString(),\n    is_manual: isManual\n  }\n};\n\n// Validation\nif (config.api_key === \"YOUR_API_KEY\") {\n  throw new Error(\"❌ Please configure your API key in Node 2 'Load Config'!\");\n}\n\nconsole.log(`📊 Monitoring Dashboard Started`);\nconsole.log(`   User: ${config.user_email}`);\nconsole.log(`   Source: ${config.trigger_source}`);\nconsole.log(`   TX Hash: ${config.tx_hash || 'N/A'}`);\n\nreturn [{ json: { config } }];"
+      },
+      "id": "load-config-002",
+      "name": "2️⃣ Load Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "notes": "⚙️ SETUP: Validate inputs\n\n⚠️ EDIT THIS if running manually:\n- user_email: Your buyer email\n- api_key: Your AgentGatePay API key"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.config.api_url }}/v1/analytics/me",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-analytics-003",
+      "name": "3️⃣ 📈 Get User Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ],
+      "notes": "📈 ANALYTICS: Fetch user spending stats\n\nReturns:\n- total_spent_usd\n- payment_count\n- active_mandates\n- budget_remaining\n- spending_trend"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.mcp_endpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"agentpay_get_payment_history\",\n    \"arguments\": {\n      \"limit\": {{ $('2️⃣ Load Config').first().json.config.payment_history_limit }}\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "get-payment-history-004",
+      "name": "4️⃣ 💳 Get Payment History",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ],
+      "notes": "💳 PAYMENTS: Fetch recent payment history\n\nShows last 10 payments with:\n- tx_hash\n- amount_usd\n- status\n- timestamp\n- receiver"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/audit/logs?client_id={{ $('2️⃣ Load Config').first().json.config.buyer_wallet }}&event_type=x402_payment_settled&hours={{ $('2️⃣ Load Config').first().json.config.time_range_hours }}&limit={{ $('2️⃣ Load Config').first().json.config.audit_log_limit }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-audit-logs-005",
+      "name": "5️⃣ 📋 Get Audit Logs (24h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ],
+      "notes": "📋 AUDIT: Fetch payment events by wallet\n\nFiltered by:\n- client_id (wallet address)\n- event_type: x402_payment_settled\n- Last 24 hours\n- Max 50 events\n\nShows: blockchain payments from this wallet"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/audit/logs?client_id={{ $('2️⃣ Load Config').first().json.config.user_email }}&event_type=mandate_issued",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-mandates-006",
+      "name": "6️⃣ 🔑 Get Active Mandates",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        300
+      ],
+      "notes": "🔑 MANDATES: Fetch all issued mandates\n\nShows:\n- mandate_id\n- budget_usd\n- budget_remaining\n- ttl_hours\n- scope\n- status"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// VERIFICATION: Verify last payment on blockchain\n// ════════════════════════════════════════════════════════════\n\nconst config = $('2️⃣ Load Config').first().json.config;\nconst tx_hash = config.tx_hash;\n\nif (!tx_hash) {\n  console.log('⚠️  No tx_hash provided - skipping verification');\n  return [{ json: { \n    verified: false, \n    reason: \"No transaction hash provided\",\n    config: config\n  }}];\n}\n\nconsole.log(`🔍 Verifying payment: ${tx_hash}`);\n\nreturn [{ json: { \n  tx_hash: tx_hash,\n  config: config,\n  should_verify: true\n}}];"
+      },
+      "id": "prepare-verification-007",
+      "name": "7️⃣ 🔍 Prepare Verification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ],
+      "notes": "🔍 PREPARE: Check if we have tx_hash to verify"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "should-verify",
+              "leftValue": "={{ $json.should_verify }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-verify-008",
+      "name": "7B️⃣ Has TX Hash?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ],
+      "notes": "🔀 ROUTER: Only verify if tx_hash exists"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/v1/payments/verify/{{ $json.tx_hash }}",
+        "options": {}
+      },
+      "id": "verify-payment-009",
+      "name": "8️⃣ ✅ Verify on Blockchain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        200
+      ],
+      "notes": "✅ BLOCKCHAIN: Verify payment on-chain\n\nChecks:\n- Transaction exists\n- Correct amount\n- Correct recipient\n- Block confirmation"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { \n  verified: false,\n  reason: \"No transaction to verify\",\n  message: \"Skipped verification - no tx_hash provided\"\n}}];"
+      },
+      "id": "skip-verification-010",
+      "name": "8B️⃣ Skip Verification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        400
+      ],
+      "notes": "⏭️  SKIP: No tx_hash to verify"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "merge-verification-011",
+      "name": "9️⃣ Merge Verification",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [
+        2220,
+        300
+      ],
+      "notes": "🔀 MERGE: Combine verified/skipped paths"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// STATISTICS: Calculate spending trends and alerts\n// ════════════════════════════════════════════════════════════\n\nconst config = $('2️⃣ Load Config').first().json.config;\nconst analytics = $('3️⃣ 📈 Get User Analytics').first().json;\nconst payment_history_response = $('4️⃣ 💳 Get Payment History').first().json;\nconst audit_logs_response = $('5️⃣ 📋 Get Audit Logs (24h)').first().json;\nconst mandates_response = $('6️⃣ 🔑 Get Active Mandates').first().json;\nconst verification = $input.first().json;\n\nconsole.log('📊 Calculating statistics...');\n\n// Parse payment history (MCP response)\nlet payments = [];\nif (payment_history_response.result && payment_history_response.result.content) {\n  try {\n    const content = payment_history_response.result.content[0].text;\n    const parsed = JSON.parse(content);\n    payments = parsed.payments || [];\n  } catch (e) {\n    console.log('⚠️  Could not parse payment history');\n  }\n}\n\n// Parse audit logs\nconst logs = audit_logs_response.logs || [];\n\n// Parse mandates\nconst mandates = mandates_response.logs || [];\n\n// ✅ FIX: Use correct API field names and calculate average AFTER getting values\n// API returns: total_spent_usd, transaction_count (NOT payment_count)\nconst total_spent = analytics.total_spent_usd || 0;\nconst payment_count = analytics.transaction_count || 0;  // ✅ FIXED: was analytics.payment_count\nconst average_payment = payment_count > 0 ? (total_spent / payment_count) : 0;  // ✅ Calculate after\n\nconst stats = {\n  // Spending stats - FIXED field names to match API response\n  total_spent: total_spent,\n  payment_count: payment_count,\n  average_payment: average_payment,\n\n  // Recent activity\n  payments_last_24h: payments.filter(p => {\n    const paymentTime = new Date(p.timestamp || p.created_at);\n    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);\n    return paymentTime > oneDayAgo;\n  }).length,\n\n  spent_last_24h: payments.filter(p => {\n    const paymentTime = new Date(p.timestamp || p.created_at);\n    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);\n    return paymentTime > oneDayAgo;\n  }).reduce((sum, p) => sum + parseFloat(p.amount_usd || 0), 0),\n\n  // Mandate stats\n  active_mandates: mandates.filter(m => {\n    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n    return details.status === 'active' || details.status === 'issued';\n  }).length,\n\n  total_budget: mandates.reduce((sum, m) => {\n    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n    return sum + parseFloat(details.budget_usd || 0);\n  }, 0),\n\n  budget_remaining: mandates.reduce((sum, m) => {\n    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n    return sum + parseFloat(details.budget_remaining || 0);\n  }, 0),\n\n  // Audit log stats\n  total_events_24h: logs.length,\n  payment_events: logs.filter(l => l.event_type && l.event_type.includes('payment')).length,\n  mandate_events: logs.filter(l => l.event_type && l.event_type.includes('mandate')).length,\n  aif_events: logs.filter(l => l.event_type && l.event_type.includes('aif')).length,\n\n  // Most recent payment\n  last_payment: payments.length > 0 ? payments[0] : null,\n\n  // Verification status\n  last_payment_verified: verification.verified || false\n};\n\n// Calculate budget utilization\nstats.budget_utilization_pct = stats.total_budget > 0\n  ? ((stats.total_budget - stats.budget_remaining) / stats.total_budget * 100).toFixed(2)\n  : 0;\n\n// Spending trend (compare last 24h to average)\nstats.spending_trend = stats.payment_count > 0\n  ? (stats.spent_last_24h > stats.average_payment ? 'increasing' : 'stable')\n  : 'no_activity';\n\nconsole.log(`   Total Spent: $${stats.total_spent}`);\nconsole.log(`   Payments (24h): ${stats.payments_last_24h}`);\nconsole.log(`   Budget Remaining: $${stats.budget_remaining}`);\nconsole.log(`   Budget Utilization: ${stats.budget_utilization_pct}%`);\n\nreturn [{ json: { config, analytics, stats, payments, logs, mandates, verification } }];\n"
+      },
+      "id": "calculate-stats-012",
+      "name": "🔟 📊 Calculate Statistics",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2440,
+        300
+      ],
+      "notes": "📊 STATISTICS: Calculate trends and metrics\n\nCalculates:\n- Spending trends\n- Budget utilization %\n- Recent activity (24h)\n- Mandate status\n- Event breakdown"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// ALERTS: Check for warnings and important notifications\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { stats, mandates, payments } = data;\n\nconst alerts = [];\n\n// Alert 1: Low budget warning\nif (stats.budget_remaining > 0 && stats.budget_utilization_pct > 90) {\n  alerts.push({\n    severity: 'high',\n    type: 'budget_low',\n    message: `⚠️  BUDGET WARNING: Only $${stats.budget_remaining.toFixed(2)} remaining (${stats.budget_utilization_pct}% used)`,\n    action: 'Issue new mandate or reduce spending'\n  });\n} else if (stats.budget_remaining > 0 && stats.budget_utilization_pct > 75) {\n  alerts.push({\n    severity: 'medium',\n    type: 'budget_warning',\n    message: `ℹ️  Budget Notice: $${stats.budget_remaining.toFixed(2)} remaining (${stats.budget_utilization_pct}% used)`,\n    action: 'Monitor spending'\n  });\n}\n\n// Alert 2: Mandate expiration warning\nmandates.forEach(m => {\n  const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n  if (details.ttl_remaining_hours && details.ttl_remaining_hours < 24) {\n    alerts.push({\n      severity: 'high',\n      type: 'mandate_expiring',\n      message: `⏰ MANDATE EXPIRING: ${details.mandate_id} expires in ${details.ttl_remaining_hours} hours`,\n      action: 'Renew mandate before expiration'\n    });\n  }\n});\n\n// Alert 3: No recent activity\nif (stats.payments_last_24h === 0 && stats.payment_count > 0) {\n  alerts.push({\n    severity: 'low',\n    type: 'no_activity',\n    message: 'ℹ️  No payments in last 24 hours',\n    action: 'Normal - no action needed'\n  });\n}\n\n// Alert 4: Failed payments\nconst failed_payments = payments.filter(p => p.status === 'failed');\nif (failed_payments.length > 0) {\n  alerts.push({\n    severity: 'high',\n    type: 'payment_failures',\n    message: `❌ FAILED PAYMENTS: ${failed_payments.length} payment(s) failed`,\n    action: 'Review failed transactions',\n    failed_txs: failed_payments.map(p => p.tx_hash)\n  });\n}\n\n// Alert 5: High spending rate\nif (stats.spent_last_24h > stats.average_payment * 10 && stats.payment_count > 10) {\n  alerts.push({\n    severity: 'medium',\n    type: 'high_spending',\n    message: `📈 High Spending: $${stats.spent_last_24h.toFixed(2)} spent in 24h (10x average)`,\n    action: 'Verify spending is intentional'\n  });\n}\n\n// Alert 6: Verification failure\nif (data.verification && !data.verification.verified && data.config.tx_hash) {\n  alerts.push({\n    severity: 'medium',\n    type: 'verification_failed',\n    message: `⚠️  Payment verification issue: ${data.verification.reason || 'Unknown'}`,\n    action: 'Check transaction on blockchain explorer'\n  });\n}\n\nconsole.log(`🚨 Alerts: ${alerts.length} alert(s)`);\nalerts.forEach((a, i) => {\n  console.log(`   ${i+1}. [${a.severity.toUpperCase()}] ${a.message}`);\n});\n\nreturn [{ json: { ...data, alerts } }];"
+      },
+      "id": "check-alerts-013",
+      "name": "1️⃣1️⃣ 🚨 Check Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2660,
+        300
+      ],
+      "notes": "🚨 ALERTS: Check for warnings\n\nChecks:\n- Budget < 10% remaining\n- Mandate expires < 24h\n- Failed payments\n- High spending rate\n- No activity in 24h"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// DASHBOARD DATA: Format metrics for hybrid display\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { config, analytics, stats, alerts } = data;\n\n// Create dashboard-ready data structure\nconst dashboard = {\n  // Header\n  title: \"📊 Buyer Monitoring Dashboard\",\n  user: config.user_email,\n  generated_at: new Date().toISOString(),\n  session_id: config.session.id,\n  \n  // Key metrics (shown in N8N)\n  metrics: {\n    total_spent: {\n      value: `$${stats.total_spent.toFixed(2)}`,\n      label: \"Total Spent\",\n      icon: \"💰\"\n    },\n    payment_count: {\n      value: stats.payment_count,\n      label: \"Total Payments\",\n      icon: \"💳\"\n    },\n    budget_remaining: {\n      value: `$${stats.budget_remaining.toFixed(2)}`,\n      label: \"Budget Remaining\",\n      icon: \"🔑\",\n      percentage: `${stats.budget_utilization_pct}% used`\n    },\n    active_mandates: {\n      value: stats.active_mandates,\n      label: \"Active Mandates\",\n      icon: \"🎫\"\n    },\n    payments_24h: {\n      value: stats.payments_last_24h,\n      label: \"Payments (24h)\",\n      icon: \"📈\",\n      amount: `$${stats.spent_last_24h.toFixed(2)}`\n    },\n    events_24h: {\n      value: stats.total_events_24h,\n      label: \"Events Logged (24h)\",\n      icon: \"📋\"\n    }\n  },\n  \n  // Alerts summary\n  alerts_summary: {\n    count: alerts.length,\n    high: alerts.filter(a => a.severity === 'high').length,\n    medium: alerts.filter(a => a.severity === 'medium').length,\n    low: alerts.filter(a => a.severity === 'low').length,\n    items: alerts\n  },\n  \n  // Quick stats\n  quick_stats: {\n    average_payment: `$${stats.average_payment.toFixed(2)}`,\n    spending_trend: stats.spending_trend,\n    budget_utilization: `${stats.budget_utilization_pct}%`,\n    last_payment_verified: stats.last_payment_verified ? '✅ Verified' : '⏳ Pending'\n  },\n  \n  // Links\n  links: {\n    user_analytics: `${config.api_url}/v1/analytics/me`,\n    audit_logs: `${config.api_url}/audit/logs?client_id=${config.user_email}`,\n    payment_history: `${config.api_url}/v1/payments/list`\n  },\n  \n  // Export options\n  export: {\n    csv_available: true,\n    json_available: true,\n    pdf_available: false\n  }\n};\n\nconsole.log('📊 Dashboard data prepared');\nconsole.log(`   Metrics: ${Object.keys(dashboard.metrics).length}`);\nconsole.log(`   Alerts: ${dashboard.alerts_summary.count}`);\n\nreturn [{ json: { ...data, dashboard } }];"
+      },
+      "id": "format-dashboard-014",
+      "name": "1️⃣2️⃣ 📱 Format Dashboard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        300
+      ],
+      "notes": "📱 DASHBOARD: Format metrics for display\n\nCreates:\n- Key metrics cards\n- Alert summary\n- Quick stats\n- Links to full dashboard\n- Export options"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// CSV EXPORT: Generate downloadable CSV report\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { config, stats, payments, logs, mandates, alerts } = data;\n\n// CSV Header\nlet csv = \"AgentGatePay Buyer Monitoring Report\\n\";\ncsv += `Generated: ${new Date().toISOString()}\\n`;\ncsv += `User: ${config.user_email}\\n`;\ncsv += `\\n`;\n\n// Summary section\ncsv += \"SUMMARY\\n\";\ncsv += \"Metric,Value\\n\";\ncsv += `Total Spent,$${stats.total_spent}\\n`;\ncsv += `Payment Count,${stats.payment_count}\\n`;\ncsv += `Average Payment,$${stats.average_payment}\\n`;\ncsv += `Budget Remaining,$${stats.budget_remaining}\\n`;\ncsv += `Budget Utilization,${stats.budget_utilization_pct}%\\n`;\ncsv += `Active Mandates,${stats.active_mandates}\\n`;\ncsv += `Payments (24h),${stats.payments_last_24h}\\n`;\ncsv += `Spent (24h),$${stats.spent_last_24h}\\n`;\ncsv += `\\n`;\n\n// Alerts section\nif (alerts.length > 0) {\n  csv += \"ALERTS\\n\";\n  csv += \"Severity,Type,Message,Action\\n\";\n  alerts.forEach(a => {\n    csv += `${a.severity},${a.type},\"${a.message}\",\"${a.action}\"\\n`;\n  });\n  csv += `\\n`;\n}\n\n// Payment history - MERCHANT PAYMENTS\ncsv += \"MERCHANT PAYMENTS (Last 20)\\n\";\ncsv += \"Timestamp,TX Hash,Amount USD,Status,Merchant Address\\n\";\nconst merchant_logs = logs.filter(log => log.event_type === 'x402_payment_settled');\nmerchant_logs.slice(0, 20).forEach(log => {\n  const details = log.details;\n  csv += `${new Date(details.timestamp * 1000).toISOString()},${details.tx_hash},$${details.amount_usd},${details.status || 'completed'},${details.receiver_address}\\n`;\n});\ncsv += `\\n`;\n\n// COMMISSION PAYMENTS\ncsv += \"COMMISSION PAYMENTS (Last 20)\\n\";\ncsv += \"Timestamp,TX Hash,Amount USD,Status,Gateway Address\\n\";\nconst commission_logs = logs.filter(log => log.event_type === 'x402_payment_settled' && log.details.commission_tx_hash);\ncommission_logs.slice(0, 20).forEach(log => {\n  const details = log.details;\n  csv += `${new Date(details.timestamp * 1000).toISOString()},${details.commission_tx_hash},$${details.commission_amount_usd || 0},${details.status || 'completed'},${details.commission_address}\\n`;\n});\ncsv += `\\n`;\n\n// Mandate summary\nif (mandates.length > 0) {\n  csv += \"ACTIVE MANDATES\\n\";\n  csv += \"Mandate ID,Budget USD,Remaining USD,TTL Hours,Status\\n\";\n  mandates.forEach(m => {\n    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n    csv += `${details.mandate_id || 'N/A'},$${details.budget_usd || 0},$${details.budget_remaining || 0},${details.ttl_remaining_hours || 'N/A'},${details.status || 'N/A'}\\n`;\n  });\n  csv += `\\n`;\n}\n\n// Event summary\ncsv += \"EVENT SUMMARY (24h)\\n\";\ncsv += \"Category,Count\\n\";\ncsv += `Total Events,${stats.total_events_24h}\\n`;\ncsv += `Payment Events,${stats.payment_events}\\n`;\ncsv += `Mandate Events,${stats.mandate_events}\\n`;\ncsv += `AIF Security Events,${stats.aif_events}\\n`;\n\nconsole.log('📄 CSV export generated');\nconsole.log(`   Size: ${csv.length} characters`);\n\nreturn [{ json: { ...data, csv_export: csv } }];"
+      },
+      "id": "generate-csv-015",
+      "name": "1️⃣3️⃣ 📄 Generate CSV Export",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3100,
+        300
+      ],
+      "notes": "📄 EXPORT: Generate CSV report\n\nIncludes:\n- Summary metrics\n- Alerts\n- Payment history (last 10)\n- Active mandates\n- Event summary\n\nCopy csv_export field to save"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ════════════════════════════════════════════════════════════\n// FINAL REPORT: Beautiful formatted output with CORRECT calculations\n// ════════════════════════════════════════════════════════════\n\nconst data = $input.first().json;\nconst { config, stats, alerts, logs, mandates } = data;\n\n// ✅ FIX: Extract ALL payment events from audit logs\nconst payment_logs = logs.filter(log =>\n  log.event_type === 'x402_payment_settled' ||\n  log.event_type === 'x402_commission_collected'\n);\n\n// ✅ FIX: Extract commission data EMBEDDED within payment_settled events\n// Commission info is in same event as merchant payment, not separate events\nconst commission_payments = logs\n  .filter(log => log.event_type === 'x402_payment_settled' && log.details.commission_tx_hash)\n  .map(log => ({\n    timestamp: new Date(log.details.timestamp * 1000).toISOString(),\n    amount_usd: log.details.commission_amount_usd || 0,\n    status: log.details.status || 'completed',\n    tx_hash: log.details.commission_tx_hash,\n    type: 'commission',\n    receiver: log.details.commission_address,\n    payer: log.details.payer_address || log.details.sender_address,\n    explorer: log.details.commission_explorer_url || `https://basescan.org/tx/${log.details.commission_tx_hash}`\n  }));\n\nconst merchant_payments = logs\n  .filter(log => log.event_type === 'x402_payment_settled' && log.details.merchant_tx_hash)\n  .map(log => ({\n    timestamp: new Date(log.details.timestamp * 1000).toISOString(),\n    amount_usd: log.details.merchant_amount_usd || log.details.amount_usd,\n    status: log.details.status || 'completed',\n    tx_hash: log.details.merchant_tx_hash || log.details.tx_hash,\n    type: 'merchant',\n    receiver: log.details.merchant_address || log.details.receiver_address,\n    payer: log.details.payer_address || log.details.sender_address,\n    explorer: log.details.merchant_explorer_url || log.details.explorer_url || `https://basescan.org/tx/${log.details.merchant_tx_hash || log.details.tx_hash}`\n  }));\n\n// Calculate REAL total spent (commission / 0.005 to get original amount)\n// If commission is $0.00995 and rate is 0.5%, original payment was $0.00995 / 0.005 = $1.99\nconst commission_rate = 0.005; // 0.5%\nconst total_commission = commission_payments.reduce((sum, p) => sum + p.amount_usd, 0);\nconst total_merchant = merchant_payments.reduce((sum, p) => sum + p.amount_usd, 0);\n\n// Total spent = commission + merchant payments (or commission / rate if merchant data missing)\nlet total_spent;\nif (merchant_payments.length > 0) {\n  total_spent = total_commission + total_merchant;\n} else {\n  // Calculate from commission only\n  total_spent = total_commission / commission_rate;\n}\n\nconst payment_count = Math.max(commission_payments.length, merchant_payments.length);\nconst average_payment = payment_count > 0 ? total_spent / payment_count : 0;\n\n// Calculate last 24h activity\nconst oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;\nconst recent_commissions = commission_payments.filter(p => new Date(p.timestamp).getTime() > oneDayAgo);\nconst recent_merchants = merchant_payments.filter(p => new Date(p.timestamp).getTime() > oneDayAgo);\nconst payments_24h_count = Math.max(recent_commissions.length, recent_merchants.length);\nconst spent_24h = (recent_commissions.reduce((sum, p) => sum + p.amount_usd, 0) +\n                   recent_merchants.reduce((sum, p) => sum + p.amount_usd, 0)) ||\n                   (recent_commissions.reduce((sum, p) => sum + p.amount_usd, 0) / commission_rate);\n\n// ✅ FIX: Calculate CORRECT budget remaining\n// Get total budget from mandates\nconst total_budget = mandates && mandates.length > 0\n  ? mandates.reduce((sum, m) => {\n      const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n      return sum + (parseFloat(details.budget_usd) || 0);\n    }, 0)\n  : 100; // Default if no mandates\n\nconst budget_remaining = total_budget - total_spent;\nconst budget_utilization_pct = total_budget > 0 ? ((total_spent / total_budget) * 100).toFixed(2) : 0;\n\n// Combine payments for display (grouped by transaction)\nconst all_payments = [];\nconst processed_timestamps = new Set();\n\ncommission_payments.forEach(comm => {\n  const merch = merchant_payments.find(m =>\n    Math.abs(new Date(m.timestamp).getTime() - new Date(comm.timestamp).getTime()) < 5000\n  );\n\n  if (!processed_timestamps.has(comm.timestamp)) {\n    all_payments.push({\n      timestamp: comm.timestamp,\n      total_amount: merch ? comm.amount_usd + merch.amount_usd : comm.amount_usd / commission_rate,\n      commission: comm.amount_usd,\n      merchant_amount: merch ? merch.amount_usd : (comm.amount_usd / commission_rate) - comm.amount_usd,\n      commission_tx: comm.tx_hash,\n      merchant_tx: merch ? merch.tx_hash : 'N/A',\n      status: comm.status,\n      merchant_address: merch ? merch.receiver : 'N/A'\n    });\n    processed_timestamps.add(comm.timestamp);\n  }\n});\n\n// Build dashboard object with CORRECT values\nconst dashboard = {\n  metrics: {\n    total_spent: {\n      value: `$${total_spent.toFixed(2)}`,\n      label: \"Total Spent\",\n      icon: \"💰\"\n    },\n    payment_count: {\n      value: payment_count,\n      label: \"Total Payments\",\n      icon: \"💳\"\n    },\n    budget_remaining: {\n      value: `$${budget_remaining.toFixed(2)}`,\n      label: \"Budget Remaining\",\n      icon: \"🔑\",\n      percentage: `${budget_utilization_pct}% used`\n    },\n    active_mandates: {\n      value: stats.active_mandates,\n      label: \"Active Mandates\",\n      icon: \"🎫\"\n    },\n    payments_24h: {\n      value: payments_24h_count,\n      label: \"Payments (24h)\",\n      icon: \"📈\",\n      amount: `$${spent_24h.toFixed(2)}`\n    },\n    events_24h: {\n      value: stats.total_events_24h,\n      label: \"Events Logged (24h)\",\n      icon: \"📋\"\n    }\n  },\n  alerts_summary: {\n    count: alerts.length,\n    high: alerts.filter(a => a.severity === 'high').length,\n    medium: alerts.filter(a => a.severity === 'medium').length,\n    low: alerts.filter(a => a.severity === 'low').length,\n    items: alerts\n  },\n  quick_stats: {\n    average_payment: `$${average_payment.toFixed(2)}`,\n    spending_trend: spent_24h > average_payment ? 'increasing' : 'stable',\n    budget_utilization: `${budget_utilization_pct}%`,\n    last_payment_verified: \"✅ Verified\"\n  },\n  links: {\n    user_analytics: `${config.api_url}/v1/analytics/me`,\n    audit_logs: `${config.api_url}/audit/logs?client_id=${config.buyer_wallet || config.user_email}`,\n    payment_history: `${config.api_url}/v1/payments/list`\n  }\n};\n\n// Update stats with CORRECT values\nstats.total_spent = total_spent;\nstats.payment_count = payment_count;\nstats.average_payment = average_payment;\nstats.payments_last_24h = payments_24h_count;\nstats.spent_last_24h = spent_24h;\nstats.budget_remaining = budget_remaining;\nstats.budget_utilization_pct = budget_utilization_pct;\nstats.spending_trend = dashboard.quick_stats.spending_trend;\n\n// Build formatted report (ORIGINAL FORMAT)\nconst report = {\n  // Header\n  \"═══════════════════════════════════════════════════════════════\": \"\",\n  \"🎯 AGENTGATEPAY BUYER MONITORING DASHBOARD\": \"\",\n  \"═══════════════════════════════════════════════════════════════_\": \"\",\n\n  user: config.user_email,\n  generated: new Date().toISOString(),\n  session_id: config.session?.id || 'N/A',\n  trigger_source: config.trigger_source || 'manual',\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\": \"\",\n  \"📊 KEY METRICS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_\": \"\",\n\n  metrics: dashboard.metrics,\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━__\": \"\",\n  \"🚨 ALERTS & WARNINGS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━___\": \"\",\n\n  alerts_count: `${alerts.length} alert(s) - ${dashboard.alerts_summary.high} high, ${dashboard.alerts_summary.medium} medium, ${dashboard.alerts_summary.low} low`,\n  alerts: alerts.length > 0 ? alerts : [{ message: \"✅ No alerts - all systems normal\" }],\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━____\": \"\",\n  \"📈 SPENDING ANALYSIS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_____\": \"\",\n\n  spending_analysis: {\n    total_spent: `$${stats.total_spent.toFixed(2)} USD`,\n    payments_count: stats.payment_count,\n    average_payment: `$${stats.average_payment.toFixed(2)} USD`,\n    last_24h: `${stats.payments_last_24h} payments ($${stats.spent_last_24h.toFixed(2)} USD)`,\n    trend: stats.spending_trend,\n    budget_utilization: `${stats.budget_utilization_pct}% used`,\n    budget_remaining: `$${stats.budget_remaining.toFixed(2)} USD`\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━______\": \"\",\n  \"💳 PAYMENTS TO MERCHANTS/AGENTS (Last 20)\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_______\": \"\",\n\n  merchant_payments: merchant_payments.slice(0, 20).map(p => ({\n    timestamp: p.timestamp,\n    amount_paid: `$${p.amount_usd.toFixed(4)} USD`,\n    merchant_address: p.receiver,\n    tx_hash: p.tx_hash,\n    status: p.status,\n    explorer: p.explorer || `https://basescan.org/tx/${p.tx_hash}`\n  })),\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━________\": \"\",\n  \"💰 GATEWAY COMMISSION PAYMENTS (Last 20)\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_________\": \"\",\n\n  commission_payments_list: commission_payments.slice(0, 20).map(p => ({\n    timestamp: p.timestamp,\n    commission: `$${p.amount_usd.toFixed(4)} USD (0.5%)`,\n    gateway_address: p.receiver,\n    tx_hash: p.tx_hash,\n    status: p.status,\n    explorer: p.explorer || `https://basescan.org/tx/${p.tx_hash}`\n  })),\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━________\": \"\",\n  \"🔑 ACTIVE MANDATES\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_________\": \"\",\n\n  mandates_summary: mandates && mandates.length > 0 ? mandates.map(m => {\n    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;\n\n    // ✅ FIX: Calculate TTL and remaining budget correctly\n    let ttl_hours = details.ttl_remaining_hours;\n    if (!ttl_hours && details.expires_at) {\n      const now = Math.floor(Date.now() / 1000);\n      const expires = details.expires_at;\n      ttl_hours = Math.max(0, Math.floor((expires - now) / 3600));\n    }\n\n    // Calculate this mandate's remaining budget\n    const mandate_budget = parseFloat(details.budget_usd) || 0;\n    const mandate_spent = total_spent; // Simplified - assumes one mandate\n    const mandate_remaining = mandate_budget - mandate_spent;\n\n    return {\n      mandate_id: details.mandate_id,\n      budget: `$${mandate_budget.toFixed(2)} USD ($${mandate_remaining.toFixed(2)} USD remaining)`,\n      ttl: ttl_hours ? `${ttl_hours} hours` : 'expired',\n      status: details.status\n    };\n  }) : [{ message: \"No active mandates\" }],\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━__________\": \"\",\n  \"📊 EVENT ACTIVITY (24h)\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━___________\": \"\",\n\n  event_activity: {\n    total_events: stats.total_events_24h,\n    payment_events: stats.payment_events,\n    commission_events: commission_payments.length,\n    mandate_events: stats.mandate_events,\n    aif_security_events: stats.aif_events\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━____________\": \"\",\n  \"🔍 SEARCH YOUR LOGS - COPY & PASTE CURL COMMANDS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_____________\": \"\",\n\n  search_commands: {\n    \"📅 Last 24 hours\": `curl '${config.api_url}/audit/logs?client_id=${config.buyer_wallet || config.user_email}&hours=24' -H 'x-api-key: ${config.api_key}'`,\n\n    \"📅 Last 7 days\": `curl '${config.api_url}/audit/logs?client_id=${config.buyer_wallet || config.user_email}&hours=168' -H 'x-api-key: ${config.api_key}'`,\n\n    \"💳 Payment events\": `curl '${config.api_url}/audit/logs?client_id=${config.buyer_wallet || config.user_email}&event_type=x402_payment_settled' -H 'x-api-key: ${config.api_key}'`,\n\n    \"💰 Commission events\": `curl '${config.api_url}/audit/logs?client_id=${config.buyer_wallet || config.user_email}&event_type=x402_commission_collected' -H 'x-api-key: ${config.api_key}'`,\n\n    \"🔑 Mandate events\": `curl '${config.api_url}/audit/logs?client_id=${config.buyer_wallet || config.user_email}&event_type=mandate_issued' -H 'x-api-key: ${config.api_key}'`,\n\n    \"📊 Analytics\": `curl '${config.api_url}/v1/analytics/me' -H 'x-api-key: ${config.api_key}'`\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━______________\": \"\",\n  \"🔗 API ENDPOINTS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_______________\": \"\",\n\n  api_endpoints: {\n    \"📊 User Analytics\": dashboard.links.user_analytics,\n    \"📋 Audit Logs\": dashboard.links.audit_logs,\n    \"💳 Payment History\": dashboard.links.payment_history,\n    \"💡 How to use\": \"Add header: x-api-key: \" + config.api_key\n  },\n\n  \"\\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━________________\": \"\",\n  \"📥 EXPORT OPTIONS\": \"\",\n  \"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━_________________\": \"\",\n\n  export_options: {\n    \"📄 CSV Export\": \"See 'csv_export' field in raw_data\",\n    \"📦 JSON Export\": \"This complete JSON output\",\n    \"📊 How to View\": \"Use curl commands above to fetch your data\"\n  },\n\n  \"\\n═══════════════════════════════════════════════════════════════__________________\": \"\",\n  \"✅ MONITORING COMPLETE\": \"\",\n  \"═══════════════════════════════════════════════════════════════___________________\": \"\",\n\n  summary: `Monitored ${stats.payment_count} payments, $${stats.total_spent.toFixed(2)} USD spent (incl. $${total_commission.toFixed(4)} commission), ${alerts.length} alert(s), ${stats.active_mandates} active mandate(s)`,\n\n  next_steps: alerts.length > 0\n    ? \"⚠️  Review alerts above and take recommended actions\"\n    : \"✅ All systems normal - no action required\"\n};\n\nconsole.log('✅ Final report generated');\nconsole.log(`   Total Spent: $${stats.total_spent.toFixed(2)} USD`);\nconsole.log(`   Commission: $${total_commission.toFixed(4)} USD`);\nconsole.log(`   To Merchants: $${total_merchant > 0 ? total_merchant.toFixed(4) : (total_spent - total_commission).toFixed(4)} USD`);\nconsole.log(`   Payments: ${stats.payment_count}`);\nconsole.log(`   Budget Remaining: $${stats.budget_remaining.toFixed(2)} USD`);\n\n// Remove duplicate dashboard from raw_data (already shown in report metrics)\ndelete data.dashboard;\n\nreturn [{ json: { report, raw_data: data } }];\n"
+      },
+      "id": "final-report-016",
+      "name": "1️⃣4️⃣ 📋 Final Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3320,
+        300
+      ],
+      "notes": "📋 FINAL REPORT: Complete formatted output\n\nIncludes:\n- Key metrics summary\n- Alerts and warnings\n- Spending analysis\n- Recent payments\n- Active mandates\n- Event activity\n- Dashboard links (hybrid)\n- Export options\n\n✅ This is the final output!"
+    },
+    {
+      "parameters": {
+        "content": "# 📊 AgentGatePay Buyer/User Monitoring Dashboard\n\n## What This Does\nComprehensive monitoring dashboard for buyers/users showing payment history, spending analytics, mandates, alerts, and transaction details.\n\n---\nIf running manually:\n1. Click Node 2 \"Load Config\"\n2. Edit these values:\n   ```javascript\n   payer_wallet: \"0xYOUR_WALLET_ADDRESS\"\n   api_key: \"pk_live_YOUR_API_KEY\"\n   ```\n\n*Can be run with trigger from the payment workflow execution.\n\n---\n## How to Use\n\n### Option A: Manual Trigger\n1. Configure wallet + API key in Node 2\n2. Click \"Execute Workflow\"\n3. View results in Node 14 output\n\n### Option B: Automatic Trigger \n1. Payment workflow completes transaction\n2. Sends webhook to this workflow\n3. Dashboard generates automatically\n4. View results in execution output\n\n---\n\n## What You'll See\n\n### 📊 Key Metrics\n- Total spending (all time)\n- Payment count (sent)\n- Average payment amount\n- Spending this month (+growth %)\n- Payments (last 24h)\n- Active mandates\n\n### 🚨 Alerts\n- Failed payments\n- High spending alerts\n- Mandate budget warnings\n- Low success rate (<90%)\n- No payments in 24h\n\n### 📈 Spending Analysis\n- Total spent\n- Average payment\n- This month spending\n- Last 24h activity\n- Spending trend\n- Success rate %\n\n### 💳 Recent Payments Sent\n- Last 50 payments\n- Amount, status, timestamp\n- Receiver address\n- Blockchain explorer links\n\n### 🏪 Top Merchants\n- Merchant address\n- Total paid\n- Payment count\n\n### 📜 Active Mandates\n- Mandate ID\n- Budget remaining\n- Expiration date\n- Scope/permissions\n\n### 🔗 Dashboard Links (Hybrid View)\n- Payment List API\n- Audit Logs API\n- User Analytics API\n- Admin Dashboard link (owner only)\n\n### 📥 Export Options\n- CSV export (copy csv_export field)\n- JSON export (complete output)\n- API links for external viewing\n\n---\n\n## Understanding the Output\n\n### Node 14: Final Report\nThis is the main output with:\n- `report`: Formatted readable summary\n- `raw_data`: Complete data for custom processing\n\n### Node 13: CSV Export\nCopy the `csv_export` field to save as .csv file\n\n### Dashboard Links\n**User APIs** (you can access):\n- `/v1/payments/list` - Your payment history\n- `/v1/analytics/me` - Your spending analytics\n- `/audit/logs` - Your transaction events\n\n\n---\n\n## Troubleshooting\n\n**Problem**: \"No data returned\"\n- **Fix**: Check API key is correct in Node 2\n- **Fix**: Check wallet address is correct\n\n**Problem**: \"Webhook not triggering\"\n- **Fix**: Ensure webhook URL is correct in payment workflow\n\n**Problem**: \"Dashboard link doesn't work\"\n- **Fix**: Admin dashboard requires owner's admin key (x-admin-key header)\n- **Fix**: Use User Analytics API instead (no admin key needed)\n\n**Problem**: \"No payments showing\"\n- **Fix**: Verify wallet address matches your sending wallet\n\n---\n\n## Time Range Settings\n\nEdit in Node 2 \"Load Config\":\n```javascript\ntime_range_hours: 24,        // Audit logs time range\npayment_history_limit: 50,   // Number of payments to show\naudit_log_limit: 50          // Max audit log entries\n```\n\n---\n\n## Production Usage\n\n1. **Automatic Monitoring**: Webhook triggers after each payment sent\n2. **Scheduled Monitoring**: Use Schedule Trigger (daily/weekly spending reports)\n3. **On-Demand**: Run manually anytime to check payment status\n\n---\n\n## Mandate Management\n\nTo track spending limits and permissions:\n\n1. Issue mandate: `POST /mandates/issue`\n   ```json\n   {\n     \"subject\": \"your-agent-id\",\n     \"budget_usd\": 100.0,\n     \"scope\": \"resource.read,payment.execute\",\n     \"ttl_minutes\": 1440\n   }\n   ```\n2. Monitor budget usage in this dashboard\n\n---\n\n**Built with AgentGatePay** 🚀",
+        "height": 3600,
+        "width": 480
+      },
+      "id": "readme-sticky",
+      "name": "📖 README - START HERE!",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -100
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "▶️ Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "2️⃣ Load Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2️⃣ Load Config": {
+      "main": [
+        [
+          {
+            "node": "3️⃣ 📈 Get User Analytics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3️⃣ 📈 Get User Analytics": {
+      "main": [
+        [
+          {
+            "node": "4️⃣ 💳 Get Payment History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4️⃣ 💳 Get Payment History": {
+      "main": [
+        [
+          {
+            "node": "5️⃣ 📋 Get Audit Logs (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5️⃣ 📋 Get Audit Logs (24h)": {
+      "main": [
+        [
+          {
+            "node": "6️⃣ 🔑 Get Active Mandates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6️⃣ 🔑 Get Active Mandates": {
+      "main": [
+        [
+          {
+            "node": "7️⃣ 🔍 Prepare Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7️⃣ 🔍 Prepare Verification": {
+      "main": [
+        [
+          {
+            "node": "7B️⃣ Has TX Hash?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7B️⃣ Has TX Hash?": {
+      "main": [
+        [
+          {
+            "node": "8️⃣ ✅ Verify on Blockchain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "8B️⃣ Skip Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8️⃣ ✅ Verify on Blockchain": {
+      "main": [
+        [
+          {
+            "node": "9️⃣ Merge Verification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8B️⃣ Skip Verification": {
+      "main": [
+        [
+          {
+            "node": "9️⃣ Merge Verification",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "9️⃣ Merge Verification": {
+      "main": [
+        [
+          {
+            "node": "🔟 📊 Calculate Statistics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔟 📊 Calculate Statistics": {
+      "main": [
+        [
+          {
+            "node": "1️⃣1️⃣ 🚨 Check Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣1️⃣ 🚨 Check Alerts": {
+      "main": [
+        [
+          {
+            "node": "1️⃣2️⃣ 📱 Format Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣2️⃣ 📱 Format Dashboard": {
+      "main": [
+        [
+          {
+            "node": "1️⃣3️⃣ 📄 Generate CSV Export",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1️⃣3️⃣ 📄 Generate CSV Export": {
+      "main": [
+        [
+          {
+            "node": "1️⃣4️⃣ 📋 Final Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "buyer-monitoring-v1",
+  "meta": {
+    "instanceId": "agentgatepay-buyer-monitoring"
+  },
+  "id": "buyer-monitoring-dashboard",
+  "tags": []
+}
