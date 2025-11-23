@@ -126,6 +126,7 @@
 
   ## Features
 
+  - **AIF (Agent Interaction Firewall)** - First firewall built for AI agents with rate limiting and reputation system
   - Multi-chain blockchain support (Ethereum, Base, Polygon, Arbitrum)
   - Multi-token support (USDC, USDT, DAI) with automatic decimal handling
   - Real-time notifications (Slack, Email, Discord, Webhooks)
@@ -157,10 +158,11 @@
   ## Documentation
 
   - [AgentGatePay API Documentation](https://docs.agentgatepay.com/api) - REST API reference
-  - [n8n Complete Guide](n8n/README.md) - Full setup, configuration, and troubleshooting
-  - [Multi-Token & Multi-Chain Guide](docs/guides/MULTI_TOKEN_CHAIN_GUIDE.md) - Detailed token/chain configuration
+  - [SDK Repository](https://github.com/AgentGatePay/agentgatepay-sdks) - Official SDKs (JavaScript + Python)
   - [Python SDK Documentation](https://pypi.org/project/agentgatepay-sdk/) - Python package reference
   - [JavaScript SDK Documentation](https://www.npmjs.com/package/agentgatepay-sdk/) - npm package reference
+  - [n8n Complete Guide](n8n/README.md) - Full setup, configuration, and troubleshooting
+  - [Multi-Token & Multi-Chain Guide](docs/guides/MULTI_TOKEN_CHAIN_GUIDE.md) - Detailed token/chain configuration
   - [MCP Integration](https://mcp.agentgatepay.com) - Model Context Protocol (15 tools)
 
   ---
