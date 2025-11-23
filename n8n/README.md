@@ -134,9 +134,10 @@ Before importing these templates, you need:
    - Seller wallet address (receives payments)
 
 3. **Transaction Signing Service**
-   - Deploy Render/Railway service from: https://github.com/agentgatepay/transaction-signing-service
-   - Or use Coinbase x402 API (alternative option)
-   - Or implement custom signing solution
+   - Option 1: Use AgentGatePay SDK with local signing (ethers.js or web3.py)
+   - Option 2: Deploy Render/Railway service from: https://github.com/AgentGatePay/TX
+   - Option 3: Use Coinbase x402 API
+   - Option 4: Implement custom signing solution
 
 4. **N8N Environment**
    - N8N Cloud account (n8n.cloud) OR
@@ -180,31 +181,64 @@ Save the API keys returned in the response (shown only once).
 
 ---
 
-### Step 3: Deploy Transaction Signing Service
+### Step 3: Choose Transaction Signing Method
 
-**Option A: Render (Recommended - Free tier available)**
+**Option 1: SDK with Local Signing (Simple, no external service)**
 
-1. Fork repository: [https://github.com/agentgatepay/transaction-signing-service](https://github.com/AgentGatePay/TX)
-2. Create new Web Service on Render.com
+Use AgentGatePay SDK (JavaScript or Python) with ethers.js/web3.py for local transaction signing. This approach signs transactions directly in your N8N workflow using the SDK without requiring external services.
+
+**Pros:**
+- No external service deployment needed
+- Direct control over signing process
+- Works with existing infrastructure
+- Full SDK feature access (mandates, payments, analytics)
+
+**Cons:**
+- Requires SDK installation in N8N environment
+- Need to manage private key securely in N8N
+- Slightly more code than managed service options
+
+**Implementation:** Replace Render/Railway API calls in buyer workflow with SDK code. See N8N_IMPLEMENTATION_GUIDE.md for SDK integration examples.
+
+---
+
+**Option 2: Render/Railway Service (Managed, easy deployment)**
+
+1. Fork repository: https://github.com/AgentGatePay/TX
+2. Create new Web Service on Render.com or Railway.app
 3. Connect your GitHub repository
-4. Add environment variables.
+4. Add environment variables
 5. Deploy (takes ~2 minutes)
-6. Save service URL: `https://your-app.onrender.com`
+6. Save service URL: `https://your-app.onrender.com` or `https://your-app.railway.app`
 
-**Option B: Railway**
+**Pros:**
+- Quick setup (2-minute deployment)
+- Isolated private key management
+- Free tier available
+- Pre-configured N8N workflow templates provided
 
-1. Fork repository: https://github.com/agentgatepay/transaction-signing-service
-2. Create new project on Railway.app
-3. Connect your GitHub repository
-4. Add environment variable: `PRIVATE_KEY=0xYourBuyerPrivateKey...`
-5. Deploy (takes ~2 minutes)
-6. Save service URL: `https://your-app.railway.app`
+**Cons:**
+- External dependency
+- Cold start delays on free tier (~5 seconds)
 
-**Option C: Coinbase x402 API**
+**N8N Templates:** This method includes ready-to-use N8N workflow templates (included in this repository). If you need help or additional custom workflows, please contact us at support@agentgatepay.com
+
+---
+
+**Option 3: Coinbase x402 API (Managed, KYC required)**
 
 1. Create Coinbase account and get API key
 2. Use Coinbase x402 endpoint in templates
 3. See documentation: https://docs.agentgatepay.com/transaction-signing
+
+**Pros:**
+- Managed by Coinbase
+- Zero transaction fees
+- No deployment needed
+
+**Cons:**
+- Requires KYC verification
+- Regional restrictions may apply
 
 ---
 
@@ -354,58 +388,90 @@ The buyer agent template uses N8N Data Tables to persist mandate tokens across e
 
 ### Transaction Signing Options
 
-#### 1. Render/Railway Service (Recommended)
+#### 1. SDK with Local Signing
+
+Use the AgentGatePay SDK directly in your N8N workflow to sign transactions locally without external services.
 
 **Pros:**
+- No external service needed
+- Direct control over signing
+- Full SDK capabilities (mandates, payments, webhooks, analytics)
+- Lower latency (no network calls to signing service)
+
+**Cons:**
+- Requires SDK installation in N8N environment
+- Private key stored in N8N credentials
+- More code than managed service options
+
+**Setup:**
+Replace the Render/Railway HTTP request node in the buyer workflow with SDK code that signs transactions using ethers.js (JavaScript) or web3.py (Python). Basic implementation involves initializing a wallet with your private key and calling the transfer function on the USDC contract.
+
+**Note:** This approach is similar to Render/Railway but runs the signing code directly in N8N instead of calling an external service.
+
+---
+
+#### 2. Render/Railway Service
+
+Deploy a managed transaction signing service to an external platform.
+
+**Pros:**
+- Quick deployment (2 minutes)
+- Isolated private key storage
 - Free tier available
-- 2-minute setup
-- No blockchain knowledge required
-- Secure (private key isolated)
+- No N8N configuration changes needed
 
 **Cons:**
 - External dependency
-- Cold start delay (~5 sec first request)
+- Cold start delays on free tier (~5 seconds)
+- Additional service to maintain
 
 **Setup:** See Step 3 above
 
 ---
 
-#### 2. Coinbase x402 API (Alternative)
+#### 3. Coinbase x402 API
+
+Use Coinbase managed wallet infrastructure for transaction signing.
 
 **Pros:**
-- 0% transaction fees
+- Zero transaction fees
 - Managed by Coinbase
-- No deployment needed
+- No deployment or maintenance
+- Enterprise-grade security
 
 **Cons:**
-- Requires Coinbase account
-- KYC verification needed
-- Regional restrictions may apply
+- KYC verification required
+- Regional restrictions
+- Coinbase API dependency
 
 **Setup:**
 1. Get Coinbase API key: https://www.coinbase.com/cloud
-2. In buyer template, replace Render service calls with Coinbase x402 API
+2. Replace Render service calls with Coinbase x402 API in buyer workflow
 3. See documentation: https://docs.agentgatepay.com/coinbase-x402
 
 ---
 
-#### 3. Custom Implementation
+#### 4. Custom Implementation
+
+Build your own transaction signing service tailored to your infrastructure.
 
 **Pros:**
-- Full control
+- Full control over implementation
+- Can integrate with existing systems
 - No external dependencies
-- Can be hosted on same server as agent
 
 **Cons:**
-- Requires development work
+- Development work required
 - Must handle private key security
+- Ongoing maintenance responsibility
 
 **Languages Supported:**
-- Python (ethers.py, web3.py)
+- Python (web3.py, eth-account)
 - JavaScript/TypeScript (ethers.js, web3.js)
-- Any language with Web3 library
+- Go (go-ethereum)
+- Any language with Web3 library support
 
-**Example:** See https://github.com/agentgatepay/agentgatepay-sdk
+**Reference Implementation:** See https://github.com/AgentGatePay/TX for a complete Node.js example
 
 ---
 

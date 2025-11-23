@@ -270,9 +270,10 @@ Request → AIF Check → Rate Limit → Nonce Validation → Reputation Check �
    - Funded with USDC (payments) and ETH (gas fees) on Base network
 
 4. **Transaction Signing Service**
-   - Deploy to Render or Railway (instructions below)
-   - Stores buyer's private key and signs transactions
-   - Alternative: Use Coinbase Wallet API or other external wallet service
+   - Option 1: Use AgentGatePay SDK with local signing (ethers.js or web3.py)
+   - Option 2: Deploy to Render or Railway (instructions below)
+   - Option 3: Use Coinbase Wallet API
+   - Option 4: Implement custom signing service
 
 ---
 
@@ -294,7 +295,70 @@ The transaction signing service is required for autonomous blockchain transactio
 - N8N calls service API to request signed transactions
 - Service returns transaction hashes for both merchant and commission
 
-### Option 1: Render One-Click Deploy (Recommended)
+### Option 0: SDK with Local Signing
+
+Use the AgentGatePay SDK (JavaScript or Python) directly in your N8N workflow to sign transactions locally without deploying external services. This approach executes the same transaction signing logic that would run in Render/Railway, but directly within N8N.
+
+**How It Works:**
+Replace the HTTP Request node that calls Render/Railway with a Code node that uses ethers.js (JavaScript) or web3.py (Python) to sign USDC transfer transactions.
+
+**Basic Implementation Concept:**
+```javascript
+// In N8N Code node (JavaScript)
+const { ethers } = require('ethers');
+
+// Initialize wallet and provider
+const provider = new ethers.JsonRpcProvider('https://mainnet.base.org');
+const wallet = new ethers.Wallet(privateKey, provider);
+
+// USDC contract on Base
+const usdcContract = new ethers.Contract(
+  '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  ['function transfer(address,uint256)'],
+  wallet
+);
+
+// Calculate commission (0.5%)
+const commission = BigInt(totalAmount) * BigInt(5) / BigInt(1000);
+const merchantAmount = BigInt(totalAmount) - commission;
+
+// Execute two transactions
+const tx1 = await usdcContract.transfer(commissionAddress, commission);
+await tx1.wait();
+
+const tx2 = await usdcContract.transfer(merchantAddress, merchantAmount);
+await tx2.wait();
+
+// Return both transaction hashes
+return {
+  tx_hash: tx2.hash,
+  tx_hash_commission: tx1.hash
+};
+```
+
+**Pros:**
+- No external service deployment needed
+- Lower latency (no HTTP round-trip to external service)
+- Full control over signing process
+- Simpler architecture (fewer moving parts)
+
+**Cons:**
+- Requires SDK and Web3 library installation in N8N environment
+- Private key stored in N8N credentials (must be secured properly)
+- More complex N8N workflow code than HTTP request
+- Depends on N8N environment supporting npm packages (ethers.js/web3.js)
+
+**When to Use:**
+- Self-hosted N8N with full control over environment
+- Need lowest possible latency
+- Want to avoid external dependencies
+- Comfortable managing secrets in N8N
+
+**Note:** This approach provides the same security and functionality as Render/Railway options but executes the signing code directly in N8N instead of calling an external service. For most users, Render/Railway deployment (Option 1 below) is simpler and requires less N8N configuration.
+
+---
+
+### Option 1: Render One-Click Deploy
 
 **🚀 One-Click Deploy - 3 minutes to production**
 
