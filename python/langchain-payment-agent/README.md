@@ -61,7 +61,8 @@ This repository contains **6 complete examples** demonstrating how to integrate 
 
 ```bash
 # Clone repository
-cd /home/maxmedov/agentgatepay-examples/python/langchain-payment-agent
+git clone https://github.com/AgentGatePay/agentgatepay-examples.git
+cd agentgatepay-examples/python/langchain-payment-agent
 
 # Create virtual environment
 python3 -m venv venv
