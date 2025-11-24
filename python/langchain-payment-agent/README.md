@@ -8,12 +8,13 @@
 
 ## Overview
 
-This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **9 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1-3:** REST API basics (payment, buyer/seller, audit logs)
 - **Examples 4-6:** MCP tools basics (same features as 1-3 using MCP)
 - **Example 7:** REST API complete (ALL 10 AgentGatePay features)
 - **Example 8:** MCP complete (ALL 15 MCP tools - 100% coverage)
+- **Example 9:** PRODUCTION signing (external TX service - NO private key in code)
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -166,6 +167,9 @@ python examples/7_api_complete_features.py
 
 # Example 8: Complete features demo (MCP tools) - ALL 15 MCP TOOLS
 python examples/8_mcp_complete_features.py
+
+# Example 9: Production TX signing (external service) - PRODUCTION READY 🚀
+python examples/9_api_with_tx_service.py
 ```
 
 ## Examples Overview
@@ -453,6 +457,82 @@ MCP version of Example 3, demonstrating comprehensive audit logging using MCP to
    100% feature parity with REST API
    Matches n8n workflow capabilities
 ```
+
+---
+
+### Example 9: Production TX Signing (External Service) ⭐ **PRODUCTION READY**
+
+**File:** `examples/9_api_with_tx_service.py`
+
+**PRODUCTION-READY payment flow using external transaction signing service:**
+- ✅ NO private key in application code
+- ✅ Signing handled by external service (Render/Docker/Railway)
+- ✅ Secure private key storage
+- ✅ Scalable architecture
+
+**Flow:**
+1. Issue mandate via SDK
+2. Request signature from external TX service
+3. Service signs both transactions (merchant + commission)
+4. Submit payment proof to AgentGatePay
+5. Verify payment completion
+
+**External Service Call:**
+```python
+response = requests.post(
+    f"{TX_SIGNING_SERVICE}/sign-payment",
+    headers={"x-api-key": BUYER_API_KEY},
+    json={
+        "merchant_address": recipient,
+        "amount_usd": str(amount_usd),
+        "chain": "base",
+        "token": "USDC"
+    },
+    timeout=120
+)
+# Returns: {tx_hash, tx_hash_commission, status}
+```
+
+**Security Benefits:**
+- ✅ Private key stored in signing service, NOT in code
+- ✅ Application cannot access private keys
+- ✅ Signing service can be audited independently
+- ✅ Scalable deployment (Render/Docker/Railway/self-hosted)
+
+**Setup:**
+1. Deploy TX signing service ([Render one-click](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX) or Docker)
+2. Add `TX_SIGNING_SERVICE=https://your-service.onrender.com` to `.env`
+3. Run `python examples/9_api_with_tx_service.py`
+
+**Output:**
+```
+🏥 Signing service is healthy
+✅ Wallet configured: true
+
+🔐 Issuing mandate with $100 budget...
+✅ Mandate issued successfully
+
+💳 Requesting payment signature from external service...
+✅ Payment signed and submitted by external service
+   Merchant TX: 0xabc123...
+   Commission TX: 0xdef456...
+
+🔍 Verifying payment: 0xabc123...
+✅ Payment verified successfully
+
+✅ PRODUCTION SUCCESS:
+   Private key: SECURE (stored in signing service)
+   Application code: CLEAN (no private keys)
+   Payment: VERIFIED (on Base blockchain)
+```
+
+**Why This Matters:**
+- Separates payment logic from key management
+- Allows secure production deployments
+- Keys can be rotated without code changes
+- Service can be scaled independently
+
+**See:** [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for complete deployment guide
 
 ---
 

@@ -123,7 +123,9 @@ REQUIRED_FILES=(
     "examples/2b_api_seller_agent.py"
     "examples/3_api_with_audit.py"
     "examples/4_mcp_basic_payment.py"
+    "examples/9_api_with_tx_service.py"
     "docs/API_VS_MCP.md"
+    "docs/TX_SIGNING_OPTIONS.md"
     "tests/test_imports.py"
     "tests/test_configuration.py"
 )
@@ -288,10 +290,45 @@ else
     done
 
     # ========================================
-    # TEST 9: Example script validation
+    # TEST 9: TX Signing Service (Optional)
     # ========================================
 
-    print_header "TEST 9: Example Scripts Validation"
+    print_header "TEST 9: TX Signing Service (Optional)"
+
+    # Check if TX_SIGNING_SERVICE is configured
+    if [ -f ".env" ] && grep -q "^TX_SIGNING_SERVICE=" .env; then
+        TX_SERVICE_URL=$(grep "^TX_SIGNING_SERVICE=" .env | cut -d= -f2-)
+        echo "TX signing service configured: $TX_SERVICE_URL"
+
+        # Try to check service health
+        if command -v curl &> /dev/null; then
+            if curl -s --max-time 5 "${TX_SERVICE_URL}/health" > /dev/null 2>&1; then
+                print_success "TX signing service is reachable: $TX_SERVICE_URL"
+                print_success "Example 9 can be tested with external signing"
+            else
+                print_warning "TX signing service not reachable: $TX_SERVICE_URL"
+                print_warning "Example 9 will skip external signing tests"
+            fi
+        else
+            print_warning "curl not available - cannot test TX service connectivity"
+        fi
+    else
+        print_skip "TX_SIGNING_SERVICE not configured (Example 9 will be skipped)"
+        print_skip "This is optional - see docs/TX_SIGNING_OPTIONS.md for setup"
+    fi
+
+    # Check Example 9 exists
+    if [ -f "examples/9_api_with_tx_service.py" ]; then
+        print_success "Example 9 file exists (external signing service integration)"
+    else
+        print_warning "Example 9 file missing (expected: examples/9_api_with_tx_service.py)"
+    fi
+
+    # ========================================
+    # TEST 10: Example script validation
+    # ========================================
+
+    print_header "TEST 10: Example Scripts Validation"
 
     # Check each example has proper structure
     for py_file in examples/*.py; do

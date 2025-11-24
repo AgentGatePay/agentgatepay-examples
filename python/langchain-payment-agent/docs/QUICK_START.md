@@ -261,7 +261,15 @@ python examples/7_api_complete_features.py
 
 # Example 8: ALL 15 MCP tools (100% coverage)
 python examples/8_mcp_complete_features.py
+
+# Example 9: Production signing (external service) - PRODUCTION READY 🚀
+python examples/9_api_with_tx_service.py
 ```
+
+**Example 9 Requirements:**
+- TX signing service must be deployed (see Step 4, Option B)
+- `TX_SIGNING_SERVICE` must be set in `.env` file
+- Uses external service for secure transaction signing (NO private key in code)
 
 ### Learn More
 
