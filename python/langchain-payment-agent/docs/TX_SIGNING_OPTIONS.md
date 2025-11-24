@@ -155,7 +155,7 @@ Python Script submits proof to AgentGatePay
 **Step 1: Pull Docker Image**
 
 ```bash
-docker pull ghcr.io/agentgatepay/tx-signing-service:latest
+docker pull agentgatepay/tx-signing-service:latest
 ```
 
 **Step 2: Create Environment File**
@@ -176,7 +176,7 @@ docker run -d \
   --env-file .env.signing-service \
   -p 3000:3000 \
   --restart unless-stopped \
-  ghcr.io/agentgatepay/tx-signing-service:latest
+  agentgatepay/tx-signing-service:latest
 ```
 
 **Step 4: Test Service**
@@ -228,7 +228,7 @@ payment = agentpay.payments.submit(
 version: '3.8'
 services:
   tx-signing-service:
-    image: ghcr.io/agentgatepay/tx-signing-service:latest
+    image: agentgatepay/tx-signing-service:latest
     ports:
       - "3000:3000"
     environment:

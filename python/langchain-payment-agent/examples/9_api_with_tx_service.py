@@ -49,7 +49,7 @@ load_dotenv()
 #
 # Setup options:
 # - Option 1: Render one-click deploy (https://github.com/AgentGatePay/TX)
-# - Option 2: Docker container (docker run ghcr.io/agentgatepay/tx-signing-service)
+# - Option 2: Docker container (docker pull agentgatepay/tx-signing-service)
 # - Option 3: Railway deployment (see docs/TX_SIGNING_OPTIONS.md)
 # - Option 4: Self-hosted service (clone TX repo, npm start)
 #
