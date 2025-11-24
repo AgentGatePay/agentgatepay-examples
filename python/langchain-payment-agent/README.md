@@ -103,7 +103,38 @@ SELLER_WALLET=0xYOUR_SELLER_WALLET
 
 # OpenAI
 OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
+
+# Optional: External TX Signing Service (recommended for production)
+TX_SIGNING_SERVICE=https://your-service.onrender.com
 ```
+
+### Transaction Signing (Important!)
+
+AgentGatePay requires blockchain transactions to be signed. Choose your signing method:
+
+#### Option A: Local Signing (Development Only)
+
+✅ **Best for:** Testing and learning
+⚠️ **NOT for production**
+
+Private key stored in `.env` file. Used in examples 1-8.
+
+#### Option B: External Signing Service (Production Ready)
+
+✅ **Best for:** Production deployments
+✅ **Private key NOT in application code**
+
+**Quick Deploy (3 minutes):**
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+1. Click deploy button
+2. Add `WALLET_PRIVATE_KEY` and `AGENTPAY_API_KEY`
+3. Save service URL: `https://your-service.onrender.com`
+4. Add to `.env`: `TX_SIGNING_SERVICE=https://your-service.onrender.com`
+5. Run `python examples/9_api_with_tx_service.py`
+
+**See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for all options** (Docker, Railway, self-hosted, etc.)
 
 ### Run Examples
 

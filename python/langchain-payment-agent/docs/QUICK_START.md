@@ -93,7 +93,50 @@ pip install -r requirements.txt
 
 ---
 
-## Step 4: Configure Environment (1 minute)
+## Step 4: Choose Transaction Signing Method (Important!)
+
+AgentGatePay requires blockchain transactions to be signed. You have 2 options:
+
+### Option A: Local Signing (Quick Start - Development Only)
+
+✅ **Best for:** Testing and learning
+⚠️ **NOT recommended for production**
+
+Private key stored in `.env` file. Used in examples 1-8.
+
+**Setup:** Continue to Step 5 below (configure `.env` file)
+
+### Option B: External Signing Service (Production Ready)
+
+✅ **Recommended for production**
+✅ **Private key NOT in application code**
+
+**Quick Deploy (3 minutes):**
+
+1. **Click Deploy Button:**
+   [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+2. **Add Environment Variables:**
+   - `WALLET_PRIVATE_KEY`: Your private key (`0x...`)
+   - `AGENTPAY_API_KEY`: Your API key (`pk_live_...`)
+
+3. **Save Service URL:**
+   Copy: `https://your-service.onrender.com`
+
+4. **Use in Python:**
+   ```python
+   # Add to .env file
+   TX_SIGNING_SERVICE=https://your-service.onrender.com
+
+   # Run Example 9 (uses external signing)
+   python examples/9_api_with_tx_service.py
+   ```
+
+**See:** [TX_SIGNING_OPTIONS.md](TX_SIGNING_OPTIONS.md) for all signing methods (Docker, Railway, self-hosted, etc.)
+
+---
+
+## Step 5: Configure Environment (1 minute)
 
 ```bash
 # Copy template
@@ -128,10 +171,17 @@ OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
 - Never commit `.env` to git
 - Never share your private key
 - Use a separate wallet for testing (not your main wallet)
+- **Local signing is for TESTING ONLY** - Use external signing service for production
+
+**Production Users:** If you deployed a signing service in Step 4, also add:
+```bash
+# External Signing Service (Optional - for production)
+TX_SIGNING_SERVICE=https://your-service.onrender.com
+```
 
 ---
 
-## Step 5: Run Your First Example (30 seconds)
+## Step 6: Run Your First Example (30 seconds)
 
 ### Example 1: Basic Payment
 
@@ -216,6 +266,7 @@ python examples/8_mcp_complete_features.py
 ### Learn More
 
 - **[README.md](../README.md)** - Complete examples overview
+- **[TX_SIGNING_OPTIONS.md](TX_SIGNING_OPTIONS.md)** - Transaction signing guide (Docker, Render, self-hosted)
 - **[API_INTEGRATION.md](API_INTEGRATION.md)** - REST API detailed guide
 - **[MCP_INTEGRATION.md](MCP_INTEGRATION.md)** - MCP tools detailed guide
 - **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues & solutions

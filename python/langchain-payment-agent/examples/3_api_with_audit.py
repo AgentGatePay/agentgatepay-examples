@@ -37,6 +37,25 @@ from langchain.prompts import PromptTemplate
 load_dotenv()
 
 # ========================================
+# TRANSACTION SIGNING
+# ========================================
+#
+# This example uses LOCAL SIGNING (Web3.py with private key).
+#
+# ⚠️ WARNING: Local signing is NOT recommended for production!
+#
+# For production deployments, use an external signing service:
+# - Option 1: Docker container (see docs/TX_SIGNING_OPTIONS.md)
+# - Option 2: Render one-click deploy (https://github.com/AgentGatePay/TX)
+# - Option 3: Railway deployment
+# - Option 4: Self-hosted service
+#
+# See docs/TX_SIGNING_OPTIONS.md for complete guide.
+# See Example 9 (examples/9_api_with_tx_service.py) for external signing usage.
+#
+# ========================================
+
+# ========================================
 # CONFIGURATION
 # ========================================
 
