@@ -8,8 +8,14 @@
 
 ## Overview
 
-This repository contains **6 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments. Each example is available in **TWO versions**:
+This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
+- **Examples 1-3:** REST API basics (payment, buyer/seller, audit logs)
+- **Examples 4-6:** MCP tools basics (same features as 1-3 using MCP)
+- **Example 7:** REST API complete (ALL 10 AgentGatePay features)
+- **Example 8:** MCP complete (ALL 15 MCP tools - 100% coverage)
+
+**Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
 - **MCP version** - Uses AgentGatePay's 15 MCP tools (Model Context Protocol)
 
@@ -123,6 +129,12 @@ python examples/5_mcp_buyer_seller.py
 
 # Example 6: Audit logging (MCP tools)
 python examples/6_mcp_with_audit.py
+
+# Example 7: Complete features demo (REST API) - ALL 10 FEATURES
+python examples/7_api_complete_features.py
+
+# Example 8: Complete features demo (MCP tools) - ALL 15 MCP TOOLS
+python examples/8_mcp_complete_features.py
 ```
 
 ## Examples Overview
@@ -323,6 +335,93 @@ MCP version of Example 3, demonstrating comprehensive audit logging using MCP to
 - Payment tracking across multiple transactions
 - Budget utilization monitoring
 - Spending pattern analysis
+
+---
+
+### Example 7: Complete Features Demo (REST API) ⭐ **ALL FEATURES**
+
+**File:** `examples/7_api_complete_features.py`
+
+**Comprehensive demonstration of ALL 10 AgentGatePay features** matching n8n workflow capabilities.
+
+**Features Demonstrated:**
+1. ✅ User Authentication & Signup
+2. ✅ Wallet Management
+3. ✅ API Key Management (create, list, revoke)
+4. ✅ Mandate Management (issue, verify, budget tracking)
+5. ✅ Payment Execution (2-TX model)
+6. ✅ Payment History Retrieval
+7. ✅ Merchant Revenue Analytics
+8. ✅ Comprehensive Audit Logging
+9. ✅ Webhook Configuration & Testing
+10. ✅ System Health Monitoring
+
+**Why This Example Matters:**
+- Shows COMPLETE platform capabilities
+- Matches n8n buyer + seller + monitoring workflows combined
+- Production-ready feature coverage
+- Demonstrates full agent economy ecosystem
+
+**Output:**
+```
+✅ Features Demonstrated: 10/10
+   ✓ User authentication & signup
+   ✓ Wallet management
+   ✓ API key management
+   ✓ Mandates (AP2)
+   ✓ Payments (2-TX model)
+   ✓ Payment history
+   ✓ Revenue analytics
+   ✓ Audit logging
+   ✓ Webhooks
+   ✓ System health
+🎉 ALL 10 AGENTGATEPAY FEATURES DEMONSTRATED!
+```
+
+---
+
+### Example 8: Complete Features Demo (MCP Tools) ⭐ **ALL 15 MCP TOOLS**
+
+**File:** `examples/8_mcp_complete_features.py`
+
+**Comprehensive demonstration of ALL 15 AgentGatePay MCP tools** - 100% coverage.
+
+**MCP Tools Demonstrated:**
+1. ✅ `agentpay_signup` - User signup
+2. ✅ `agentpay_get_user_info` - Get user info
+3. ✅ `agentpay_add_wallet` - Add wallet
+4. ✅ `agentpay_create_api_key` - Create API key
+5. ✅ `agentpay_list_api_keys` - List API keys
+6. ✅ `agentpay_revoke_api_key` - Revoke API key
+7. ✅ `agentpay_issue_mandate` - Issue mandate
+8. ✅ `agentpay_verify_mandate` - Verify mandate
+9. ✅ `agentpay_create_payment` - Create payment
+10. ✅ `agentpay_submit_payment` - Submit payment
+11. ✅ `agentpay_verify_payment` - Verify payment
+12. ✅ `agentpay_get_payment_history` - Payment history
+13. ✅ `agentpay_get_analytics` - Analytics
+14. ✅ `agentpay_list_audit_logs` - Audit logs
+15. ✅ `agentpay_get_system_health` - System health
+
+**Why This Example Matters:**
+- 100% MCP tool coverage (15/15)
+- Proves MCP = REST API feature parity
+- Shows standardized JSON-RPC 2.0 protocol
+- Matches complete n8n workflow feature set
+- Future-proof integration approach
+
+**Output:**
+```
+📊 MCP TOOLS USED: 15/15
+   1. agentpay_signup
+   2. agentpay_get_user_info
+   ... (all 15 tools listed)
+   15. agentpay_get_system_health
+
+🎉 ALL 15 MCP TOOLS DEMONSTRATED!
+   100% feature parity with REST API
+   Matches n8n workflow capabilities
+```
 
 ---
 
