@@ -104,8 +104,12 @@ OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
 # Example 1: Basic payment (REST API)
 python examples/1_api_basic_payment.py
 
-# Example 2: Buyer/seller interaction (REST API)
-python examples/2_api_buyer_seller.py
+# Example 2: Buyer/seller marketplace (REST API) - TWO SCRIPTS
+# Terminal 1: Start seller first
+python examples/2b_api_seller_agent.py
+
+# Terminal 2: Then run buyer
+python examples/2a_api_buyer_agent.py
 
 # Example 3: Payment with audit logs (REST API)
 python examples/3_api_with_audit.py
@@ -129,7 +133,7 @@ Simple autonomous payment flow:
 4. Verify completion
 
 **Uses:**
-- AgentGatePay SDK (agentgatepay-sdk==1.1.0)
+- AgentGatePay SDK (agentgatepay-sdk>=1.1.3)
 - Web3.py for blockchain signing
 - LangChain ReAct agent
 
@@ -143,38 +147,56 @@ Simple autonomous payment flow:
 
 ---
 
-### Example 2: Buyer/Seller Interaction (REST API) ⭐
+### Example 2: Buyer/Seller Marketplace (REST API) ⭐ **SEPARATE SCRIPTS**
 
-**File:** `examples/2_api_buyer_seller.py`
+**Files:**
+- `examples/2a_api_buyer_agent.py` - Autonomous buyer agent
+- `examples/2b_api_seller_agent.py` - Resource seller API
 
 **Complete marketplace interaction** (matches n8n workflow pattern):
 
-**BUYER AGENT:**
-- Issues mandate with budget
-- Discovers resource from seller
-- Signs blockchain payment
+**BUYER AGENT** (`2a_api_buyer_agent.py`):
+- **Autonomous** resource discovery from ANY seller
+- Issues mandate with budget control
+- Signs blockchain payment (2 TX: merchant + commission)
 - Claims resource after payment
+- Can discover from multiple sellers
 
-**SELLER AGENT:**
+**SELLER AGENT** (`2b_api_seller_agent.py`):
+- **Independent** Flask API service
 - Provides resource catalog
 - Returns 402 Payment Required
 - Verifies payment via AgentGatePay API
 - Delivers resource (200 OK)
+- Serves ANY buyer agent
 
 **Flow:**
 ```
-[BUYER] Issue mandate → [BUYER] Discover resource → [SELLER] 402 Payment Required
+[SELLER] Start Flask API (localhost:8000) → [SELLER] Wait for buyers
    ↓
-[BUYER] Sign blockchain TX → [BUYER] Submit payment proof → [SELLER] Verify payment
+[BUYER] Issue mandate → [BUYER] Discover catalog → [SELLER] Return catalog
    ↓
-[SELLER] Deliver resource → [BUYER] Access granted → [BOTH] Audit logs
+[BUYER] Request resource → [SELLER] 402 Payment Required
+   ↓
+[BUYER] Sign blockchain TX (2 transactions) → [BUYER] Submit payment proof
+   ↓
+[SELLER] Verify via AgentGatePay API → [SELLER] Deliver resource (200 OK)
+   ↓
+[BUYER] Access granted → [BOTH] Audit logs
 ```
+
+**Why Separate Scripts:**
+- ✅ **Realistic** - Buyer and seller are separate entities
+- ✅ **Flexible** - Buyer can buy from multiple sellers
+- ✅ **Scalable** - Seller can serve multiple buyers
+- ✅ **Production-ready** - Matches real-world architecture
 
 **Features:**
 - HTTP 402 Payment Required protocol
 - Two-transaction commission model
-- Real Flask API for seller
+- Real Flask API for seller (production-ready)
 - Comprehensive error handling
+- Multi-seller support
 
 ---
 
