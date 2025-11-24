@@ -3,14 +3,14 @@
 **Autonomous AI agent payments using blockchain and LangChain framework**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.0-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
+[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.3+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
 [![LangChain](https://img.shields.io/badge/langchain-0.1.0-orange.svg)](https://www.langchain.com/)
 
 ## Overview
 
 This repository contains **6 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments. Each example is available in **TWO versions**:
 
-- **REST API version** - Uses published AgentGatePay SDK (v1.1.0) from PyPI
+- **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
 - **MCP version** - Uses AgentGatePay's 15 MCP tools (Model Context Protocol)
 
 ## What You'll Learn
@@ -117,7 +117,11 @@ python examples/3_api_with_audit.py
 # Example 4: Basic payment (MCP tools)
 python examples/4_mcp_basic_payment.py
 
-# More examples in examples/ directory
+# Example 5: Buyer/seller marketplace (MCP tools)
+python examples/5_mcp_buyer_seller.py
+
+# Example 6: Audit logging (MCP tools)
+python examples/6_mcp_with_audit.py
 ```
 
 ## Examples Overview
@@ -222,12 +226,17 @@ Demonstrates comprehensive payment tracking:
 
 ---
 
-### Example 4-6: MCP Tools Versions
+### Example 4: Basic Payment Flow (MCP Tools)
 
-**Files:**
-- `examples/4_mcp_basic_payment.py` - Basic payment using MCP tools
-- `examples/5_mcp_buyer_seller.py` - Buyer/seller using MCP tools
-- `examples/6_mcp_with_audit.py` - Audit logging using MCP tools
+**File:** `examples/4_mcp_basic_payment.py`
+
+MCP version of Example 1, demonstrating the same payment flow using AgentGatePay's MCP tools instead of REST API.
+
+**Flow:**
+1. Issue mandate via `agentpay_issue_mandate` tool
+2. Sign blockchain transaction (Web3.py)
+3. Submit payment via `agentpay_submit_payment` tool
+4. Verify payment via `agentpay_verify_payment` tool
 
 **MCP Advantages:**
 - Native tool discovery (frameworks auto-list all 15 tools)
@@ -235,12 +244,84 @@ Demonstrates comprehensive payment tracking:
 - Future-proof (Anthropic-backed)
 - Cleaner tool abstraction
 
+**Output:**
+```
+✅ Mandate issued via MCP
+💳 Payment sent: $10 to 0x742d35...
+✅ Payment verified via MCP
+📊 MCP Tools Used: 3
+```
+
+---
+
+### Example 5: Buyer/Seller Marketplace (MCP Tools)
+
+**File:** `examples/5_mcp_buyer_seller.py`
+
+MCP version of Example 2, demonstrating marketplace interactions using MCP tools for all AgentGatePay operations.
+
+**Features:**
+- Mandate issuance via MCP (`agentpay_issue_mandate`)
+- Payment submission via MCP (`agentpay_submit_payment`)
+- Payment verification via MCP (`agentpay_verify_payment`)
+- Simulated catalog discovery and resource delivery
+- Two-transaction commission model (blockchain)
+
+**Flow:**
+1. Issue mandate (MCP)
+2. Discover catalog (simulated)
+3. Request resource (simulated 402)
+4. Sign blockchain payment (Web3.py)
+5. Submit payment proof (MCP)
+6. Verify payment (MCP)
+7. Claim resource (simulated)
+
+**Why Simulated Seller:**
+- Focus is on demonstrating MCP tool integration
+- Real seller API shown in Example 2b (REST API version)
+- Production sellers would use same MCP tools for verification
+
 **MCP Tools Used:**
 - `agentpay_issue_mandate` - Issue payment mandate
 - `agentpay_submit_payment` - Submit payment proof
-- `agentpay_verify_mandate` - Verify mandate status
-- `agentpay_list_audit_logs` - Retrieve audit logs
-- ... and 11 more (see docs/MCP_INTEGRATION.md)
+- `agentpay_verify_payment` - Verify payment status
+
+---
+
+### Example 6: Payment with Audit Logs (MCP Tools)
+
+**File:** `examples/6_mcp_with_audit.py`
+
+MCP version of Example 3, demonstrating comprehensive audit logging using MCP tools.
+
+**Features:**
+- Mandate issuance via MCP
+- Multiple payments with blockchain signing
+- Payment submission via MCP
+- Audit log retrieval via MCP (`agentpay_list_audit_logs`)
+- Spending pattern analysis via MCP
+- Budget monitoring via MCP (`agentpay_verify_mandate`)
+
+**Analytics:**
+```
+📊 Spending Analysis (via MCP):
+   Total payments: 5
+   Total spent: $47.50
+   Average payment: $9.50
+   Budget utilization: 47.5%
+```
+
+**MCP Tools Used:**
+- `agentpay_issue_mandate` - Issue mandate
+- `agentpay_submit_payment` - Submit payments
+- `agentpay_verify_mandate` - Check budget
+- `agentpay_list_audit_logs` - Retrieve logs
+
+**Demonstrates:**
+- Complete audit trail via MCP
+- Payment tracking across multiple transactions
+- Budget utilization monitoring
+- Spending pattern analysis
 
 ---
 
