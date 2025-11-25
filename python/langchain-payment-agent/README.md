@@ -49,26 +49,6 @@ This repository contains **9 complete examples** demonstrating how to integrate 
 
 ## Quick Start
 
-### Choose Your Path
-
-**👉 New to AgentGatePay? Start here:**
-
-1. **For Learning & Testing** → Run Examples 1-8
-   - Uses: Private key in `.env` file
-   - Time: 5 minutes setup
-   - Security: ⚠️ Insecure (learning only)
-   - Best for: Understanding how payments work
-
-2. **For Production** → Run Example 9
-   - Uses: External signing service (Docker/Render/Railway)
-   - Time: 10 minutes setup
-   - Security: ✅ Secure (private key isolated)
-   - Best for: Real applications
-
-**Recommendation:** Start with Examples 1-3 to learn, then move to Example 9 for production.
-
----
-
 ### Prerequisites
 
 1. **Python 3.12+**
@@ -151,14 +131,21 @@ OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
 TX_SIGNING_SERVICE=https://your-service.onrender.com
 ```
 
-### Transaction Signing
+### Transaction Signing Options
 
-**For Testing (Examples 1-8):**
-- Private key in `.env` file (⚠️ insecure, learning only)
+**Choose how to sign blockchain transactions:**
 
-**For Production (Example 9):**
-- Deploy signing service: Docker / Render / Railway / self-hosted
-- See **[TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md)** for setup guides
+1. **🎓 Quick Testing (Examples 1-8)** - Private key in `.env` file (⚠️ insecure, learning only) - Run: `python examples/1_api_basic_payment.py`
+
+2. **✅ Best for Production** - User signs with their own wallet (MetaMask, hardware wallet, etc.) - Most secure
+
+3. **🐳 Local Docker** - Run signing service on your machine - Command: `docker run -p 3000:3000 agentgatepay/tx-signing-service`
+
+4. **☁️ Render Deploy** - One-click deployment (no DevOps needed) - Link: [Deploy to Render](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+5. **🏢 Enterprise Options** - Coinbase Custody, Fireblocks, BitGo, AWS KMS, self-hosted
+
+**See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for detailed setup guides for each option.**
 
 ### Run Examples
 
