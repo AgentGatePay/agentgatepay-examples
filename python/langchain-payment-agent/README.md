@@ -131,21 +131,48 @@ OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
 TX_SIGNING_SERVICE=https://your-service.onrender.com
 ```
 
-### Transaction Signing Options
+### Transaction Signing
 
-**Choose how to sign blockchain transactions:**
+**Examples 1-8: Local Signing**
 
-1. **🎓 Quick Testing (Examples 1-8)** - Private key in `.env` file (⚠️ insecure, learning only) - Run: `python examples/1_api_basic_payment.py`
+These examples sign transactions using your private key from `.env` file:
 
-2. **✅ Best for Production** - User signs with their own wallet (MetaMask, hardware wallet, etc.) - Most secure
+```bash
+# In your .env file:
+BUYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
+BUYER_WALLET=0xYOUR_WALLET_ADDRESS_HERE
 
-3. **🐳 Local Docker** - Run signing service on your machine - Command: `docker run -p 3000:3000 agentgatepay/tx-signing-service`
+# Run example:
+python examples/1_api_basic_payment.py
+```
 
-4. **☁️ Render Deploy** - One-click deployment (no DevOps needed) - Link: [Deploy to Render](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+Note: Private key in `.env` is for testing only. Do not use with large amounts.
 
-5. **🏢 Enterprise Options** - Coinbase Custody, Fireblocks, BitGo, AWS KMS, self-hosted
+---
 
-**See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for detailed setup guides for each option.**
+**Example 9: External Signing Service**
+
+This example uses a separate signing service:
+
+1. Deploy signing service (choose one):
+   - Docker: `docker run -p 3000:3000 agentgatepay/tx-signing-service`
+   - Render: [One-click deploy](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+2. Add service URL to `.env`:
+   ```bash
+   TX_SIGNING_SERVICE=https://your-service.onrender.com
+   ```
+
+3. Run example:
+   ```bash
+   python examples/9_api_with_tx_service.py
+   ```
+
+---
+
+**Other Options**
+
+For production deployments with wallet services, HSM, or custom implementations, see [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md).
 
 ### Run Examples
 
