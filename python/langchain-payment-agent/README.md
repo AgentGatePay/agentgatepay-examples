@@ -49,6 +49,26 @@ This repository contains **9 complete examples** demonstrating how to integrate 
 
 ## Quick Start
 
+### Choose Your Path
+
+**👉 New to AgentGatePay? Start here:**
+
+1. **For Learning & Testing** → Run Examples 1-8
+   - Uses: Private key in `.env` file
+   - Time: 5 minutes setup
+   - Security: ⚠️ Insecure (learning only)
+   - Best for: Understanding how payments work
+
+2. **For Production** → Run Example 9
+   - Uses: External signing service (Docker/Render/Railway)
+   - Time: 10 minutes setup
+   - Security: ✅ Secure (private key isolated)
+   - Best for: Real applications
+
+**Recommendation:** Start with Examples 1-3 to learn, then move to Example 9 for production.
+
+---
+
 ### Prerequisites
 
 1. **Python 3.12+**
