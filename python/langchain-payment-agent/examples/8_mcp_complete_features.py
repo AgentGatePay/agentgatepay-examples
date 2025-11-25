@@ -32,6 +32,7 @@ Requirements:
 """
 
 import os
+import time
 import json
 import requests
 from typing import Dict, Any
@@ -41,9 +42,13 @@ from eth_account import Account
 from datetime import datetime
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -364,8 +369,8 @@ class MCPCompleteDemo:
             self.current_mandate = mandate
 
             print(f"✅ Mandate issued via MCP!")
-            print(f"   Token: {mandate['mandateToken'][:50]}...")
-            print(f"   Budget: ${mandate['budgetUsd']}")
+            print(f"   Token: {mandate['mandate_token'][:50]}...")
+            print(f"   Budget: ${mandate['budget_usd']}")
 
             return f"Mandate issued via MCP: ${budget_usd} budget"
 
@@ -383,7 +388,7 @@ class MCPCompleteDemo:
 
         try:
             result = call_mcp_tool("agentpay_verify_mandate", {
-                "mandate_token": self.current_mandate['mandateToken']
+                "mandate_token": self.current_mandate['mandate_token']
             }, self.api_key)
 
             self.track_tool("agentpay_verify_mandate")
@@ -464,7 +469,7 @@ class MCPCompleteDemo:
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
-            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
             self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
 
             # Commission TX
@@ -483,7 +488,7 @@ class MCPCompleteDemo:
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
-            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
 
             print(f"✅ Blockchain payment executed!")
@@ -520,7 +525,7 @@ class MCPCompleteDemo:
 
         try:
             result = call_mcp_tool("agentpay_submit_payment", {
-                "mandate_token": self.current_mandate['mandateToken'],
+                "mandate_token": self.current_mandate['mandate_token'],
                 "tx_hash_merchant": merchant_tx,
                 "tx_hash_commission": commission_tx,
                 "chain": "base",

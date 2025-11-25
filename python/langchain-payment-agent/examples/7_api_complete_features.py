@@ -25,6 +25,7 @@ Requirements:
 """
 
 import os
+import time
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -34,9 +35,13 @@ from datetime import datetime
 import json
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -278,16 +283,16 @@ class AgentPayCompleteDemo:
         try:
             mandate = self.agentpay.mandates.issue(
                 subject=f"complete-demo-{self.account.address}",
-                budget_usd=budget_usd,
+                budget=budget_usd,
                 scope="resource.read,payment.execute,analytics.read",
-                ttl_hours=168
+                ttl_minutes=10080
             )
 
             self.current_mandate = mandate
 
             print(f"✅ Mandate issued successfully")
-            print(f"   Token: {mandate['mandateToken'][:50]}...")
-            print(f"   Budget: ${mandate['budgetUsd']}")
+            print(f"   Token: {mandate['mandate_token'][:50]}...")
+            print(f"   Budget: ${mandate['budget_usd']}")
 
             return f"Mandate issued: ${budget_usd} budget"
 
@@ -327,7 +332,7 @@ class AgentPayCompleteDemo:
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
-            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
             self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
 
             # Commission TX
@@ -346,7 +351,7 @@ class AgentPayCompleteDemo:
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
-            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
 
             print(f"✅ Payment executed!")

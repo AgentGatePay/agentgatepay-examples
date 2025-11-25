@@ -19,6 +19,7 @@ Requirements:
 """
 
 import os
+import time
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -26,9 +27,13 @@ from eth_account import Account
 from agentgatepay_sdk import AgentGatePay
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -64,7 +69,7 @@ SELLER_WALLET = os.getenv('SELLER_WALLET')
 COMMISSION_ADDRESS = os.getenv('AGENTPAY_COMMISSION_ADDRESS')
 
 # Payment configuration
-RESOURCE_PRICE_USD = 10.0
+RESOURCE_PRICE_USD = 0.01
 MANDATE_BUDGET_USD = 100.0
 COMMISSION_RATE = 0.005  # 0.5%
 
@@ -110,22 +115,34 @@ def issue_payment_mandate(budget_usd: float) -> str:
     global current_mandate
 
     try:
-        print(f"\n🔐 Issuing mandate with ${budget_usd} budget...")
+        agent_id = f"research-assistant-{buyer_account.address}"
+
+        # Check for existing mandate
+        existing_mandate = get_mandate(agent_id)
+        if existing_mandate:
+            print(f"\n♻️  Reusing existing mandate...")
+            print(f"   Budget remaining: ${existing_mandate.get('budget_remaining', 'N/A')}")
+            current_mandate = existing_mandate
+            return f"Reusing existing mandate. Budget remaining: ${existing_mandate.get('budget_remaining')}"
+
+        print(f"\n🔐 Creating new mandate with ${budget_usd} budget...")
 
         mandate = agentpay.mandates.issue(
-            subject=f"research-assistant-{buyer_account.address}",
-            budget_usd=budget_usd,
+            subject=agent_id,
+            budget=budget_usd,
             scope="resource.read,payment.execute",
-            ttl_hours=168  # 7 days
+            ttl_minutes=168 * 60  # 7 days in minutes
         )
 
         current_mandate = mandate
-        print(f"✅ Mandate issued successfully")
-        print(f"   Token: {mandate['mandateToken'][:50]}...")
-        print(f"   Budget: ${mandate['budgetUsd']}")
-        print(f"   Expires: {mandate['expiresAt']}")
+        save_mandate(agent_id, mandate)
 
-        return f"Mandate issued successfully. Token: {mandate['mandateToken'][:50]}... Budget: ${budget_usd}"
+        print(f"✅ Mandate issued successfully")
+        print(f"   Token: {mandate['mandate_token'][:50]}...")
+        print(f"   Budget: ${mandate['budget_usd']}")
+        print(f"   Expires: {mandate['expires_at']}")
+
+        return f"Mandate issued successfully. Token: {mandate['mandate_token'][:50]}... Budget: ${budget_usd}"
 
     except Exception as e:
         error_msg = f"Failed to issue mandate: {str(e)}"
@@ -179,7 +196,7 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         }
 
         signed_merchant_tx = buyer_account.sign_transaction(merchant_tx)
-        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant_tx.rawTransaction)
+        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant_tx.raw_transaction)
 
         print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
 
@@ -187,6 +204,9 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         print(f"   ⏳ Waiting for merchant TX confirmation...")
         merchant_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
         print(f"   ✅ Merchant TX confirmed in block {merchant_receipt['blockNumber']}")
+
+        # Get fresh nonce after first TX confirms
+        time.sleep(2)
 
         # Transaction 2: Commission payment
         print(f"\n   📤 Signing transaction 2 (commission)...")
@@ -205,7 +225,7 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         }
 
         signed_commission_tx = buyer_account.sign_transaction(commission_tx)
-        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission_tx.rawTransaction)
+        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission_tx.raw_transaction)
 
         print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
 
@@ -346,12 +366,19 @@ if __name__ == "__main__":
     print()
     print("=" * 80)
 
+    # Get user input
+    budget_input = input("\n💰 Enter mandate budget amount in USD (default: 100): ").strip()
+    mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
+
+    purpose = input("📝 Enter payment purpose (default: research resource): ").strip()
+    purpose = purpose if purpose else "research resource"
+
     # Agent task
     task = f"""
-    Purchase a research resource for ${RESOURCE_PRICE_USD} USD.
+    Purchase a {purpose} for ${RESOURCE_PRICE_USD} USD.
 
     Steps:
-    1. Issue a payment mandate with a ${MANDATE_BUDGET_USD} budget
+    1. Issue a payment mandate with a ${mandate_budget} budget
     2. Make a payment of ${RESOURCE_PRICE_USD} to the seller wallet: {SELLER_WALLET}
     3. Verify the payment was recorded successfully
     """
@@ -368,8 +395,8 @@ if __name__ == "__main__":
         # Display final status
         if current_mandate:
             print(f"\n📊 Final Status:")
-            print(f"   Mandate: {current_mandate.get('mandateToken', 'N/A')[:50]}...")
-            print(f"   Budget remaining: ${current_mandate.get('budgetRemaining', 'N/A')}")
+            print(f"   Mandate: {current_mandate.get('mandate_token', 'N/A')[:50]}...")
+            print(f"   Budget remaining: ${current_mandate.get('budget_remaining', 'N/A')}")
 
         if 'merchant_tx_hash' in globals():
             print(f"   Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")

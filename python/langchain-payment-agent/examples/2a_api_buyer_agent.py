@@ -26,6 +26,7 @@ Requirements:
 """
 
 import os
+import time
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -34,9 +35,13 @@ from agentgatepay_sdk import AgentGatePay
 import requests
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -124,17 +129,17 @@ class BuyerAgent:
         try:
             mandate = self.agentpay.mandates.issue(
                 subject=f"buyer-agent-{self.account.address}",
-                budget_usd=budget_usd,
+                budget=budget_usd,
                 scope="resource.read,payment.execute",
-                ttl_hours=168  # 7 days
+                ttl_minutes=10080  # 7 days
             )
 
             self.current_mandate = mandate
             print(f"✅ Mandate issued successfully")
-            print(f"   Token: {mandate['mandateToken'][:50]}...")
-            print(f"   Budget: ${mandate['budgetUsd']}")
+            print(f"   Token: {mandate['mandate_token'][:50]}...")
+            print(f"   Budget: ${mandate['budget_usd']}")
 
-            return f"Mandate issued. Budget: ${budget_usd}, Token: {mandate['mandateToken'][:50]}..."
+            return f"Mandate issued. Budget: ${budget_usd}, Token: {mandate['mandate_token'][:50]}..."
 
         except Exception as e:
             error_msg = f"Failed to issue mandate: {str(e)}"
@@ -262,7 +267,7 @@ class BuyerAgent:
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
-            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
             print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
 
             # Wait for confirmation
@@ -287,7 +292,7 @@ class BuyerAgent:
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
-            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
 
             # Wait for confirmation
@@ -473,7 +478,7 @@ if __name__ == "__main__":
         # Display final status
         if buyer.current_mandate:
             print(f"\n📊 Final Status:")
-            print(f"   Mandate budget: ${buyer.current_mandate.get('budgetUsd', 'N/A')}")
+            print(f"   Mandate budget: ${buyer.current_mandate.get('budget_usd', 'N/A')}")
 
         if buyer.last_payment and 'merchant_tx' in buyer.last_payment:
             print(f"   Merchant TX: https://basescan.org/tx/{buyer.last_payment['merchant_tx']}")

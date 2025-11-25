@@ -21,6 +21,7 @@ Requirements:
 """
 
 import os
+import time
 from typing import Dict, List, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -29,9 +30,13 @@ from agentgatepay_sdk import AgentGatePay
 from datetime import datetime
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -97,16 +102,16 @@ def issue_mandate_with_tracking(budget_usd: float) -> str:
 
     mandate = agentpay.mandates.issue(
         subject=f"audited-buyer-{buyer_account.address}",
-        budget_usd=budget_usd,
+        budget=budget_usd,
         scope="resource.read,payment.execute",
-        ttl_hours=168
+        ttl_minutes=10080
     )
 
     current_mandate = mandate
 
     print(f"✅ Mandate issued")
-    print(f"   Token: {mandate['mandateToken'][:50]}...")
-    print(f"   Budget: ${mandate['budgetUsd']}")
+    print(f"   Token: {mandate['mandate_token'][:50]}...")
+    print(f"   Budget: ${mandate['budget_usd']}")
     print(f"   ID: {mandate.get('id', 'N/A')}")
 
     return f"Mandate issued successfully. Budget: ${budget_usd}, ID: {mandate.get('id', 'N/A')}"
@@ -147,7 +152,7 @@ def execute_tracked_payment(amount_usd: float, recipient: str, description: str 
         }
 
         signed_merchant = buyer_account.sign_transaction(merchant_tx)
-        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
         merchant_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
 
         print(f"   ✅ Merchant TX confirmed: {tx_hash_merchant.hex()[:20]}...")
@@ -169,7 +174,7 @@ def execute_tracked_payment(amount_usd: float, recipient: str, description: str 
         }
 
         signed_commission = buyer_account.sign_transaction(commission_tx)
-        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
         commission_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
 
         print(f"   ✅ Commission TX confirmed: {tx_hash_commission.hex()[:20]}...")
@@ -289,8 +294,8 @@ def analyze_spending_pattern() -> str:
 
         # Budget utilization
         if current_mandate:
-            budget_total = float(current_mandate.get('budgetUsd', 0))
-            budget_remaining = float(current_mandate.get('budgetRemaining', budget_total))
+            budget_total = float(current_mandate.get('budget_usd', 0))
+            budget_remaining = float(current_mandate.get('budget_remaining', budget_total))
             budget_used = budget_total - budget_remaining
             utilization = (budget_used / budget_total * 100) if budget_total > 0 else 0
 
@@ -315,11 +320,11 @@ def get_budget_status() -> str:
 
     try:
         # Verify mandate is still valid
-        verification = agentpay.mandates.verify(current_mandate['mandateToken'])
+        verification = agentpay.mandates.verify(current_mandate['mandate_token'])
 
         if verification.get('valid'):
             budget_remaining = float(verification.get('budget_remaining', 0))
-            budget_total = float(current_mandate.get('budgetUsd', 0))
+            budget_total = float(current_mandate.get('budget_usd', 0))
             budget_used = budget_total - budget_remaining
             utilization = (budget_used / budget_total * 100) if budget_total > 0 else 0
 
@@ -464,7 +469,7 @@ if __name__ == "__main__":
         if current_mandate:
             print(f"\n   Mandate Status:")
             print(f"      ID: {current_mandate.get('id', 'N/A')}")
-            print(f"      Budget allocated: ${current_mandate.get('budgetUsd', 'N/A')}")
+            print(f"      Budget allocated: ${current_mandate.get('budget_usd', 'N/A')}")
 
         print(f"\n🔗 View transactions on BaseScan:")
         for payment in payment_history:

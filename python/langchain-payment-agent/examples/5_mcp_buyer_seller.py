@@ -27,6 +27,7 @@ Requirements:
 """
 
 import os
+import time
 import json
 import requests
 from typing import Dict, Any
@@ -35,9 +36,13 @@ from web3 import Web3
 from eth_account import Account
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -157,7 +162,7 @@ class BuyerAgentMCP:
                 "resource_id": "research-paper-2025",
                 "name": "AI Research Paper 2025",
                 "description": "Latest AI research findings",
-                "price_usd": 10.0,
+                "price_usd": 0.01,
                 "seller_wallet": SELLER_WALLET
             },
             {
@@ -189,10 +194,10 @@ class BuyerAgentMCP:
 
             self.current_mandate = mandate
             print(f"✅ Mandate issued via MCP")
-            print(f"   Token: {mandate['mandateToken'][:50]}...")
-            print(f"   Budget: ${mandate['budgetUsd']}")
+            print(f"   Token: {mandate['mandate_token'][:50]}...")
+            print(f"   Budget: ${mandate['budget_usd']}")
 
-            return f"Mandate issued via MCP. Budget: ${budget_usd}, Token: {mandate['mandateToken'][:50]}..."
+            return f"Mandate issued via MCP. Budget: ${budget_usd}, Token: {mandate['mandate_token'][:50]}..."
 
         except Exception as e:
             error_msg = f"MCP mandate issue failed: {str(e)}"
@@ -287,7 +292,7 @@ class BuyerAgentMCP:
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
-            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
             print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
 
             # Wait for confirmation
@@ -312,7 +317,7 @@ class BuyerAgentMCP:
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
-            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
 
             # Wait for confirmation
@@ -341,7 +346,7 @@ class BuyerAgentMCP:
         try:
             # Submit payment via MCP tool
             result = call_mcp_tool("agentpay_submit_payment", {
-                "mandate_token": self.current_mandate['mandateToken'],
+                "mandate_token": self.current_mandate['mandate_token'],
                 "tx_hash_merchant": payment_info['merchant_tx'],
                 "tx_hash_commission": payment_info['commission_tx'],
                 "chain": "base",
@@ -540,7 +545,7 @@ if __name__ == "__main__":
         # Display final status
         if buyer.current_mandate:
             print(f"\n📊 Final Status:")
-            print(f"   Mandate budget: ${buyer.current_mandate.get('budgetUsd', 'N/A')}")
+            print(f"   Mandate budget: ${buyer.current_mandate.get('budget_usd', 'N/A')}")
 
         if buyer.last_payment and 'merchant_tx' in buyer.last_payment:
             print(f"   Merchant TX: https://basescan.org/tx/{buyer.last_payment['merchant_tx']}")

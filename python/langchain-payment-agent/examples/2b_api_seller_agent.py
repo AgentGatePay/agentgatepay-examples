@@ -23,6 +23,7 @@ Requirements:
 """
 
 import os
+import time
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
@@ -70,7 +71,7 @@ class SellerAgent:
             "research-paper-2025": {
                 "id": "research-paper-2025",
                 "name": "AI Agent Payments Research Paper 2025",
-                "price_usd": 10.0,
+                "price_usd": 0.01,
                 "description": "Comprehensive research on autonomous agent payment systems",
                 "category": "research",
                 "data": {

@@ -28,6 +28,7 @@ Requirements:
 """
 
 import os
+import time
 import json
 import requests
 from typing import Dict, Any, List
@@ -37,9 +38,13 @@ from eth_account import Account
 from datetime import datetime
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -163,8 +168,8 @@ def mcp_issue_mandate(budget_usd: float) -> str:
         current_mandate = mandate
 
         print(f"✅ Mandate issued via MCP")
-        print(f"   Token: {mandate['mandateToken'][:50]}...")
-        print(f"   Budget: ${mandate['budgetUsd']}")
+        print(f"   Token: {mandate['mandate_token'][:50]}...")
+        print(f"   Budget: ${mandate['budget_usd']}")
         print(f"   ID: {mandate.get('id', 'N/A')}")
 
         return f"Mandate issued via MCP. Budget: ${budget_usd}, ID: {mandate.get('id', 'N/A')}"
@@ -210,7 +215,7 @@ def execute_blockchain_payment(amount_usd: float, recipient: str, description: s
         }
 
         signed_merchant = buyer_account.sign_transaction(merchant_tx)
-        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
         merchant_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
 
         print(f"   ✅ Merchant TX confirmed: {tx_hash_merchant.hex()[:20]}...")
@@ -232,7 +237,7 @@ def execute_blockchain_payment(amount_usd: float, recipient: str, description: s
         }
 
         signed_commission = buyer_account.sign_transaction(commission_tx)
-        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
         commission_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
 
         print(f"   ✅ Commission TX confirmed: {tx_hash_commission.hex()[:20]}...")
@@ -265,7 +270,7 @@ def mcp_submit_payment(merchant_tx: str, commission_tx: str) -> str:
             return "Error: No active mandate. Issue mandate first."
 
         result = call_mcp_tool("agentpay_submit_payment", {
-            "mandate_token": current_mandate['mandateToken'],
+            "mandate_token": current_mandate['mandate_token'],
             "tx_hash_merchant": merchant_tx,
             "tx_hash_commission": commission_tx,
             "chain": "base",
@@ -383,8 +388,8 @@ def mcp_analyze_spending() -> str:
 
         # Budget utilization
         if current_mandate:
-            budget_total = float(current_mandate.get('budgetUsd', 0))
-            budget_remaining = float(current_mandate.get('budgetRemaining', budget_total))
+            budget_total = float(current_mandate.get('budget_usd', 0))
+            budget_remaining = float(current_mandate.get('budget_remaining', budget_total))
             budget_used = budget_total - budget_remaining
             utilization = (budget_used / budget_total * 100) if budget_total > 0 else 0
 
@@ -412,12 +417,12 @@ def mcp_check_budget() -> str:
 
         # Verify mandate via MCP
         verification = call_mcp_tool("agentpay_verify_mandate", {
-            "mandate_token": current_mandate['mandateToken']
+            "mandate_token": current_mandate['mandate_token']
         })
 
         if verification.get('valid'):
             budget_remaining = float(verification.get('budget_remaining', 0))
-            budget_total = float(current_mandate.get('budgetUsd', 0))
+            budget_total = float(current_mandate.get('budget_usd', 0))
             budget_used = budget_total - budget_remaining
             utilization = (budget_used / budget_total * 100) if budget_total > 0 else 0
 
@@ -574,7 +579,7 @@ if __name__ == "__main__":
         if current_mandate:
             print(f"\n   Mandate Status:")
             print(f"      ID: {current_mandate.get('id', 'N/A')}")
-            print(f"      Budget allocated: ${current_mandate.get('budgetUsd', 'N/A')}")
+            print(f"      Budget allocated: ${current_mandate.get('budget_usd', 'N/A')}")
 
         print(f"\n💡 MCP Tools Used:")
         print("   - agentpay_issue_mandate")

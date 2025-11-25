@@ -28,6 +28,7 @@ Requirements:
 """
 
 import os
+import time
 import json
 from typing import Dict, Any
 from dotenv import load_dotenv
@@ -36,9 +37,13 @@ from eth_account import Account
 import requests
 
 # LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain_core.tools import Tool
+from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
@@ -74,7 +79,7 @@ SELLER_WALLET = os.getenv('SELLER_WALLET')
 COMMISSION_ADDRESS = os.getenv('AGENTPAY_COMMISSION_ADDRESS', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB')
 
 # Payment configuration
-RESOURCE_PRICE_USD = 10.0
+RESOURCE_PRICE_USD = 0.01
 MANDATE_BUDGET_USD = 100.0
 COMMISSION_RATE = 0.005
 
@@ -209,7 +214,7 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         }
 
         signed_merchant = buyer_account.sign_transaction(merchant_tx)
-        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.rawTransaction)
+        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
         print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
 
         # Wait for confirmation
@@ -233,7 +238,7 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         }
 
         signed_commission = buyer_account.sign_transaction(commission_tx)
-        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.rawTransaction)
+        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
         print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
 
         # Wait for confirmation
