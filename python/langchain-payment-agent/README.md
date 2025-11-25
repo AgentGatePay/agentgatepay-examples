@@ -133,31 +133,29 @@ TX_SIGNING_SERVICE=https://your-service.onrender.com
 
 ### Transaction Signing (Important!)
 
-AgentGatePay requires blockchain transactions to be signed. Choose your signing method:
+AgentGatePay requires blockchain transactions to be signed. **[Complete guide: TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md)**
 
-#### Option A: Local Signing (Development Only)
+#### Quick Comparison:
 
-✅ **Best for:** Testing and learning
-⚠️ **NOT for production**
+| Method | Security | Setup | Best For | Examples |
+|--------|----------|-------|----------|----------|
+| **Local (Web3.py)** | ⚠️ Dev only | 1 min | Learning, testing | 1-8 |
+| **Docker** | ✅ Production | 5 min | Self-hosting | 9 |
+| **Render** | ✅ Production | 3 min | No DevOps | 9 |
+| **Railway** | ✅ Production | 5 min | Developers | 9 |
+| **Self-hosted** | ✅ Enterprise | 30+ min | Custom infra | 9 |
+| **Wallet services** | ✅ Enterprise | 10 min | High-volume | Future |
 
-Private key stored in `.env` file. Used in examples 1-8.
+#### Quickest Options:
 
-#### Option B: External Signing Service (Production Ready)
+**For Learning (Examples 1-8):**
+- Private key in `.env` file (⚠️ insecure, testing only)
 
-✅ **Best for:** Production deployments
-✅ **Private key NOT in application code**
+**For Production (Example 9):**
+- **Docker:** `docker pull agentgatepay/tx-signing-service` (5 min)
+- **Render:** [![Deploy](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX) (3 min)
 
-**Quick Deploy (3 minutes):**
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
-
-1. Click deploy button
-2. Add `WALLET_PRIVATE_KEY` and `AGENTPAY_API_KEY`
-3. Save service URL: `https://your-service.onrender.com`
-4. Add to `.env`: `TX_SIGNING_SERVICE=https://your-service.onrender.com`
-5. Run `python examples/9_api_with_tx_service.py`
-
-**See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for all options** (Docker, Railway, self-hosted, etc.)
+**See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md)** for complete comparison of all 6 methods.
 
 ### Run Examples
 
