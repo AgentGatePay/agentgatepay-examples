@@ -14,7 +14,7 @@ This repository contains **9 complete examples** demonstrating how to integrate 
 - **Examples 4-6:** MCP tools basics (same features as 1-3 using MCP)
 - **Example 7:** REST API complete (ALL 10 AgentGatePay features)
 - **Example 8:** MCP complete (ALL 15 MCP tools - 100% coverage)
-- **Example 9:** PRODUCTION signing (external TX service - NO private key in code)
+- **Example 9:** External TX service
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -53,16 +53,44 @@ This repository contains **9 complete examples** demonstrating how to integrate 
 
 1. **Python 3.12+**
 2. **AgentGatePay accounts** (2 accounts for buyer/seller demos)
-   - Buyer account: `user_type="agent"`
-   - Seller account: `user_type="merchant"`
-   - Get API keys from: https://api.agentgatepay.com/v1/users/signup
+
+   **Create accounts via API:**
+   ```bash
+   # Create buyer/agent account
+   curl -X POST https://api.agentgatepay.com/v1/users/signup \
+     -H "Content-Type: application/json" \
+     -d '{"email": "buyer@example.com", "password": "YourPass123!", "user_type": "agent"}'
+
+   # Create seller/merchant account
+   curl -X POST https://api.agentgatepay.com/v1/users/signup \
+     -H "Content-Type: application/json" \
+     -d '{"email": "seller@example.com", "password": "YourPass123!", "user_type": "merchant"}'
+   ```
+
+   **Save the API keys** from the response (shown only once): `pk_live_...`
 
 3. **Wallet setup**
-   - Buyer wallet with USDC on Base network
-   - Seller wallet address for receiving payments
-   - Private key for buyer wallet (for signing transactions)
 
-4. **OpenAI API key** (for LangChain LLM)
+   **Supported Networks:** Ethereum, Base, Polygon, Arbitrum
+   **Supported Tokens:** USDC, USDT, DAI
+
+   **Recommended:** Base network with USDC (lowest gas fees ~$0.001, fastest ~2-5 sec)
+
+   You need:
+   - Buyer wallet with stablecoins (any supported token on any supported chain)
+   - Seller wallet address (for receiving payments)
+   - Private key for buyer wallet (for signing transactions)
+   - Small amount of native token for gas (ETH/MATIC - ~$0.01 worth)
+
+4. **LLM API key** (for LangChain agent intelligence)
+
+   **Supported LLMs:**
+   - **OpenAI** (GPT-4, GPT-3.5) - Recommended for best results: `OPENAI_API_KEY`
+   - **Anthropic** (Claude) - Alternative via LangChain: `ANTHROPIC_API_KEY`
+   - **Google** (Gemini) - Alternative via LangChain: `GOOGLE_API_KEY`
+   - **Local models** (Ollama, LM Studio) - Free but requires more setup
+
+   **These examples use OpenAI by default**, but you can easily swap to any LangChain-supported LLM by changing the model initialization in the scripts.
 
 ### Installation
 
