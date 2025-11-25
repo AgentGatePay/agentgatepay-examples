@@ -84,13 +84,7 @@ This repository contains **9 complete examples** demonstrating how to integrate 
 
 4. **LLM API key** (for LangChain agent intelligence)
 
-   **Supported LLMs:**
-   - **OpenAI** (GPT-4, GPT-3.5) - Recommended for best results: `OPENAI_API_KEY`
-   - **Anthropic** (Claude) - Alternative via LangChain: `ANTHROPIC_API_KEY`
-   - **Google** (Gemini) - Alternative via LangChain: `GOOGLE_API_KEY`
-   - **Local models** (Ollama, LM Studio) - Free but requires more setup
-
-   **These examples use OpenAI by default**, but you can easily swap to any LangChain-supported LLM by changing the model initialization in the scripts.
+   Examples use **OpenAI** by default (`OPENAI_API_KEY`), but any LangChain-supported LLM works (Anthropic, Google, local models, etc.). Swap by changing model initialization in scripts.
 
 ### Installation
 
