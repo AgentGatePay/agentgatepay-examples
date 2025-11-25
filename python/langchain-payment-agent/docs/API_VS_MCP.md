@@ -65,9 +65,9 @@ agentpay = AgentGatePay(api_url=API_URL, api_key=API_KEY)
 
 mandate = agentpay.mandates.issue(
     subject="buyer-agent",
-    budget_usd=100,
+    budget=100,
     scope="resource.read,payment.execute",
-    ttl_hours=168
+    ttl_minutes=10080  # 7 days (168 hours * 60)
 )
 
 print(f"Mandate: {mandate['mandateToken']}")
@@ -95,7 +95,7 @@ mandate_json = call_mcp_tool("agentpay_issue_mandate", {
     "subject": "buyer-agent",
     "budget_usd": 100,
     "scope": "resource.read,payment.execute",
-    "ttl_hours": 168
+    "ttl_minutes": 10080  # 7 days (168 hours * 60)
 })
 
 mandate = json.loads(mandate_json)
@@ -159,7 +159,7 @@ from agentgatepay_sdk.exceptions import (
 )
 
 try:
-    mandate = agentpay.mandates.issue(subject="...", budget_usd=100)
+    mandate = agentpay.mandates.issue(subject="...", budget=100)
 except RateLimitError as e:
     # Specific exception with retry_after info
     time.sleep(e.retry_after)
@@ -385,9 +385,9 @@ agentpay = AgentGatePay(api_url=API_URL, api_key=API_KEY)
 # Issue mandate
 mandate = agentpay.mandates.issue(
     subject="buyer-agent",
-    budget_usd=100,
+    budget=100,
     scope="resource.read,payment.execute",
-    ttl_hours=168
+    ttl_minutes=10080  # 7 days (168 hours * 60)
 )
 
 # Submit payment
@@ -430,7 +430,7 @@ mandate = call_mcp_tool("agentpay_issue_mandate", {
     "subject": "buyer-agent",
     "budget_usd": 100,
     "scope": "resource.read,payment.execute",
-    "ttl_hours": 168
+    "ttl_minutes": 10080  # 7 days (168 hours * 60)
 })
 
 # Submit payment

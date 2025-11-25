@@ -501,7 +501,7 @@ tx1 = usdc_contract.functions.transfer(
 })
 
 signed_tx1 = web3.eth.account.sign_transaction(tx1, BUYER_PRIVATE_KEY)
-tx_hash = web3.eth.send_raw_transaction(signed_tx1.rawTransaction)
+tx_hash = web3.eth.send_raw_transaction(signed_tx1.raw_transaction)
 
 # Wait for confirmation
 receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
@@ -896,7 +896,7 @@ tx = usdc_contract.functions.transfer(
 })
 
 signed_tx = web3.eth.account.sign_transaction(tx, BUYER_PRIVATE_KEY)
-tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
 receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
 print(f"✅ Blockchain TX sent: {receipt.transactionHash.hex()}")
 
@@ -1408,7 +1408,7 @@ parsed_result = json.loads(content_text)
 import time
 
 # Send blockchain transaction
-tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
 
 # Wait for confirmation
 time.sleep(15)  # Base network needs 10-15 seconds

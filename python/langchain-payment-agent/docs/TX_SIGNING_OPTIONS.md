@@ -75,7 +75,7 @@ tx = {
 }
 
 signed_tx = buyer_account.sign_transaction(tx)
-tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
 ```
 
 ### Setup
@@ -599,7 +599,7 @@ def sign_payment():
     })
 
     signed_tx1 = web3.eth.account.sign_transaction(tx1, account.key)
-    tx_hash_commission = web3.eth.send_raw_transaction(signed_tx1.rawTransaction)
+    tx_hash_commission = web3.eth.send_raw_transaction(signed_tx1.raw_transaction)
 
     # Wait for confirmation
     web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
@@ -617,7 +617,7 @@ def sign_payment():
     })
 
     signed_tx2 = web3.eth.account.sign_transaction(tx2, account.key)
-    tx_hash = web3.eth.send_raw_transaction(signed_tx2.rawTransaction)
+    tx_hash = web3.eth.send_raw_transaction(signed_tx2.raw_transaction)
 
     # Wait for confirmation
     web3.eth.wait_for_transaction_receipt(tx_hash, timeout=60)

@@ -145,9 +145,9 @@ from eth_account import Account
 # Step 1: Issue mandate ($100 budget for 7 days)
 mandate = agentpay.mandates.issue(
     subject="buyer-agent-12345",
-    budget_usd=100.0,
+    budget=100.0,
     scope="resource.read,payment.execute",
-    ttl_hours=168  # 7 days
+    ttl_minutes=10080  # 7 days (168 hours * 60)
 )
 print(f"✅ Mandate issued: {mandate['mandate_id']}")
 print(f"   Budget: ${mandate['budget_usd']}")
@@ -165,9 +165,9 @@ USDC_ABI = [{"constant": False, "inputs": [{"name": "_to", "type": "address"}, {
 
 usdc_contract = web3.eth.contract(address=USDC_ADDRESS, abi=USDC_ABI)
 
-# Calculate merchant amount (99.5% of $10 = $9.95)
-amount_usd = 10.0
-merchant_amount = int(9.95 * 10**6)  # USDC has 6 decimals
+# Calculate merchant amount (99.5% of $0.01 = $0.00995)
+amount_usd = 0.01
+merchant_amount = int(0.00995 * 10**6)  # USDC has 6 decimals
 
 tx = usdc_contract.functions.transfer(
     os.getenv('SELLER_WALLET'),
@@ -181,7 +181,7 @@ tx = usdc_contract.functions.transfer(
 
 # Sign and send
 signed_tx = web3.eth.account.sign_transaction(tx, os.getenv('BUYER_PRIVATE_KEY'))
-tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
 receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
 print(f"✅ Blockchain TX: {receipt.transactionHash.hex()}")
 
@@ -277,9 +277,9 @@ def revoke_api_key(key_id: str) -> Dict[str, Any]
 # Issue mandate
 mandate = agentpay.mandates.issue(
     subject="agent-12345",
-    budget_usd=100.0,
+    budget=100.0,
     scope="resource.read,payment.execute",
-    ttl_hours=168  # 7 days (default)
+    ttl_minutes=10080  # 7 days (168 hours * 60, default)
 )
 
 mandate_token = mandate['mandate_token']  # Use for payments
@@ -302,9 +302,9 @@ else:
 ```python
 def issue(
     subject: str,
-    budget_usd: float,
+    budget: float,
     scope: str,
-    ttl_hours: int = 168
+    ttl_minutes: int = 10080  # 7 days default
 ) -> Dict[str, Any]
 
 def verify(mandate_token: str) -> Dict[str, Any]
@@ -325,9 +325,9 @@ if verification['budget_remaining'] < payment_amount:
 # Issue mandate with custom TTL
 mandate = agentpay.mandates.issue(
     subject="agent-12345",
-    budget_usd=50.0,
+    budget=50.0,
     scope="resource.read,payment.execute",
-    ttl_hours=24  # 1 day only
+    ttl_minutes=1440  # 1 day only (24 hours * 60)
 )
 ```
 
@@ -341,7 +341,7 @@ mandate = agentpay.mandates.issue(
 # Submit payment (after blockchain transaction)
 payment = agentpay.payments.submit(
     mandate_token=mandate_token,
-    amount_usd=10.0,
+    amount_usd=0.01,
     receiver_address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0",
     tx_hash="0xabc123def456...",
     chain="base",  # or "ethereum", "polygon", "arbitrum"
@@ -457,9 +457,9 @@ print(f"✅ Webhook deleted")
   "timestamp": 1700000000,
   "data": {
     "charge_id": "charge_abc123",
-    "amount_usd": 10.0,
-    "merchant_amount": 9.95,
-    "commission_amount": 0.05,
+    "amount_usd": 0.01,
+    "merchant_amount": 0.00995,
+    "commission_amount": 0.00005,
     "receiver_address": "0x742d35...",
     "payer": "0x123abc...",
     "tx_hash": "0xabc123...",
@@ -690,9 +690,9 @@ print(f"✅ Wallet added: {wallet['wallet_address']}")
 # Step 5: Issue mandate ($100 budget, 7 days)
 mandate = agentpay.mandates.issue(
     subject="buyer-agent-12345",
-    budget_usd=100.0,
+    budget=100.0,
     scope="resource.read,payment.execute",
-    ttl_hours=168
+    ttl_minutes=10080  # 168 hours * 60
 )
 mandate_token = mandate['mandate_token']
 print(f"✅ Mandate issued: {mandate['mandate_id']}")
@@ -741,7 +741,7 @@ tx = usdc_contract.functions.transfer(
 })
 
 signed_tx = web3.eth.account.sign_transaction(tx, os.getenv('BUYER_PRIVATE_KEY'))
-tx_hash = web3.eth.send_raw_transaction(signed_tx.rawTransaction)
+tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
 receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
 print(f"✅ Blockchain TX: {receipt.transactionHash.hex()}")
 
@@ -810,7 +810,7 @@ agentpay = AgentGatePay(
 CATALOG = {
     "research-paper-2025": {
         "id": "research-paper-2025",
-        "price_usd": 10.0,
+        "price_usd": 0.01,
         "description": "AI Research Paper 2025",
         "content": "SECRET_RESEARCH_DATA_HERE"
     }
@@ -996,7 +996,7 @@ from agentgatepay_sdk.exceptions import (
 try:
     mandate = agentpay.mandates.issue(
         subject="agent-12345",
-        budget_usd=100.0,
+        budget=100.0,
         scope="resource.read,payment.execute"
     )
 except AuthenticationError as e:
@@ -1059,7 +1059,7 @@ def call_with_retry(func, *args, max_retries=3, **kwargs):
 mandate = call_with_retry(
     agentpay.mandates.issue,
     subject="agent-12345",
-    budget_usd=100.0,
+    budget=100.0,
     scope="resource.read,payment.execute"
 )
 ```
@@ -1176,7 +1176,7 @@ def logged_mandate_issue(**kwargs):
 # Usage
 mandate = logged_mandate_issue(
     subject="agent-12345",
-    budget_usd=100.0,
+    budget=100.0,
     scope="resource.read,payment.execute"
 )
 ```
@@ -1264,9 +1264,9 @@ MandateError: Mandate not found or expired
 # Mandates have a TTL (default 7 days), issue a new one
 mandate = agentpay.mandates.issue(
     subject="agent-12345",
-    budget_usd=100.0,
+    budget=100.0,
     scope="resource.read,payment.execute",
-    ttl_hours=168  # 7 days
+    ttl_minutes=10080  # 7 days (168 hours * 60)
 )
 
 # Save mandate token for future use

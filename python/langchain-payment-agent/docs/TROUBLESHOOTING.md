@@ -154,9 +154,9 @@ Mandates have a TTL (default 7 days). Issue a new mandate:
 ```python
 mandate = agentpay.mandates.issue(
     subject="agent-1",
-    budget_usd=100,
+    budget=100,
     scope="resource.read,payment.execute",
-    ttl_hours=168  # 7 days
+    ttl_minutes=10080  # 7 days (168 hours * 60)
 )
 ```
 
