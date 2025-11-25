@@ -131,31 +131,14 @@ OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
 TX_SIGNING_SERVICE=https://your-service.onrender.com
 ```
 
-### Transaction Signing (Important!)
+### Transaction Signing
 
-AgentGatePay requires blockchain transactions to be signed. **[Complete guide: TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md)**
-
-#### Quick Comparison:
-
-| Method | Security | Setup | Best For | Examples |
-|--------|----------|-------|----------|----------|
-| **Local (Web3.py)** | ⚠️ Dev only | 1 min | Learning, testing | 1-8 |
-| **Docker** | ✅ Production | 5 min | Self-hosting | 9 |
-| **Render** | ✅ Production | 3 min | No DevOps | 9 |
-| **Railway** | ✅ Production | 5 min | Developers | 9 |
-| **Self-hosted** | ✅ Enterprise | 30+ min | Custom infra | 9 |
-| **Wallet services** | ✅ Enterprise | 10 min | High-volume | Future |
-
-#### Quickest Options:
-
-**For Learning (Examples 1-8):**
-- Private key in `.env` file (⚠️ insecure, testing only)
+**For Testing (Examples 1-8):**
+- Private key in `.env` file (⚠️ insecure, learning only)
 
 **For Production (Example 9):**
-- **Docker:** `docker pull agentgatepay/tx-signing-service` (5 min)
-- **Render:** [![Deploy](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX) (3 min)
-
-**See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md)** for complete comparison of all 6 methods.
+- Deploy signing service: Docker / Render / Railway / self-hosted
+- See **[TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md)** for setup guides
 
 ### Run Examples
 
