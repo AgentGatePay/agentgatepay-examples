@@ -76,12 +76,32 @@ DEMO_MODE = os.getenv('DEMO_MODE', 'true').lower() == 'true'
 BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2')
-COMMISSION_ADDRESS = os.getenv('AGENTPAY_COMMISSION_ADDRESS', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB')
 
 # USDC configuration
 USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 USDC_DECIMALS = 6
 COMMISSION_RATE = 0.005
+
+# ========================================
+# HELPER FUNCTIONS
+# ========================================
+
+def get_commission_config(api_key: str = None) -> dict:
+    """Fetch commission configuration from AgentGatePay API"""
+    import requests
+    try:
+        headers = {}
+        if api_key:
+            headers["x-api-key"] = api_key
+        response = requests.get(
+            f"{AGENTPAY_API_URL}/v1/config/commission",
+            headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"⚠️  Failed to fetch commission config: {e}")
+        return None
 
 # ========================================
 # STATE
@@ -306,8 +326,16 @@ class AgentPayCompleteDemo:
         print(f"\n💳 [PAYMENT] Executing payment: ${amount_usd}")
 
         try:
+            # Fetch commission config dynamically
+            commission_config = get_commission_config(api_key=self.api_key)
+            if not commission_config:
+                return "Error: Failed to fetch commission config"
+
+            commission_address = commission_config['commission_address']
+            commission_rate = commission_config.get('commission_rate', COMMISSION_RATE)
+
             # Calculate amounts
-            commission_usd = amount_usd * COMMISSION_RATE
+            commission_usd = amount_usd * commission_rate
             merchant_usd = amount_usd - commission_usd
 
             merchant_atomic = int(merchant_usd * (10 ** USDC_DECIMALS))
@@ -332,12 +360,13 @@ class AgentPayCompleteDemo:
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
-            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
-            self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+            tx_hash_merchant_raw = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
+            tx_hash_merchant = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
+            self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
 
             # Commission TX
             commission_data = transfer_sig + \
-                             self.web3.to_bytes(hexstr=COMMISSION_ADDRESS).rjust(32, b'\x00') + \
+                             self.web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
@@ -351,23 +380,24 @@ class AgentPayCompleteDemo:
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
-            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
-            self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
+            tx_hash_commission_raw = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
+            tx_hash_commission = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
+            self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
 
             print(f"✅ Payment executed!")
-            print(f"   Merchant TX: {tx_hash_merchant.hex()[:20]}...")
-            print(f"   Commission TX: {tx_hash_commission.hex()[:20]}...")
+            print(f"   Merchant TX: {tx_hash_merchant[:20]}...")
+            print(f"   Commission TX: {tx_hash_commission[:20]}...")
 
             # Track payment
             self.payment_history.append({
                 "amount_usd": amount_usd,
-                "merchant_tx": tx_hash_merchant.hex(),
-                "commission_tx": tx_hash_commission.hex(),
+                "merchant_tx": tx_hash_merchant,
+                "commission_tx": tx_hash_commission,
                 "description": description,
                 "timestamp": datetime.now().isoformat()
             })
 
-            return f"Payment completed: ${amount_usd}. TX: {tx_hash_merchant.hex()[:20]}..."
+            return f"Payment completed: ${amount_usd}. TX: {tx_hash_merchant[:20]}..."
 
         except Exception as e:
             error_msg = f"Payment failed: {str(e)}"

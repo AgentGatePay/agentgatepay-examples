@@ -4,7 +4,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.3+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
-[![LangChain](https://img.shields.io/badge/langchain-0.1.0-orange.svg)](https://www.langchain.com/)
+[![LangChain](https://img.shields.io/badge/langchain-1.0.0+-orange.svg)](https://www.langchain.com/)
 
 ## Overview
 
@@ -111,6 +111,11 @@ cp .env.example .env
 nano .env
 ```
 
+**IMPORTANT:** Replace placeholder values with your actual credentials:
+- `BUYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY` → Your actual 64-character private key
+- `BUYER_WALLET` → Your wallet address
+- `OPENAI_API_KEY` → Your OpenAI API key
+
 Required variables:
 ```bash
 # AgentGatePay
@@ -146,7 +151,9 @@ BUYER_WALLET=0xYOUR_WALLET_ADDRESS_HERE
 python examples/1_api_basic_payment.py
 ```
 
-Note: Private key in `.env` is for testing only. Do not use with large amounts.
+**Test Amounts:** Examples use **$0.01 USDC** for testing (safe small amount).
+
+**Note:** Private key in `.env` is for testing only. Do not use with large amounts or on mainnet with significant funds.
 
 ---
 
@@ -215,23 +222,40 @@ python examples/9_api_with_tx_service.py
 
 **File:** `examples/1_api_basic_payment.py`
 
-Simple autonomous payment flow:
-1. Issue AP2 mandate ($100 budget)
-2. Sign blockchain transaction (USDC on Base)
-3. Submit payment proof
-4. Verify completion
+Simple autonomous payment flow demonstrating the complete 3-step process:
+1. **Issue Mandate**: Create AP2 mandate with $100 budget and budget tracking
+2. **Sign Transactions**: Sign two blockchain transactions (merchant + commission)
+3. **Submit to Gateway**: Submit payment proof to AgentGatePay for verification
 
 **Uses:**
-- AgentGatePay SDK (agentgatepay-sdk>=1.1.3)
+- AgentGatePay SDK (agentgatepay-sdk>=1.1.3) from PyPI
 - Web3.py for blockchain signing
-- LangChain ReAct agent
+- LangChain 1.x agent with LangGraph backend
+
+**Key Features:**
+- Dynamic commission fetching from API
+- Live budget tracking via mandate verification
+- Complete end-to-end payment flow
+- Base network for fast, low-cost transactions
 
 **Output:**
 ```
-✅ Mandate issued successfully
-💳 Payment sent: $10 to 0x742d35...
-✅ Payment verified
-📊 Budget remaining: $90
+✅ Initialized AgentGatePay client
+✅ Buyer wallet: 0x9752717...
+
+🔐 Creating mandate ($100)...
+✅ Mandate created (Budget: $100.0)
+
+💳 Signing payment ($0.01)...
+   ✅ TX 1/2 confirmed (block 23485610)
+   ✅ TX 2/2 confirmed (block 23485611)
+
+📤 Submitting to gateway...
+✅ Payment recorded
+   ✅ Budget updated: $99.99
+
+✅ PAYMENT WORKFLOW COMPLETED
+   Budget remaining: $99.99
 ```
 
 ---
@@ -267,11 +291,15 @@ Simple autonomous payment flow:
    ↓
 [BUYER] Request resource → [SELLER] 402 Payment Required
    ↓
-[BUYER] Sign blockchain TX (2 transactions) → [BUYER] Submit payment proof
+[BUYER] Sign blockchain TX (2 transactions: merchant + commission)
    ↓
-[SELLER] Verify via AgentGatePay API → [SELLER] Deliver resource (200 OK)
+[BUYER] Submit payment to AgentGatePay gateway → [GATEWAY] Verify on-chain
    ↓
-[BUYER] Access granted → [BOTH] Audit logs
+[BUYER] Claim resource with payment proof → [SELLER] Verify via AgentGatePay API
+   ↓
+[SELLER] Deliver resource (200 OK) → [BUYER] Access granted
+   ↓
+[BOTH] View audit logs
 ```
 
 **Why Separate Scripts:**
@@ -319,9 +347,9 @@ MCP version of Example 1, demonstrating the same payment flow using AgentGatePay
 
 **Flow:**
 1. Issue mandate via `agentpay_issue_mandate` tool
-2. Sign blockchain transaction (Web3.py)
-3. Submit payment via `agentpay_submit_payment` tool
-4. Verify payment via `agentpay_verify_payment` tool
+2. Sign blockchain transactions (Web3.py - merchant + commission)
+3. Submit payment proof via `agentpay_submit_payment` tool
+4. Gateway verifies on-chain and updates budget automatically
 
 **MCP Advantages:**
 - Native tool discovery (frameworks auto-list all 15 tools)

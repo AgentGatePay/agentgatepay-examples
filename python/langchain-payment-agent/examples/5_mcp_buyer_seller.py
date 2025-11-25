@@ -29,6 +29,7 @@ Requirements:
 import os
 import time
 import json
+import base64
 import requests
 from typing import Dict, Any
 from dotenv import load_dotenv
@@ -81,11 +82,28 @@ MCP_ENDPOINT = f"{AGENTPAY_API_URL}/mcp/tools/call"
 # Payment configuration
 MANDATE_BUDGET_USD = float(os.getenv('MANDATE_BUDGET_USD', 100.0))
 SELLER_WALLET = os.getenv('SELLER_WALLET', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2')
-GATEWAY_COMMISSION_WALLET = os.getenv('GATEWAY_COMMISSION_WALLET', '0x1234567890123456789012345678901234567890')
 
 # USDC contract on Base
 USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 USDC_DECIMALS = 6
+COMMISSION_RATE = 0.005
+
+# ========================================
+# HELPER FUNCTIONS
+# ========================================
+
+def get_commission_config() -> dict:
+    """Fetch commission configuration from AgentGatePay API"""
+    try:
+        response = requests.get(
+            f"{AGENTPAY_API_URL}/v1/config/commission",
+            headers={"x-api-key": BUYER_API_KEY}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"⚠️  Failed to fetch commission config: {e}")
+        return None
 
 # ========================================
 # MCP HELPER FUNCTIONS
@@ -244,9 +262,7 @@ class BuyerAgentMCP:
             "resource_id": resource_id,
             "resource_name": resource['name'],
             "price_usd": resource['price_usd'],
-            "recipient": resource['seller_wallet'],
-            "commission_address": GATEWAY_COMMISSION_WALLET,
-            "commission_rate": 0.005
+            "recipient": resource['seller_wallet']
         }
 
         return f"Resource '{resource['name']}' costs ${resource['price_usd']}. Payment required to access."
@@ -260,9 +276,19 @@ class BuyerAgentMCP:
         print(f"\n💳 [BLOCKCHAIN] Executing payment: ${payment_info['price_usd']} to {payment_info['recipient'][:10]}...")
 
         try:
+            # Fetch commission configuration from API
+            commission_config = get_commission_config()
+            if not commission_config:
+                return "Error: Failed to fetch commission configuration"
+
+            commission_address = commission_config.get('commission_address')
+            commission_rate = commission_config.get('commission_rate', COMMISSION_RATE)
+
+            print(f"   Using commission address: {commission_address[:10]}...")
+            print(f"   Commission rate: {commission_rate * 100}%")
+
             # Calculate amounts
             total_usd = payment_info['price_usd']
-            commission_rate = payment_info['commission_rate']
             commission_usd = total_usd * commission_rate
             merchant_usd = total_usd - commission_usd
 
@@ -292,18 +318,21 @@ class BuyerAgentMCP:
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
-            tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
-            print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
+            tx_hash_merchant_raw = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
+
+            # Fix TX hash format
+            tx_hash_merchant_str = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
+            print(f"   ✅ Merchant TX sent: {tx_hash_merchant_str}")
 
             # Wait for confirmation
             print(f"   ⏳ Waiting for confirmation...")
-            receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+            receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
             print(f"   ✅ Confirmed in block {receipt_merchant['blockNumber']}")
 
             # TX 2: Commission payment
             print(f"   📤 Signing commission transaction...")
             commission_data = transfer_sig + \
-                             self.web3.to_bytes(hexstr=payment_info['commission_address']).rjust(32, b'\x00') + \
+                             self.web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
@@ -317,18 +346,21 @@ class BuyerAgentMCP:
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
-            tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
-            print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
+            tx_hash_commission_raw = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
+
+            # Fix TX hash format
+            tx_hash_commission_str = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
+            print(f"   ✅ Commission TX sent: {tx_hash_commission_str}")
 
             # Wait for confirmation
-            receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
+            receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
             print(f"   ✅ Confirmed in block {receipt_commission['blockNumber']}")
 
-            # Store transaction hashes
-            self.last_payment['merchant_tx'] = tx_hash_merchant.hex()
-            self.last_payment['commission_tx'] = tx_hash_commission.hex()
+            # Store transaction hashes in proper format
+            self.last_payment['merchant_tx'] = tx_hash_merchant_str
+            self.last_payment['commission_tx'] = tx_hash_commission_str
 
-            return f"Payment executed! Merchant TX: {tx_hash_merchant.hex()}, Commission TX: {tx_hash_commission.hex()}"
+            return f"Payment executed! Merchant TX: {tx_hash_merchant_str}, Commission TX: {tx_hash_commission_str}"
 
         except Exception as e:
             error_msg = f"Payment failed: {str(e)}"

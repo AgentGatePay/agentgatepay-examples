@@ -191,28 +191,22 @@ python examples/1_api_basic_payment.py
 
 **Expected Output:**
 ```
-🤖 BUYER AGENT INITIALIZED
-================================================================
-Wallet: 0x742d35...
-API URL: https://api.agentgatepay.com
-================================================================
+✅ Initialized AgentGatePay client
+✅ Buyer wallet: 0x9752717...
 
-🔐 Issuing mandate with $100 budget...
-✅ Mandate issued successfully
-   Token: eyJhbGciOiJFZERTQSI...
-   Budget: $100.0
+🔐 Creating mandate ($100)...
+✅ Mandate created (Budget: $100.0)
 
-💳 Executing payment: $10 to 0x742d35...
-   📤 Merchant TX: $9.95
-   ✅ Merchant TX sent: 0xabc123...
-   ✅ Confirmed in block 12345
+💳 Signing payment ($0.01)...
+   ✅ TX 1/2 confirmed (block 23485610)
+   ✅ TX 2/2 confirmed (block 23485611)
 
-   📤 Commission TX: $0.05
-   ✅ Commission TX sent: 0xdef456...
-   ✅ Confirmed in block 12346
+📤 Submitting to gateway...
+✅ Payment recorded
+   ✅ Budget updated: $99.99
 
-✅ Payment completed!
-📊 Budget remaining: $90
+✅ PAYMENT WORKFLOW COMPLETED
+   Budget remaining: $99.99
 ```
 
 **Verify on Blockchain:**
@@ -225,16 +219,17 @@ https://basescan.org/tx/0xabc123...
 
 ## What Just Happened?
 
-Your autonomous agent:
+Your autonomous agent completed the **3-step payment flow**:
 
-1. ✅ **Issued an AP2 Mandate** - Created $100 budget authorization
-2. ✅ **Signed 2 Blockchain Transactions:**
-   - Merchant payment ($9.95 USDC to seller)
-   - Gateway commission ($0.05 USDC to AgentGatePay)
-3. ✅ **Verified Payment** - Confirmed on Base blockchain
-4. ✅ **Updated Budget** - Deducted $10 from mandate
+1. ✅ **Issue Mandate** - Created $100 budget with live tracking
+2. ✅ **Sign Blockchain Transactions:**
+   - Merchant payment ($0.01 USDC to seller)
+   - Gateway commission (0.5% to AgentGatePay)
+3. ✅ **Submit to Gateway** - Payment proof submitted and verified on-chain
+   - Gateway verified transactions on Base blockchain
+   - Budget automatically updated: $100.00 → $99.99
 
-**Total cost:** $10.01 (payment + ~$0.001 gas)
+**Total cost:** $0.01 (payment + ~$0.001 gas)
 
 ---
 

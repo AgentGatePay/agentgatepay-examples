@@ -136,11 +136,16 @@ health = agentpay.system.health()
 print(f"✅ Connected to AgentGatePay v{health['version']}")
 ```
 
-### 3. First Payment Flow
+### 3. First Payment Flow (3-Step Process)
+
+**Complete payment flow: Issue Mandate → Sign Transactions → Submit to Gateway**
 
 ```python
 from web3 import Web3
 from eth_account import Account
+import requests
+import json
+import base64
 
 # Step 1: Issue mandate ($100 budget for 7 days)
 mandate = agentpay.mandates.issue(
@@ -152,51 +157,83 @@ mandate = agentpay.mandates.issue(
 print(f"✅ Mandate issued: {mandate['mandate_id']}")
 print(f"   Budget: ${mandate['budget_usd']}")
 
-# Step 2: Verify mandate
+# Step 1b: Verify mandate and get live budget
 verification = agentpay.mandates.verify(mandate['mandate_token'])
 print(f"✅ Mandate valid: ${verification['budget_remaining']} remaining")
 
-# Step 3: Sign blockchain transaction (USDC on Base)
+# Step 1c: Fetch commission configuration dynamically
+commission_response = requests.get(
+    f"{os.getenv('AGENTPAY_API_URL')}/v1/config/commission",
+    headers={"x-api-key": os.getenv('BUYER_API_KEY')}
+)
+commission_config = commission_response.json()
+commission_address = commission_config['commission_address']
+commission_rate = commission_config.get('commission_rate', 0.005)
+print(f"✅ Commission config: {commission_rate*100}% to {commission_address[:10]}...")
+
+# Step 2: Sign TWO blockchain transactions (merchant + commission)
 web3 = Web3(Web3.HTTPProvider(os.getenv('BASE_RPC_URL')))
 account = Account.from_key(os.getenv('BUYER_PRIVATE_KEY'))
 
 USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 USDC_ABI = [{"constant": False, "inputs": [{"name": "_to", "type": "address"}, {"name": "_value", "type": "uint256"}], "name": "transfer", "outputs": [{"name": "", "type": "bool"}], "type": "function"}]
-
 usdc_contract = web3.eth.contract(address=USDC_ADDRESS, abi=USDC_ABI)
 
-# Calculate merchant amount (99.5% of $0.01 = $0.00995)
 amount_usd = 0.01
-merchant_amount = int(0.00995 * 10**6)  # USDC has 6 decimals
+merchant_amount = int(amount_usd * (1 - commission_rate) * 10**6)  # 99.5%
+commission_amount = int(amount_usd * commission_rate * 10**6)      # 0.5%
 
-tx = usdc_contract.functions.transfer(
-    os.getenv('SELLER_WALLET'),
-    merchant_amount
+# TX 1: Merchant payment
+tx1 = usdc_contract.functions.transfer(
+    os.getenv('SELLER_WALLET'), merchant_amount
 ).build_transaction({
     'from': account.address,
     'nonce': web3.eth.get_transaction_count(account.address),
     'gas': 100000,
     'gasPrice': web3.eth.gas_price
 })
+signed_tx1 = web3.eth.account.sign_transaction(tx1, os.getenv('BUYER_PRIVATE_KEY'))
+tx_hash1 = web3.eth.send_raw_transaction(signed_tx1.raw_transaction)
+receipt1 = web3.eth.wait_for_transaction_receipt(tx_hash1)
+print(f"✅ TX 1/2 confirmed: {receipt1.transactionHash.hex()}")
 
-# Sign and send
-signed_tx = web3.eth.account.sign_transaction(tx, os.getenv('BUYER_PRIVATE_KEY'))
-tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
-receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-print(f"✅ Blockchain TX: {receipt.transactionHash.hex()}")
+# TX 2: Commission payment
+tx2 = usdc_contract.functions.transfer(
+    commission_address, commission_amount
+).build_transaction({
+    'from': account.address,
+    'nonce': web3.eth.get_transaction_count(account.address),
+    'gas': 100000,
+    'gasPrice': web3.eth.gas_price
+})
+signed_tx2 = web3.eth.account.sign_transaction(tx2, os.getenv('BUYER_PRIVATE_KEY'))
+tx_hash2 = web3.eth.send_raw_transaction(signed_tx2.raw_transaction)
+receipt2 = web3.eth.wait_for_transaction_receipt(tx_hash2)
+print(f"✅ TX 2/2 confirmed: {receipt2.transactionHash.hex()}")
 
-# Step 4: Submit payment to AgentGatePay
-payment = agentpay.payments.submit(
-    mandate_token=mandate['mandate_token'],
-    amount_usd=amount_usd,
-    receiver_address=os.getenv('SELLER_WALLET'),
-    tx_hash=receipt.transactionHash.hex(),
-    chain="base"
+# Step 3: Submit payment proof to AgentGatePay gateway
+payment_payload = {
+    "scheme": "eip3009",
+    "tx_hash": receipt1.transactionHash.hex(),
+    "tx_hash_commission": receipt2.transactionHash.hex()
+}
+payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
+
+payment_response = requests.get(
+    f"{os.getenv('AGENTPAY_API_URL')}/x402/resource?chain=base&token=USDC&price_usd={amount_usd}",
+    headers={
+        "x-api-key": os.getenv('BUYER_API_KEY'),
+        "x-mandate": mandate['mandate_token'],
+        "x-payment": payment_b64
+    }
 )
-print(f"✅ Payment verified: {payment['charge_id']}")
-print(f"   Merchant TX: {payment['merchant_tx_hash']}")
-print(f"   Commission TX: {payment['commission_tx_hash']}")
-print(f"   Budget remaining: ${payment['budget_remaining']}")
+payment_result = payment_response.json()
+print(f"✅ Payment verified by gateway")
+print(f"   Charge ID: {payment_result.get('charge_id')}")
+
+# Fetch updated budget
+updated_verification = agentpay.mandates.verify(mandate['mandate_token'])
+print(f"   Budget remaining: ${updated_verification['budget_remaining']}")
 ```
 
 **Expected Output:**
@@ -205,12 +242,20 @@ print(f"   Budget remaining: ${payment['budget_remaining']}")
 ✅ Mandate issued: mandate_abc123
    Budget: $100.0
 ✅ Mandate valid: $100.0 remaining
-✅ Blockchain TX: 0xabc123def456...
-✅ Payment verified: charge_xyz789
-   Merchant TX: 0xabc123...
-   Commission TX: 0xdef456...
-   Budget remaining: $90.0
+✅ Commission config: 0.5% to 0x742d35Cc...
+✅ TX 1/2 confirmed: 0xabc123...
+✅ TX 2/2 confirmed: 0xdef456...
+✅ Payment verified by gateway
+   Charge ID: charge_xyz789
+   Budget remaining: $99.99
 ```
+
+**Key Features:**
+- ✅ Dynamic commission fetching from API
+- ✅ Live budget tracking via mandate verification
+- ✅ Two-transaction model (merchant + commission)
+- ✅ Gateway verifies both transactions on-chain
+- ✅ Automatic budget updates
 
 ---
 

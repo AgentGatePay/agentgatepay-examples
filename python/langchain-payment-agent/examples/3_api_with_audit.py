@@ -22,6 +22,9 @@ Requirements:
 
 import os
 import time
+import json
+import base64
+import requests
 from typing import Dict, List, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -69,7 +72,6 @@ BUYER_API_KEY = os.getenv('BUYER_API_KEY')
 BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
-COMMISSION_ADDRESS = os.getenv('AGENTPAY_COMMISSION_ADDRESS', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB')
 
 # USDC configuration
 USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
@@ -89,6 +91,101 @@ current_mandate = None
 payment_history = []
 
 print(f"✅ Initialized with buyer wallet: {buyer_account.address}\n")
+
+# ========================================
+# HELPER FUNCTIONS
+# ========================================
+
+def get_commission_config() -> dict:
+    """Fetch live commission configuration from AgentGatePay API"""
+    try:
+        response = requests.get(
+            f"{AGENTPAY_API_URL}/v1/config/commission",
+            headers={"x-api-key": BUYER_API_KEY}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"⚠️  Failed to fetch commission config: {e}")
+        return None
+
+def decode_mandate_token(token: str) -> dict:
+    """Decode AP2 mandate token to extract payload"""
+    try:
+        parts = token.split('.')
+        if len(parts) != 3:
+            return {}
+        payload_b64 = parts[1]
+        padding = 4 - (len(payload_b64) % 4)
+        if padding != 4:
+            payload_b64 += '=' * padding
+        payload_json = base64.urlsafe_b64decode(payload_b64)
+        return json.loads(payload_json)
+    except:
+        return {}
+
+def submit_and_verify_payment(payment_data: str) -> str:
+    """Submit payment to AgentGatePay gateway and verify"""
+    global current_mandate
+    try:
+        parts = payment_data.split(',')
+        if len(parts) != 4:
+            return f"Error: Invalid format"
+        merchant_tx = parts[0].strip()
+        commission_tx = parts[1].strip()
+        mandate_token = parts[2].strip()
+        price_usd = float(parts[3].strip())
+
+        print(f"\n📤 Submitting to gateway...")
+        payment_payload = {
+            "scheme": "eip3009",
+            "tx_hash": merchant_tx,
+            "tx_hash_commission": commission_tx
+        }
+        payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
+
+        headers = {
+            "x-api-key": BUYER_API_KEY,
+            "x-mandate": mandate_token,
+            "x-payment": payment_b64
+        }
+
+        url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={price_usd}"
+        response = requests.get(url, headers=headers)
+
+        if response.status_code >= 400:
+            result = response.json() if response.text else {}
+            error = result.get('error', response.text)
+            print(f"❌ Gateway error ({response.status_code}): {error}")
+            return f"Failed: {error}"
+
+        result = response.json()
+        if result.get('message') or result.get('success') or result.get('paid') or result.get('status') == 'confirmed':
+            print(f"✅ Payment recorded")
+            print(f"   🔍 Fetching updated budget...")
+            verify_response = requests.post(
+                f"{AGENTPAY_API_URL}/mandates/verify",
+                headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                json={"mandate_token": mandate_token}
+            )
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                new_budget = verify_data.get('budget_remaining', 'Unknown')
+                print(f"   ✅ Budget updated: ${new_budget}")
+                if current_mandate:
+                    current_mandate['budget_remaining'] = new_budget
+                    agent_id = f"audited-buyer-{buyer_account.address}"
+                    save_mandate(agent_id, current_mandate)
+                return f"Success! Paid: ${price_usd}, Remaining: ${new_budget}"
+            else:
+                return f"Success! Paid: ${price_usd}"
+        else:
+            error = result.get('error', 'Unknown error')
+            print(f"❌ Failed: {error}")
+            return f"Failed: {error}"
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        return f"Error: {str(e)}"
 
 # ========================================
 # AGENT TOOLS WITH AUDIT LOGGING

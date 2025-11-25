@@ -39,10 +39,27 @@ load_dotenv()
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 SELLER_API_KEY = os.getenv('SELLER_API_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
-COMMISSION_ADDRESS = os.getenv('AGENTPAY_COMMISSION_ADDRESS', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB')
 COMMISSION_RATE = 0.005  # 0.5%
 
 SELLER_API_PORT = int(os.getenv('SELLER_API_PORT', 8000))
+
+# Fetch commission address from API dynamically
+def get_commission_address():
+    """Fetch live commission address from AgentGatePay API"""
+    import requests
+    try:
+        response = requests.get(
+            f"{AGENTPAY_API_URL}/v1/config/commission",
+            headers={"x-api-key": SELLER_API_KEY}
+        )
+        response.raise_for_status()
+        config = response.json()
+        return config.get('commission_address')
+    except Exception as e:
+        print(f"⚠️  Failed to fetch commission address: {e}")
+        return "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB"  # Fallback
+
+COMMISSION_ADDRESS = get_commission_address()
 
 # ========================================
 # SELLER AGENT CLASS

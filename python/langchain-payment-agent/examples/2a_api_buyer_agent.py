@@ -27,12 +27,14 @@ Requirements:
 
 import os
 import time
+import json
+import base64
+import requests
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 from agentgatepay_sdk import AgentGatePay
-import requests
 
 # LangChain imports
 from langchain_core.tools import Tool
@@ -122,8 +124,37 @@ class BuyerAgent:
         print(f"Seller API: {SELLER_API_URL}")
         print(f"=" * 60)
 
+    def get_commission_config(self) -> dict:
+        """Fetch live commission configuration from AgentGatePay API"""
+        try:
+            response = requests.get(
+                f"{AGENTPAY_API_URL}/v1/config/commission",
+                headers={"x-api-key": BUYER_API_KEY}
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            print(f"⚠️  Failed to fetch commission config: {e}")
+            return None
+
+    def decode_mandate_token(self, token: str) -> dict:
+        """Decode AP2 mandate token to extract payload"""
+        try:
+            parts = token.split('.')
+            if len(parts) != 3:
+                return {}
+            payload_b64 = parts[1]
+            # Add padding if needed
+            padding = 4 - (len(payload_b64) % 4)
+            if padding != 4:
+                payload_b64 += '=' * padding
+            payload_json = base64.urlsafe_b64decode(payload_b64)
+            return json.loads(payload_json)
+        except:
+            return {}
+
     def issue_mandate(self, budget_usd: float) -> str:
-        """Issue AP2 payment mandate"""
+        """Issue AP2 payment mandate and fetch live budget"""
         print(f"\n🔐 [BUYER] Issuing mandate with ${budget_usd} budget...")
 
         try:
@@ -134,12 +165,31 @@ class BuyerAgent:
                 ttl_minutes=10080  # 7 days
             )
 
+            # Fetch live budget from API
+            token = mandate['mandate_token']
+            print(f"   🔍 Fetching live budget from API...")
+            verify_response = requests.post(
+                f"{AGENTPAY_API_URL}/mandates/verify",
+                headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                json={"mandate_token": token}
+            )
+
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                mandate['budget_remaining'] = verify_data.get('budget_remaining', budget_usd)
+
             self.current_mandate = mandate
+
+            # Save mandate to file
+            agent_id = f"buyer-agent-{self.account.address}"
+            save_mandate(agent_id, mandate)
+
             print(f"✅ Mandate issued successfully")
             print(f"   Token: {mandate['mandate_token'][:50]}...")
             print(f"   Budget: ${mandate['budget_usd']}")
+            print(f"   Remaining: ${mandate.get('budget_remaining', budget_usd)}")
 
-            return f"Mandate issued. Budget: ${budget_usd}, Token: {mandate['mandate_token'][:50]}..."
+            return f"MANDATE_TOKEN:{token}"
 
         except Exception as e:
             error_msg = f"Failed to issue mandate: {str(e)}"
@@ -227,14 +277,25 @@ class BuyerAgent:
             return error_msg
 
     def sign_and_pay(self) -> str:
-        """Sign and execute blockchain payment (2 transactions)"""
+        """Sign blockchain payment (2 transactions) but DON'T submit to gateway"""
         if not self.last_payment:
             return "Error: No payment request pending. Call request_resource first."
 
+        if not self.current_mandate:
+            return "Error: No mandate issued. Call issue_mandate first."
+
         payment_info = self.last_payment
-        print(f"\n💳 [BUYER] Executing payment: ${payment_info['price_usd']} to {payment_info['recipient'][:10]}...")
+        print(f"\n💳 [BUYER] Signing payment: ${payment_info['price_usd']} to {payment_info['recipient'][:10]}...")
 
         try:
+            # Fetch live commission config
+            commission_config = self.get_commission_config()
+            if commission_config:
+                commission_address = commission_config.get('commission_address')
+                print(f"   ✅ Using live commission address: {commission_address[:10]}...")
+            else:
+                return "Error: Failed to fetch commission configuration"
+
             # Calculate amounts
             total_usd = payment_info['price_usd']
             commission_rate = payment_info['commission_rate']
@@ -278,7 +339,7 @@ class BuyerAgent:
             # TX 2: Commission payment
             print(f"   📤 Signing commission transaction...")
             commission_data = transfer_sig + \
-                             self.web3.to_bytes(hexstr=payment_info['commission_address']).rjust(32, b'\x00') + \
+                             self.web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
@@ -303,12 +364,89 @@ class BuyerAgent:
             self.last_payment['merchant_tx'] = tx_hash_merchant.hex()
             self.last_payment['commission_tx'] = tx_hash_commission.hex()
 
-            return f"Payment executed! Merchant TX: {tx_hash_merchant.hex()}, Commission TX: {tx_hash_commission.hex()}"
+            # Return formatted for submit_payment tool
+            mandate_token = self.current_mandate['mandate_token']
+            price_usd = payment_info['price_usd']
+            return f"TX_HASHES:{tx_hash_merchant.hex()},{tx_hash_commission.hex()},{mandate_token},{price_usd}"
 
         except Exception as e:
             error_msg = f"Payment failed: {str(e)}"
             print(f"❌ {error_msg}")
             return error_msg
+
+    def submit_payment(self, payment_data: str) -> str:
+        """Submit payment to AgentGatePay gateway"""
+        try:
+            parts = payment_data.split(',')
+            if len(parts) != 4:
+                return f"Error: Invalid payment data format. Expected 4 parts, got {len(parts)}"
+
+            merchant_tx = parts[0].strip()
+            commission_tx = parts[1].strip()
+            mandate_token = parts[2].strip()
+            price_usd = float(parts[3].strip())
+
+            print(f"\n📤 Submitting payment to gateway...")
+            print(f"   Merchant TX: {merchant_tx[:20]}...")
+            print(f"   Commission TX: {commission_tx[:20]}...")
+            print(f"   Price: ${price_usd}")
+
+            # Build payment payload
+            payment_payload = {
+                "scheme": "eip3009",
+                "tx_hash": merchant_tx,
+                "tx_hash_commission": commission_tx
+            }
+            payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
+
+            headers = {
+                "x-api-key": BUYER_API_KEY,
+                "x-mandate": mandate_token,
+                "x-payment": payment_b64
+            }
+
+            url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={price_usd}"
+            response = requests.get(url, headers=headers)
+
+            if response.status_code >= 400:
+                result = response.json() if response.text else {}
+                error = result.get('error', response.text)
+                print(f"❌ Gateway error ({response.status_code}): {error}")
+                return f"Failed: {error}"
+
+            result = response.json()
+            if result.get('message') or result.get('success') or result.get('paid') or result.get('status') == 'confirmed':
+                print(f"✅ Payment recorded successfully")
+
+                # Fetch updated budget
+                print(f"   🔍 Fetching updated budget...")
+                verify_response = requests.post(
+                    f"{AGENTPAY_API_URL}/mandates/verify",
+                    headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                    json={"mandate_token": mandate_token}
+                )
+
+                if verify_response.status_code == 200:
+                    verify_data = verify_response.json()
+                    new_budget = verify_data.get('budget_remaining', 'Unknown')
+                    print(f"   ✅ Budget updated: ${new_budget}")
+
+                    if self.current_mandate:
+                        self.current_mandate['budget_remaining'] = new_budget
+                        agent_id = f"buyer-agent-{self.account.address}"
+                        save_mandate(agent_id, self.current_mandate)
+
+                    return f"Success! Paid: ${price_usd}, Remaining: ${new_budget}"
+                else:
+                    return f"Success! Paid: ${price_usd}"
+            else:
+                error = result.get('error', 'Unknown error')
+                print(f"❌ Failed: {error}")
+                return f"Failed: {error}"
+
+        except Exception as e:
+            print(f"❌ Error: {str(e)}")
+            return f"Error: {str(e)}"
 
     def claim_resource(self) -> str:
         """Claim resource by submitting payment proof"""
@@ -362,7 +500,7 @@ tools = [
     Tool(
         name="issue_mandate",
         func=lambda budget: buyer.issue_mandate(float(budget)),
-        description="Issue AP2 payment mandate with specified budget (USD). Use FIRST before any purchases. Input: budget amount as number."
+        description="Issue AP2 payment mandate with specified budget (USD). Use FIRST before any purchases. Input: budget amount as number. Returns: MANDATE_TOKEN:{token}"
     ),
     Tool(
         name="discover_catalog",
@@ -377,7 +515,12 @@ tools = [
     Tool(
         name="sign_and_pay",
         func=lambda _: buyer.sign_and_pay(),
-        description="Sign and execute blockchain payment for last requested resource. No input needed."
+        description="Sign and execute blockchain payment (2 transactions). Returns: TX_HASHES:{merchant_tx},{commission_tx},{mandate},{price}. No input needed."
+    ),
+    Tool(
+        name="submit_payment",
+        func=buyer.submit_payment,
+        description="Submit payment to AgentGatePay gateway. Input: TX_HASHES output from sign_and_pay. Returns updated budget."
     ),
     Tool(
         name="claim_resource",
@@ -398,11 +541,16 @@ Tool names: {tool_names}
 Task: {input}
 
 Workflow:
-1. Issue mandate with budget
+1. Issue mandate with budget - Returns MANDATE_TOKEN:{token}
 2. Discover catalog from seller
 3. Request specific resource (gets payment requirements)
-4. Sign and pay (blockchain transaction)
-5. Claim resource (submit payment proof)
+4. Sign and pay (blockchain transaction) - Returns TX_HASHES:{tx1},{tx2},{mandate},{price}
+5. Submit payment to gateway - Input: TX_HASHES output from step 4
+6. Claim resource (submit payment proof)
+
+CRITICAL: You MUST parse tool outputs and use them as inputs to subsequent tools.
+- After issue_mandate, extract token from "MANDATE_TOKEN:{token}"
+- After sign_and_pay, use entire "TX_HASHES:..." output as input to submit_payment
 
 Think step by step:
 {agent_scratchpad}

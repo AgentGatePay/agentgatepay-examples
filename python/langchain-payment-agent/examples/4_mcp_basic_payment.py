@@ -30,11 +30,12 @@ Requirements:
 import os
 import time
 import json
+import base64
+import requests
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
-import requests
 
 # LangChain imports
 from langchain_core.tools import Tool
@@ -71,12 +72,12 @@ load_dotenv()
 # CONFIGURATION
 # ========================================
 
-AGENTPAY_MCP_ENDPOINT = f"{os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')}/mcp"
+AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
+AGENTPAY_MCP_ENDPOINT = f"{AGENTPAY_API_URL}/mcp"
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
 BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
-COMMISSION_ADDRESS = os.getenv('AGENTPAY_COMMISSION_ADDRESS', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEbB')
 
 # Payment configuration
 RESOURCE_PRICE_USD = 0.01
@@ -86,6 +87,23 @@ COMMISSION_RATE = 0.005
 # USDC contract on Base
 USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 USDC_DECIMALS = 6
+
+# ========================================
+# HELPER FUNCTIONS
+# ========================================
+
+def get_commission_config() -> dict:
+    """Fetch commission configuration from AgentGatePay API"""
+    try:
+        response = requests.get(
+            f"{AGENTPAY_API_URL}/v1/config/commission",
+            headers={"x-api-key": BUYER_API_KEY}
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        print(f"⚠️  Failed to fetch commission config: {e}")
+        return None
 
 # ========================================
 # MCP TOOL WRAPPER
@@ -185,8 +203,19 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
     print(f"\n💳 Signing blockchain payment: ${amount_usd} to {recipient[:10]}...")
 
     try:
+        # Fetch commission configuration from API
+        commission_config = get_commission_config()
+        if not commission_config:
+            return "Error: Failed to fetch commission configuration"
+
+        commission_address = commission_config.get('commission_address')
+        commission_rate = commission_config.get('commission_rate', COMMISSION_RATE)
+
+        print(f"   Using commission address: {commission_address[:10]}...")
+        print(f"   Commission rate: {commission_rate * 100}%")
+
         # Calculate amounts
-        commission_amount_usd = amount_usd * COMMISSION_RATE
+        commission_amount_usd = amount_usd * commission_rate
         merchant_amount_usd = amount_usd - commission_amount_usd
 
         merchant_amount_atomic = int(merchant_amount_usd * (10 ** USDC_DECIMALS))
@@ -214,17 +243,20 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         }
 
         signed_merchant = buyer_account.sign_transaction(merchant_tx)
-        tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
-        print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
+        tx_hash_merchant_raw = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
+
+        # Fix TX hash format
+        tx_hash_merchant_str = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
+        print(f"   ✅ Merchant TX sent: {tx_hash_merchant_str}")
 
         # Wait for confirmation
-        receipt_merchant = web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+        receipt_merchant = web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
         print(f"   ✅ Confirmed in block {receipt_merchant['blockNumber']}")
 
         # TX 2: Commission payment
         print(f"   📤 Signing commission transaction...")
         commission_data = transfer_sig + \
-                         web3.to_bytes(hexstr=COMMISSION_ADDRESS).rjust(32, b'\x00') + \
+                         web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
                          commission_amount_atomic.to_bytes(32, byteorder='big')
 
         commission_tx = {
@@ -238,18 +270,21 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         }
 
         signed_commission = buyer_account.sign_transaction(commission_tx)
-        tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
-        print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
+        tx_hash_commission_raw = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
+
+        # Fix TX hash format
+        tx_hash_commission_str = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
+        print(f"   ✅ Commission TX sent: {tx_hash_commission_str}")
 
         # Wait for confirmation
-        receipt_commission = web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
+        receipt_commission = web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
         print(f"   ✅ Confirmed in block {receipt_commission['blockNumber']}")
 
-        # Store hashes
-        merchant_tx_hash = tx_hash_merchant.hex()
-        commission_tx_hash = tx_hash_commission.hex()
+        # Store hashes in proper format
+        merchant_tx_hash = tx_hash_merchant_str
+        commission_tx_hash = tx_hash_commission_str
 
-        return f"Payment sent! Merchant TX: {merchant_tx_hash}, Commission TX: {commission_tx_hash}"
+        return f"TX_HASHES:{merchant_tx_hash},{commission_tx_hash}"
 
     except Exception as e:
         error_msg = f"Payment failed: {str(e)}"
