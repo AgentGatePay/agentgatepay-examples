@@ -1,6 +1,8 @@
-# Environment variables
+# Environment variables (but NOT .env.example - users need it!)
 .env
 .env.local
+.env.*.local
+!.env.example
 
 # Python
 __pycache__/
