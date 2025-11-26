@@ -656,15 +656,24 @@ if __name__ == "__main__":
         budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
         mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
 
+    # Ask user which resource to purchase
+    print(f"\n📋 Available resources:")
+    print("   1. research-paper-2025 ($0.01)")
+    print("   2. market-data-api ($5.00)")
+    print("   3. ai-model-training-dataset ($25.00)")
+
+    resource_choice = input("\n🛒 Enter resource ID to purchase (default: research-paper-2025): ").strip()
+    resource_id = resource_choice if resource_choice else "research-paper-2025"
+
     # Agent task
     task = f"""
-    Purchase the research paper "research-paper-2025" from the seller.
+    Purchase the resource "{resource_id}" from the seller.
 
     Steps:
     1. Issue a mandate with ${mandate_budget} budget
     2. Discover the catalog from {SELLER_API_URL}
-    3. Request the resource "research-paper-2025"
-    4. If price is acceptable (under $15), sign and pay
+    3. Request the resource "{resource_id}"
+    4. If price is acceptable (under ${mandate_budget}), sign and pay
     5. Submit payment to AgentGatePay gateway
     6. Claim the resource by submitting payment proof
 
