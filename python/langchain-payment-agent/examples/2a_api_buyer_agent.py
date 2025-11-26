@@ -660,31 +660,35 @@ if __name__ == "__main__":
         mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
 
         # Ask user for mandate TTL duration
-        print(f"\n⏰ Set mandate duration:")
-        duration_value = input("   Enter duration value (default: 7): ").strip()
-        duration_value = int(duration_value) if duration_value.isdigit() else 7
+        print(f"\n⏰ Set mandate duration (format: number + unit)")
+        print(f"   Examples: 10m (10 minutes), 2h (2 hours), 7d (7 days)")
+        ttl_input = input("   Enter duration (default: 7d): ").strip().lower()
 
-        print(f"\n   Select unit:")
-        print("   1. Minutes")
-        print("   2. Hours")
-        print("   3. Days (default)")
-        unit_input = input("   Enter unit (1-3, default: Days): ").strip()
+        if not ttl_input:
+            ttl_input = "7d"
 
-        if unit_input == "1":
-            mandate_ttl_minutes = duration_value
-            unit_name = "minutes"
-        elif unit_input == "2":
-            mandate_ttl_minutes = duration_value * 60
-            unit_name = "hours"
-        elif unit_input == "3" or not unit_input:
-            mandate_ttl_minutes = duration_value * 1440
-            unit_name = "days"
+        # Parse duration
+        import re
+        match = re.match(r'^(\d+)([mhd])$', ttl_input)
+
+        if match:
+            value = int(match.group(1))
+            unit = match.group(2)
+
+            if unit == 'm':
+                mandate_ttl_minutes = value
+                unit_name = "minutes"
+            elif unit == 'h':
+                mandate_ttl_minutes = value * 60
+                unit_name = "hours"
+            elif unit == 'd':
+                mandate_ttl_minutes = value * 1440
+                unit_name = "days"
+
+            print(f"   ✅ Mandate will be valid for {value} {unit_name} ({mandate_ttl_minutes} minutes)")
         else:
-            print(f"   ⚠️  Invalid unit, using days")
-            mandate_ttl_minutes = duration_value * 1440
-            unit_name = "days"
-
-        print(f"   ✅ Mandate will be valid for {duration_value} {unit_name} ({mandate_ttl_minutes} minutes)")
+            print(f"   ⚠️  Invalid format, using default: 7 days")
+            mandate_ttl_minutes = 10080
 
     # Ask user which resource to purchase
     print(f"\n📋 Available resources:")
