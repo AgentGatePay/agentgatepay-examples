@@ -690,28 +690,35 @@ if __name__ == "__main__":
             print(f"   ⚠️  Invalid format, using default: 7 days")
             mandate_ttl_minutes = 10080
 
-    # Ask user which resource to purchase
-    print(f"\n📋 Available resources:")
-    print("   1. research-paper-2025 ($0.01)")
-    print("   2. market-data-api ($5.00)")
-    print("   3. ai-model-training-dataset ($25.00)")
+    # Ask user what they want (natural language)
+    print(f"\n🛒 What do you want to purchase?")
+    print(f"   Examples:")
+    print(f"   - 'research paper about AI agent payments'")
+    print(f"   - 'market data API access'")
+    print(f"   - 'AI training dataset'")
+    user_need = input("\n   Describe what you need: ").strip()
 
-    resource_choice = input("\n🛒 Enter resource ID to purchase (default: research-paper-2025): ").strip()
-    resource_id = resource_choice if resource_choice else "research-paper-2025"
+    if not user_need:
+        user_need = "research paper about AI agent payments"
+        print(f"   Using default: {user_need}")
 
-    # Agent task
+    # Agent task - let agent discover and choose autonomously
     task = f"""
-    Purchase the resource "{resource_id}" from the seller.
+    The user wants: "{user_need}"
+
+    Your job is to autonomously find and purchase the best matching resource.
 
     Steps:
     1. Issue a mandate with ${mandate_budget} budget
     2. Discover the catalog from {SELLER_API_URL}
-    3. Request the resource "{resource_id}"
-    4. If price is acceptable (under ${mandate_budget}), sign and pay
-    5. Submit payment to AgentGatePay gateway
-    6. Claim the resource by submitting payment proof
+    3. Analyze the catalog and identify which resource best matches: "{user_need}"
+    4. Request that resource to get payment details
+    5. If price is acceptable (under ${mandate_budget}), sign and pay
+    6. Submit payment to AgentGatePay gateway
+    7. Claim the resource by submitting payment proof
 
-    Make the purchase autonomously.
+    IMPORTANT: You must discover the catalog FIRST, then decide which resource_id to purchase.
+    Do NOT hardcode resource IDs. Choose based on what the user needs.
     """
 
     try:
