@@ -252,9 +252,14 @@ class BuyerAgent:
 
                 print(f"✅ Discovered {len(self.discovered_resources)} resources:")
                 for res in self.discovered_resources:
-                    print(f"   - {res['name']} (${res['price_usd']})")
+                    print(f"   - {res['name']} (${res['price_usd']}) [ID: {res['id']}]")
 
-                return f"Found {len(self.discovered_resources)} resources. Total catalog value: ${sum(r['price_usd'] for r in self.discovered_resources):.2f}"
+                # Return detailed resource info with IDs for agent to parse
+                resources_list = []
+                for res in self.discovered_resources:
+                    resources_list.append(f"ID: '{res['id']}', Name: '{res['name']}', Price: ${res['price_usd']}, Description: '{res['description']}'")
+
+                return f"Found {len(self.discovered_resources)} resources:\n" + "\n".join(resources_list) + f"\n\nIMPORTANT: Use the 'ID' field (e.g., 'market-data-api') when calling request_resource, NOT the name or description."
 
             else:
                 error_msg = f"Catalog discovery failed: HTTP {response.status_code}"
@@ -735,13 +740,20 @@ if __name__ == "__main__":
     1. Issue a mandate with ${mandate_budget} budget
     2. Discover the catalog from {SELLER_API_URL}
     3. Analyze the catalog and identify which resource best matches: "{user_need}"
-    4. Request that resource to get payment details
+    4. Request that resource to get payment details - USE THE 'ID' FIELD FROM CATALOG
     5. If price is acceptable (under ${mandate_budget}), sign and pay
     6. Submit payment to AgentGatePay gateway
     7. Claim the resource by submitting payment proof
 
-    IMPORTANT: You must discover the catalog FIRST, then decide which resource_id to purchase.
-    Do NOT hardcode resource IDs. Choose based on what the user needs.
+    CRITICAL INSTRUCTIONS FOR STEP 4:
+    - The catalog returns resources in this format:
+      ID: 'market-data-api', Name: 'Premium Market Data API Access', Price: $5.0
+    - When you call request_resource, you MUST use the 'ID' field (e.g., 'market-data-api')
+    - DO NOT use the name, description, or purpose text
+    - Example: request_resource('market-data-api') ✓
+    - Example: request_resource('market data and API access') ✗ WRONG
+
+    Choose the resource whose name/description best matches "{user_need}", then use its ID.
     """
 
     try:
