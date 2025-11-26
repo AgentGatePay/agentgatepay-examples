@@ -156,9 +156,10 @@ class BuyerAgent:
         except:
             return {}
 
-    def issue_mandate(self, budget_usd: float, ttl_minutes: int = 10080) -> str:
+    def issue_mandate(self, budget_usd: float, ttl_minutes: int = 10080, purpose: str = "general purchases") -> str:
         """Issue AP2 payment mandate and fetch live budget"""
         print(f"\n🔐 [BUYER] Issuing mandate with ${budget_usd} budget for {ttl_minutes} minutes...")
+        print(f"   Purpose: {purpose}")
 
         try:
             # Check if mandate already exists
@@ -214,11 +215,12 @@ class BuyerAgent:
                 token_data = self.decode_mandate_token(token)
                 budget_remaining = token_data.get('budget_remaining', str(budget_usd))
 
-            # Store with decoded budget (SDK doesn't return budget_usd, so we add it)
+            # Store with decoded budget AND purpose (SDK doesn't return these, so we add them)
             mandate_with_budget = {
                 **mandate,
                 'budget_usd': budget_usd,
-                'budget_remaining': budget_remaining
+                'budget_remaining': budget_remaining,
+                'purpose': purpose  # Store purpose for future runs
             }
 
             self.current_mandate = mandate_with_budget
@@ -228,6 +230,7 @@ class BuyerAgent:
             print(f"   Token: {mandate['mandate_token'][:50]}...")
             print(f"   Budget: ${budget_usd}")
             print(f"   Remaining: ${budget_remaining}")
+            print(f"   Purpose: {purpose}")
 
             return f"MANDATE_TOKEN:{token}"
 
@@ -535,14 +538,15 @@ class BuyerAgent:
 
 buyer = BuyerAgent()
 
-# Global variable to store TTL for mandate (will be set from user input)
+# Global variables for mandate (will be set from user input)
 mandate_ttl_minutes = 10080  # Default: 7 days
+mandate_purpose = "general purchases"  # Default purpose
 
 # Define tools
 tools = [
     Tool(
         name="issue_mandate",
-        func=lambda budget: buyer.issue_mandate(float(budget), mandate_ttl_minutes),
+        func=lambda budget: buyer.issue_mandate(float(budget), mandate_ttl_minutes, mandate_purpose),
         description="Issue AP2 payment mandate with specified budget (USD). Use FIRST before any purchases. Input: budget amount as number. Returns: MANDATE_TOKEN:{token}"
     ),
     Tool(
@@ -651,10 +655,16 @@ if __name__ == "__main__":
             token_data = buyer.decode_mandate_token(token)
             budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
 
-        print(f"\n♻️  Using existing mandate (Budget: ${budget_remaining})")
+        # Extract mandate purpose
+        mandate_purpose = existing_mandate.get('purpose', 'general purchases')
+
+        print(f"\n♻️  Using existing mandate")
+        print(f"   Purpose: {mandate_purpose}")
+        print(f"   Budget remaining: ${budget_remaining}")
         print(f"   Token: {existing_mandate.get('mandate_token', 'N/A')[:50]}...")
         print(f"   To delete: Remove from ~/.agentgatepay_mandates.json\n")
         mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
+        user_need = mandate_purpose  # Use mandate purpose for purchases
     else:
         budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
         mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
@@ -690,17 +700,30 @@ if __name__ == "__main__":
             print(f"   ⚠️  Invalid format, using default: 7 days")
             mandate_ttl_minutes = 10080
 
-    # Ask user what they want (natural language)
-    print(f"\n🛒 What do you want to purchase?")
-    print(f"   Examples:")
-    print(f"   - 'research paper about AI agent payments'")
-    print(f"   - 'market data API access'")
-    print(f"   - 'AI training dataset'")
-    user_need = input("\n   Describe what you need: ").strip()
+        # Ask user for mandate PURPOSE - this defines what it can be spent on
+        print(f"\n🎯 What is this mandate for? (This defines what resources can be purchased)")
+        print(f"   Examples from our seller:")
+        print(f"   1. Research papers and academic content")
+        print(f"   2. Market data and API access")
+        print(f"   3. AI training datasets")
+        print(f"   Or enter custom purpose in natural language")
+        purpose_input = input("\n   Enter mandate purpose (default: research papers): ").strip()
 
-    if not user_need:
-        user_need = "research paper about AI agent payments"
-        print(f"   Using default: {user_need}")
+        if purpose_input in ['1']:
+            user_need = "research papers and academic content"
+        elif purpose_input in ['2']:
+            user_need = "market data and API access"
+        elif purpose_input in ['3']:
+            user_need = "AI training datasets"
+        elif purpose_input:
+            user_need = purpose_input
+        else:
+            user_need = "research papers and academic content"
+
+        print(f"   ✅ Mandate purpose: {user_need}")
+
+        # Set global mandate_purpose for tool use
+        mandate_purpose = user_need
 
     # Agent task - let agent discover and choose autonomously
     task = f"""
