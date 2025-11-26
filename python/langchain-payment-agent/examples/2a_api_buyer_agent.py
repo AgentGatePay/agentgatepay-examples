@@ -26,6 +26,7 @@ Requirements:
 """
 
 import os
+import sys
 import time
 import json
 import base64
@@ -36,11 +37,13 @@ from web3 import Web3
 from eth_account import Account
 from agentgatepay_sdk import AgentGatePay
 
-# LangChain imports
+# LangChain imports (LangChain 1.x compatible)
 from langchain_core.tools import Tool
-from langchain.agents import AgentExecutor, create_react_agent
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
+
+# Add parent directory to path for utils import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
@@ -529,16 +532,8 @@ tools = [
     ),
 ]
 
-# Agent prompt
-agent_prompt = PromptTemplate.from_template("""
-You are an autonomous buyer agent that discovers and purchases resources from sellers.
-
-Available tools:
-{tools}
-
-Tool names: {tool_names}
-
-Task: {input}
+# System prompt for agent behavior
+system_prompt = """You are an autonomous buyer agent that discovers and purchases resources from sellers.
 
 Workflow:
 1. Issue mandate with budget - Returns MANDATE_TOKEN:{token}
@@ -552,25 +547,19 @@ CRITICAL: You MUST parse tool outputs and use them as inputs to subsequent tools
 - After issue_mandate, extract token from "MANDATE_TOKEN:{token}"
 - After sign_and_pay, use entire "TX_HASHES:..." output as input to submit_payment
 
-Think step by step:
-{agent_scratchpad}
-""")
+Think step by step and complete the workflow."""
 
-# Create agent
+# Create agent (LangChain 1.x with LangGraph backend)
 llm = ChatOpenAI(
     model="gpt-4",
     temperature=0,
     openai_api_key=os.getenv('OPENAI_API_KEY')
 )
 
-agent = create_react_agent(llm=llm, tools=tools, prompt=agent_prompt)
-
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    max_iterations=15,
-    handle_parsing_errors=True
+agent_executor = create_agent(
+    llm,
+    tools,
+    system_prompt=system_prompt
 )
 
 # ========================================
