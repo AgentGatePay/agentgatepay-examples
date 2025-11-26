@@ -161,8 +161,37 @@ class BuyerAgent:
         print(f"\n🔐 [BUYER] Issuing mandate with ${budget_usd} budget...")
 
         try:
+            # Check if mandate already exists
+            agent_id = f"buyer-agent-{self.account.address}"
+            existing_mandate = get_mandate(agent_id)
+
+            if existing_mandate:
+                token = existing_mandate.get('mandate_token')
+
+                # Get LIVE budget from gateway
+                print(f"   🔍 Fetching live budget from API...")
+                verify_response = requests.post(
+                    f"{AGENTPAY_API_URL}/mandates/verify",
+                    headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                    json={"mandate_token": token}
+                )
+
+                if verify_response.status_code == 200:
+                    verify_data = verify_response.json()
+                    budget_remaining = verify_data.get('budget_remaining', 'Unknown')
+                else:
+                    # Fallback to JWT if verify fails
+                    token_data = self.decode_mandate_token(token)
+                    budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
+
+                print(f"♻️  Reusing existing mandate (Budget: ${budget_remaining})")
+                self.current_mandate = existing_mandate
+                self.current_mandate['budget_remaining'] = budget_remaining
+                return f"MANDATE_TOKEN:{token}"
+
+            # Create new mandate
             mandate = self.agentpay.mandates.issue(
-                subject=f"buyer-agent-{self.account.address}",
+                subject=agent_id,
                 budget=budget_usd,
                 scope="resource.read,payment.execute",
                 ttl_minutes=10080  # 7 days
@@ -179,18 +208,26 @@ class BuyerAgent:
 
             if verify_response.status_code == 200:
                 verify_data = verify_response.json()
-                mandate['budget_remaining'] = verify_data.get('budget_remaining', budget_usd)
+                budget_remaining = verify_data.get('budget_remaining', budget_usd)
+            else:
+                # Fallback to JWT decode
+                token_data = self.decode_mandate_token(token)
+                budget_remaining = token_data.get('budget_remaining', str(budget_usd))
 
-            self.current_mandate = mandate
+            # Store with decoded budget (SDK doesn't return budget_usd, so we add it)
+            mandate_with_budget = {
+                **mandate,
+                'budget_usd': budget_usd,
+                'budget_remaining': budget_remaining
+            }
 
-            # Save mandate to file
-            agent_id = f"buyer-agent-{self.account.address}"
-            save_mandate(agent_id, mandate)
+            self.current_mandate = mandate_with_budget
+            save_mandate(agent_id, mandate_with_budget)
 
             print(f"✅ Mandate issued successfully")
             print(f"   Token: {mandate['mandate_token'][:50]}...")
-            print(f"   Budget: ${mandate['budget_usd']}")
-            print(f"   Remaining: ${mandate.get('budget_remaining', budget_usd)}")
+            print(f"   Budget: ${budget_usd}")
+            print(f"   Remaining: ${budget_remaining}")
 
             return f"MANDATE_TOKEN:{token}"
 
@@ -589,16 +626,47 @@ if __name__ == "__main__":
         print(f"   Please start the seller first: python 2b_api_seller_agent.py")
         exit(1)
 
+    # Check for existing mandate
+    agent_id = f"buyer-agent-{buyer.account.address}"
+    existing_mandate = get_mandate(agent_id)
+
+    if existing_mandate:
+        token = existing_mandate.get('mandate_token')
+
+        # Get LIVE budget from gateway
+        verify_response = requests.post(
+            f"{AGENTPAY_API_URL}/mandates/verify",
+            headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+            json={"mandate_token": token}
+        )
+
+        if verify_response.status_code == 200:
+            verify_data = verify_response.json()
+            budget_remaining = verify_data.get('budget_remaining', 'Unknown')
+        else:
+            # Fallback to JWT if verify fails
+            token_data = buyer.decode_mandate_token(token)
+            budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
+
+        print(f"\n♻️  Using existing mandate (Budget: ${budget_remaining})")
+        print(f"   Token: {existing_mandate.get('mandate_token', 'N/A')[:50]}...")
+        print(f"   To delete: Remove from ~/.agentgatepay_mandates.json\n")
+        mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
+    else:
+        budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
+        mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
+
     # Agent task
     task = f"""
     Purchase the research paper "research-paper-2025" from the seller.
 
     Steps:
-    1. Issue a mandate with ${MANDATE_BUDGET_USD} budget
+    1. Issue a mandate with ${mandate_budget} budget
     2. Discover the catalog from {SELLER_API_URL}
     3. Request the resource "research-paper-2025"
     4. If price is acceptable (under $15), sign and pay
-    5. Claim the resource by submitting payment proof
+    5. Submit payment to AgentGatePay gateway
+    6. Claim the resource by submitting payment proof
 
     Make the purchase autonomously.
     """
