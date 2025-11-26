@@ -604,13 +604,19 @@ if __name__ == "__main__":
     """
 
     try:
-        # Run agent
-        result = agent_executor.invoke({"input": task})
+        # Run agent (LangGraph format expects messages)
+        result = agent_executor.invoke({"messages": [("user", task)]})
 
         print("\n" + "=" * 60)
         print("✅ BUYER AGENT COMPLETED")
         print("=" * 60)
-        print(f"\nResult: {result['output']}")
+
+        # Extract final message from LangGraph response
+        if "messages" in result:
+            final_message = result["messages"][-1].content if result["messages"] else "No output"
+            print(f"\nResult: {final_message}")
+        else:
+            print(f"\nResult: {result}")
 
         # Display final status
         if buyer.current_mandate:
