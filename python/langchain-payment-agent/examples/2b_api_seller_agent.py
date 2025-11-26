@@ -372,35 +372,30 @@ if __name__ == "__main__":
     print("Buyers can discover resources and purchase with blockchain payments.")
     print()
 
-    # Ask user if they want to customize resource prices
-    print(f"\n💵 Current resource prices:")
+    # Ask user to set resource prices
+    print(f"\n💵 Set resource prices (press Enter for default $0.01):")
+    for res_id, res in seller.catalog.items():
+        price_input = input(f"   {res['name']}: $").strip()
+        if price_input:
+            try:
+                new_price = float(price_input)
+                if new_price > 0:
+                    seller.catalog[res_id]['price_usd'] = new_price
+                    print(f"      ✅ Set to ${new_price}")
+                else:
+                    print(f"      ⚠️  Invalid price, using default $0.01")
+                    seller.catalog[res_id]['price_usd'] = 0.01
+            except ValueError:
+                print(f"      ⚠️  Invalid input, using default $0.01")
+                seller.catalog[res_id]['price_usd'] = 0.01
+        else:
+            # User pressed Enter without typing - default to $0.01
+            seller.catalog[res_id]['price_usd'] = 0.01
+            print(f"      ✅ Set to default: $0.01")
+
+    print(f"\n✅ Final prices:")
     for res_id, res in seller.catalog.items():
         print(f"   - {res['name']}: ${res['price_usd']}")
-
-    customize = input("\n🔧 Customize resource prices? (y/N): ").strip().lower()
-
-    if customize == 'y':
-        print(f"\n📝 Enter new prices (press Enter for default $0.01):")
-        for res_id, res in seller.catalog.items():
-            price_input = input(f"   {res['name']} (current: ${res['price_usd']}): $").strip()
-            if price_input:
-                try:
-                    new_price = float(price_input)
-                    if new_price > 0:
-                        seller.catalog[res_id]['price_usd'] = new_price
-                        print(f"      ✅ Updated to ${new_price}")
-                    else:
-                        print(f"      ⚠️  Invalid price, keeping ${res['price_usd']}")
-                except ValueError:
-                    print(f"      ⚠️  Invalid input, keeping ${res['price_usd']}")
-            else:
-                # User pressed Enter without typing - default to $0.01
-                seller.catalog[res_id]['price_usd'] = 0.01
-                print(f"      ✅ Set to default: $0.01")
-
-        print(f"\n✅ Final prices:")
-        for res_id, res in seller.catalog.items():
-            print(f"   - {res['name']}: ${res['price_usd']}")
 
     print()
     print(f"📋 Endpoints:")
