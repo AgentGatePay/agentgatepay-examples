@@ -156,9 +156,9 @@ class BuyerAgent:
         except:
             return {}
 
-    def issue_mandate(self, budget_usd: float) -> str:
+    def issue_mandate(self, budget_usd: float, ttl_minutes: int = 10080) -> str:
         """Issue AP2 payment mandate and fetch live budget"""
-        print(f"\n🔐 [BUYER] Issuing mandate with ${budget_usd} budget...")
+        print(f"\n🔐 [BUYER] Issuing mandate with ${budget_usd} budget for {ttl_minutes} minutes...")
 
         try:
             # Check if mandate already exists
@@ -194,7 +194,7 @@ class BuyerAgent:
                 subject=agent_id,
                 budget=budget_usd,
                 scope="resource.read,payment.execute",
-                ttl_minutes=10080  # 7 days
+                ttl_minutes=ttl_minutes
             )
 
             # Fetch live budget from API
@@ -535,11 +535,14 @@ class BuyerAgent:
 
 buyer = BuyerAgent()
 
+# Global variable to store TTL for mandate (will be set from user input)
+mandate_ttl_minutes = 10080  # Default: 7 days
+
 # Define tools
 tools = [
     Tool(
         name="issue_mandate",
-        func=lambda budget: buyer.issue_mandate(float(budget)),
+        func=lambda budget: buyer.issue_mandate(float(budget), mandate_ttl_minutes),
         description="Issue AP2 payment mandate with specified budget (USD). Use FIRST before any purchases. Input: budget amount as number. Returns: MANDATE_TOKEN:{token}"
     ),
     Tool(
@@ -655,6 +658,30 @@ if __name__ == "__main__":
     else:
         budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
         mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
+
+        # Ask user for mandate TTL duration
+        print(f"\n⏰ Mandate duration options:")
+        print("   1. 1 hour (60 minutes)")
+        print("   2. 1 day (1440 minutes)")
+        print("   3. 7 days (10080 minutes) - default")
+        print("   4. 30 days (43200 minutes)")
+        ttl_input = input("\n⏱️  Enter duration (1-4 or custom minutes, default: 7 days): ").strip()
+
+        if ttl_input == "1":
+            mandate_ttl_minutes = 60
+        elif ttl_input == "2":
+            mandate_ttl_minutes = 1440
+        elif ttl_input == "3" or not ttl_input:
+            mandate_ttl_minutes = 10080
+        elif ttl_input == "4":
+            mandate_ttl_minutes = 43200
+        elif ttl_input.isdigit():
+            mandate_ttl_minutes = int(ttl_input)
+        else:
+            print(f"   ⚠️  Invalid input, using default: 7 days")
+            mandate_ttl_minutes = 10080
+
+        print(f"   ✅ Mandate will be valid for {mandate_ttl_minutes} minutes ({mandate_ttl_minutes/60:.1f} hours, {mandate_ttl_minutes/1440:.1f} days)")
 
     # Ask user which resource to purchase
     print(f"\n📋 Available resources:")
