@@ -280,6 +280,7 @@ Simple autonomous payment flow demonstrating the complete 3-step process:
 - Provides resource catalog
 - Returns 402 Payment Required
 - Verifies payment via AgentGatePay API
+- **Production webhooks** for automatic delivery (optional)
 - Delivers resource (200 OK)
 - Serves ANY buyer agent
 
@@ -312,8 +313,27 @@ Simple autonomous payment flow demonstrating the complete 3-step process:
 - HTTP 402 Payment Required protocol
 - Two-transaction commission model
 - Real Flask API for seller (production-ready)
+- **Webhook support** for automatic resource delivery (production deployments)
 - Comprehensive error handling
 - Multi-seller support
+
+**Webhooks (Optional - Production Only):**
+
+For production deployments, the seller can configure webhooks to receive automatic payment notifications:
+
+```bash
+# During seller startup, when prompted:
+Configure webhooks now? (y/n, default: n): y
+Enter public webhook URL: https://your-seller.com/webhooks/payment
+```
+
+**Benefits:**
+- ✅ Automatic resource delivery when payments confirm
+- ✅ No buyer waiting for seller verification
+- ✅ Scales better for high-volume sellers
+- ✅ Industry-standard async pattern
+
+**For local testing:** Press 'n' to skip webhooks - manual verification works perfectly on localhost.
 
 ---
 

@@ -359,6 +359,10 @@ class BuyerAgent:
             # ERC-20 transfer function
             transfer_sig = self.web3.keccak(text="transfer(address,uint256)")[:4]
 
+            # Get nonce ONCE before both transactions
+            merchant_nonce = self.web3.eth.get_transaction_count(self.account.address)
+            print(f"   📊 Current nonce: {merchant_nonce}")
+
             # TX 1: Merchant payment
             print(f"   📤 Signing merchant transaction...")
             merchant_data = transfer_sig + \
@@ -366,7 +370,7 @@ class BuyerAgent:
                            merchant_atomic.to_bytes(32, byteorder='big')
 
             merchant_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
+                'nonce': merchant_nonce,  # Use stored nonce
                 'to': USDC_CONTRACT_BASE,
                 'value': 0,
                 'gas': 100000,
@@ -391,7 +395,7 @@ class BuyerAgent:
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
+                'nonce': merchant_nonce + 1,  # Explicitly increment nonce
                 'to': USDC_CONTRACT_BASE,
                 'value': 0,
                 'gas': 100000,
@@ -425,6 +429,10 @@ class BuyerAgent:
     def submit_payment(self, payment_data: str) -> str:
         """Submit payment to AgentGatePay gateway"""
         try:
+            # Remove TX_HASHES: prefix if present
+            if payment_data.startswith('TX_HASHES:'):
+                payment_data = payment_data.replace('TX_HASHES:', '')
+
             parts = payment_data.split(',')
             if len(parts) != 4:
                 return f"Error: Invalid payment data format. Expected 4 parts, got {len(parts)}"
@@ -625,18 +633,9 @@ if __name__ == "__main__":
     print()
     print("=" * 60)
 
-    # Check seller API is running
-    print(f"\n📡 Checking seller API: {SELLER_API_URL}")
-    try:
-        health = requests.get(f"{SELLER_API_URL}/health", timeout=5)
-        if health.status_code == 200:
-            print(f"✅ Seller API is running")
-        else:
-            print(f"⚠️  Seller API returned: HTTP {health.status_code}")
-    except:
-        print(f"❌ Seller API is NOT running!")
-        print(f"   Please start the seller first: python 2b_api_seller_agent.py")
-        exit(1)
+    # ========================================
+    # STEP 1: CONFIGURE MANDATE FIRST
+    # ========================================
 
     # Check for existing mandate
     agent_id = f"buyer-agent-{buyer.account.address}"
@@ -729,6 +728,26 @@ if __name__ == "__main__":
 
         # Set global mandate_purpose for tool use
         mandate_purpose = user_need
+
+    # ========================================
+    # STEP 2: CHECK SELLER AVAILABILITY
+    # ========================================
+
+    print(f"\n📡 Checking seller API: {SELLER_API_URL}")
+    try:
+        health = requests.get(f"{SELLER_API_URL}/health", timeout=5)
+        if health.status_code == 200:
+            print(f"✅ Seller API is running")
+        else:
+            print(f"⚠️  Seller API returned: HTTP {health.status_code}")
+    except:
+        print(f"❌ Seller API is NOT running!")
+        print(f"   Please start the seller first: python 2b_api_seller_agent.py")
+        exit(1)
+
+    # ========================================
+    # STEP 3: RUN AUTONOMOUS AGENT
+    # ========================================
 
     # Agent task - let agent discover and choose autonomously
     task = f"""
