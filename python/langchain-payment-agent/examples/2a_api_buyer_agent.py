@@ -324,8 +324,8 @@ class BuyerAgent:
             print(f"❌ {error_msg}")
             return error_msg
 
-    def sign_and_pay(self) -> str:
-        """Sign blockchain payment (2 transactions) but DON'T submit to gateway"""
+    def execute_payment(self) -> str:
+        """Sign blockchain payment AND submit to gateway (combined for speed)"""
         if not self.last_payment:
             return "Error: No payment request pending. Call request_resource first."
 
@@ -333,7 +333,7 @@ class BuyerAgent:
             return "Error: No mandate issued. Call issue_mandate first."
 
         payment_info = self.last_payment
-        print(f"\n💳 [BUYER] Signing payment: ${payment_info['price_usd']} to {payment_info['recipient'][:10]}...")
+        print(f"\n💳 [BUYER] Executing payment: ${payment_info['price_usd']} to {payment_info['recipient'][:10]}...")
 
         try:
             # Fetch live commission config
@@ -370,32 +370,27 @@ class BuyerAgent:
                            merchant_atomic.to_bytes(32, byteorder='big')
 
             merchant_tx = {
-                'nonce': merchant_nonce,  # Use stored nonce
+                'nonce': merchant_nonce,
                 'to': USDC_CONTRACT_BASE,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': merchant_data,
-                'chainId': 8453  # Base mainnet
+                'chainId': 8453
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
             tx_hash_merchant = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
             print(f"   ✅ Merchant TX sent: {tx_hash_merchant.hex()}")
 
-            # Wait for confirmation
-            print(f"   ⏳ Waiting for confirmation...")
-            receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
-            print(f"   ✅ Confirmed in block {receipt_merchant['blockNumber']}")
-
-            # TX 2: Commission payment
+            # TX 2: Commission payment (sign and send immediately - parallel execution)
             print(f"   📤 Signing commission transaction...")
             commission_data = transfer_sig + \
                              self.web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
-                'nonce': merchant_nonce + 1,  # Explicitly increment nonce
+                'nonce': merchant_nonce + 1,
                 'to': USDC_CONTRACT_BASE,
                 'value': 0,
                 'gas': 100000,
@@ -408,60 +403,41 @@ class BuyerAgent:
             tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
 
-            # Wait for confirmation
+            # Wait for BOTH confirmations in parallel
+            print(f"   ⏳ Waiting for confirmations (parallel)...")
+            receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+            print(f"   ✅ Merchant confirmed in block {receipt_merchant['blockNumber']}")
+
             receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
-            print(f"   ✅ Confirmed in block {receipt_commission['blockNumber']}")
+            print(f"   ✅ Commission confirmed in block {receipt_commission['blockNumber']}")
 
             # Store transaction hashes
-            self.last_payment['merchant_tx'] = tx_hash_merchant.hex()
-            self.last_payment['commission_tx'] = tx_hash_commission.hex()
+            merchant_tx_hex = self.web3.to_hex(tx_hash_merchant)
+            commission_tx_hex = self.web3.to_hex(tx_hash_commission)
 
-            # Return formatted for submit_payment tool
-            mandate_token = self.current_mandate['mandate_token']
-            price_usd = payment_info['price_usd']
-            return f"TX_HASHES:{tx_hash_merchant.hex()},{tx_hash_commission.hex()},{mandate_token},{price_usd}"
+            self.last_payment['merchant_tx'] = merchant_tx_hex
+            self.last_payment['commission_tx'] = commission_tx_hex
 
-        except Exception as e:
-            error_msg = f"Payment failed: {str(e)}"
-            print(f"❌ {error_msg}")
-            return error_msg
-
-    def submit_payment(self, payment_data: str) -> str:
-        """Submit payment to AgentGatePay gateway"""
-        try:
-            # Remove TX_HASHES: prefix if present
-            if payment_data.startswith('TX_HASHES:'):
-                payment_data = payment_data.replace('TX_HASHES:', '')
-
-            parts = payment_data.split(',')
-            if len(parts) != 4:
-                return f"Error: Invalid payment data format. Expected 4 parts, got {len(parts)}"
-
-            merchant_tx = parts[0].strip()
-            commission_tx = parts[1].strip()
-            mandate_token = parts[2].strip()
-            price_usd = float(parts[3].strip())
-
+            # IMMEDIATELY submit to gateway (no agent delay!)
             print(f"\n📤 Submitting payment to gateway...")
-            print(f"   Merchant TX: {merchant_tx[:20]}...")
-            print(f"   Commission TX: {commission_tx[:20]}...")
-            print(f"   Price: ${price_usd}")
+            print(f"   Merchant TX: {merchant_tx_hex[:20]}...")
+            print(f"   Commission TX: {commission_tx_hex[:20]}...")
 
             # Build payment payload
             payment_payload = {
                 "scheme": "eip3009",
-                "tx_hash": merchant_tx,
-                "tx_hash_commission": commission_tx
+                "tx_hash": merchant_tx_hex,
+                "tx_hash_commission": commission_tx_hex
             }
             payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
 
             headers = {
                 "x-api-key": BUYER_API_KEY,
-                "x-mandate": mandate_token,
+                "x-mandate": self.current_mandate['mandate_token'],
                 "x-payment": payment_b64
             }
 
-            url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={price_usd}"
+            url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={total_usd}"
             response = requests.get(url, headers=headers)
 
             if response.status_code >= 400:
@@ -479,7 +455,7 @@ class BuyerAgent:
                 verify_response = requests.post(
                     f"{AGENTPAY_API_URL}/mandates/verify",
                     headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
-                    json={"mandate_token": mandate_token}
+                    json={"mandate_token": self.current_mandate['mandate_token']}
                 )
 
                 if verify_response.status_code == 200:
@@ -492,17 +468,18 @@ class BuyerAgent:
                         agent_id = f"buyer-agent-{self.account.address}"
                         save_mandate(agent_id, self.current_mandate)
 
-                    return f"Success! Paid: ${price_usd}, Remaining: ${new_budget}"
+                    return f"Success! Paid: ${total_usd}, Remaining: ${new_budget}"
                 else:
-                    return f"Success! Paid: ${price_usd}"
+                    return f"Success! Paid: ${total_usd}"
             else:
                 error = result.get('error', 'Unknown error')
                 print(f"❌ Failed: {error}")
                 return f"Failed: {error}"
 
         except Exception as e:
-            print(f"❌ Error: {str(e)}")
-            return f"Error: {str(e)}"
+            error_msg = f"Payment failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            return error_msg
 
     def claim_resource(self) -> str:
         """Claim resource by submitting payment proof"""
@@ -573,19 +550,14 @@ tools = [
         description="Request specific resource and get payment requirements. Input: resource_id string."
     ),
     Tool(
-        name="sign_and_pay",
-        func=lambda _: buyer.sign_and_pay(),
-        description="Sign and execute blockchain payment (2 transactions). Returns: TX_HASHES:{merchant_tx},{commission_tx},{mandate},{price}. No input needed."
-    ),
-    Tool(
-        name="submit_payment",
-        func=buyer.submit_payment,
-        description="Submit payment to AgentGatePay gateway. Input: TX_HASHES output from sign_and_pay. Returns updated budget."
+        name="execute_payment",
+        func=lambda _: buyer.execute_payment(),
+        description="Execute blockchain payment (2 transactions) AND submit to gateway in one step. FAST - no delay between blockchain and gateway. No input needed. Returns budget remaining."
     ),
     Tool(
         name="claim_resource",
         func=lambda _: buyer.claim_resource(),
-        description="Claim resource after payment by submitting payment proof. No input needed."
+        description="Claim resource after payment by submitting payment proof to seller. No input needed."
     ),
 ]
 
@@ -596,13 +568,11 @@ Workflow:
 1. Issue mandate with budget - Returns MANDATE_TOKEN:{token}
 2. Discover catalog from seller
 3. Request specific resource (gets payment requirements)
-4. Sign and pay (blockchain transaction) - Returns TX_HASHES:{tx1},{tx2},{mandate},{price}
-5. Submit payment to gateway - Input: TX_HASHES output from step 4
-6. Claim resource (submit payment proof)
+4. Execute payment - Signs blockchain TX AND submits to gateway (single step, optimized for speed)
+5. Claim resource (submit payment proof to seller)
 
-CRITICAL: You MUST parse tool outputs and use them as inputs to subsequent tools.
-- After issue_mandate, extract token from "MANDATE_TOKEN:{token}"
-- After sign_and_pay, use entire "TX_HASHES:..." output as input to submit_payment
+IMPORTANT: The execute_payment tool is optimized for micro-transactions - it combines blockchain signing
+and gateway submission into ONE atomic operation with zero agent overhead.
 
 Think step by step and complete the workflow."""
 
@@ -760,9 +730,8 @@ if __name__ == "__main__":
     2. Discover the catalog from {SELLER_API_URL}
     3. Analyze the catalog and identify which resource best matches: "{user_need}"
     4. Request that resource to get payment details - USE THE 'ID' FIELD FROM CATALOG
-    5. If price is acceptable (under ${mandate_budget}), sign and pay
-    6. Submit payment to AgentGatePay gateway
-    7. Claim the resource by submitting payment proof
+    5. If price is acceptable (under ${mandate_budget}), execute payment (fast - one step!)
+    6. Claim the resource by submitting payment proof to seller
 
     CRITICAL INSTRUCTIONS FOR STEP 4:
     - The catalog returns resources in this format:
@@ -802,8 +771,33 @@ if __name__ == "__main__":
         if buyer.last_payment and 'resource_data' in buyer.last_payment:
             print(f"\n📦 Received Resource:")
             resource = buyer.last_payment['resource_data']
-            print(f"   Title: {resource.get('title', 'N/A')}")
-            print(f"   Authors: {', '.join(resource.get('authors', []))}")
+
+            # Display resource data based on type (different resources have different fields)
+            if 'title' in resource:
+                # Research paper format
+                print(f"   Title: {resource.get('title')}")
+                print(f"   Authors: {', '.join(resource.get('authors', []))}")
+                if 'abstract' in resource:
+                    print(f"   Abstract: {resource.get('abstract')[:100]}...")
+                if 'pdf_url' in resource:
+                    print(f"   PDF: {resource.get('pdf_url')}")
+            elif 'service' in resource:
+                # API service format
+                print(f"   Service: {resource.get('service')}")
+                print(f"   Base URL: {resource.get('base_url')}")
+                print(f"   API Key: {resource.get('api_key')}")
+                print(f"   Rate Limit: {resource.get('rate_limit')}")
+            elif 'name' in resource:
+                # Dataset format
+                print(f"   Name: {resource.get('name')}")
+                print(f"   Samples: {resource.get('samples', 'N/A')}")
+                if 'format' in resource:
+                    print(f"   Format: {resource.get('format')}")
+                if 'download_url' in resource:
+                    print(f"   Download: {resource.get('download_url')}")
+            else:
+                # Generic format (fallback)
+                print(f"   Data: {resource}")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Buyer agent interrupted by user")

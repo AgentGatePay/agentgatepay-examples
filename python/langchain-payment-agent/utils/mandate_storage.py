@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-STORAGE_FILE = Path.home() / ".agentgatepay_mandates.json"
+STORAGE_FILE = Path(__file__).parent.parent / ".agentgatepay_mandates.json"
 
 def save_mandate(agent_id: str, mandate_data: dict):
     """Save mandate for reuse"""
@@ -14,7 +14,8 @@ def save_mandate(agent_id: str, mandate_data: dict):
     storage[agent_id] = {
         'mandate_token': mandate_data.get('mandate_token'),
         'expires_at': mandate_data.get('expires_at'),
-        'budget_remaining': mandate_data.get('budget_remaining'),
+        'budget_remaining': mandate_data.get('budget_remaining') or mandate_data.get('budget_usd'),
+        'budget_usd': mandate_data.get('budget_usd'),
         'saved_at': datetime.now().isoformat()
     }
     _save_storage(storage)
