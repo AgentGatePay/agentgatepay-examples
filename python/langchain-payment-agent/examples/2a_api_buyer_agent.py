@@ -31,6 +31,7 @@ import time
 import json
 import base64
 import requests
+import threading
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -47,6 +48,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
+
+# Chain configuration from .env
+from chain_config import get_chain_config, ChainConfig
 
 # Load environment variables
 load_dotenv()
@@ -76,7 +80,6 @@ load_dotenv()
 
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 
 # Seller API URL (can be changed to discover from multiple sellers)
@@ -85,9 +88,8 @@ SELLER_API_URL = os.getenv('SELLER_API_URL', 'http://localhost:8000')
 # Payment configuration
 MANDATE_BUDGET_USD = float(os.getenv('MANDATE_BUDGET_USD', 100.0))
 
-# USDC contract on Base
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
+# Chain/token configuration - loaded from .env in main()
+CHAIN_CONFIG = None  # Set in main() from chain_config
 
 # ========================================
 # BUYER AGENT CLASS
@@ -104,15 +106,18 @@ class BuyerAgent:
     - Multi-seller support
     """
 
-    def __init__(self):
+    def __init__(self, config: ChainConfig):
         # Initialize AgentGatePay client
         self.agentpay = AgentGatePay(
             api_url=AGENTPAY_API_URL,
             api_key=BUYER_API_KEY
         )
 
-        # Initialize Web3
-        self.web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
+        # Store chain/token config
+        self.config = config
+
+        # Initialize Web3 with config RPC
+        self.web3 = Web3(Web3.HTTPProvider(config.rpc_url))
         self.account = Account.from_key(BUYER_PRIVATE_KEY)
 
         # State
@@ -123,6 +128,9 @@ class BuyerAgent:
         print(f"\n🤖 BUYER AGENT INITIALIZED")
         print(f"=" * 60)
         print(f"Wallet: {self.account.address}")
+        print(f"Chain: {config.chain.upper()} (ID: {config.chain_id})")
+        print(f"Token: {config.token} ({config.decimals} decimals)")
+        print(f"RPC: {config.rpc_url[:50]}...")
         print(f"API URL: {AGENTPAY_API_URL}")
         print(f"Seller API: {SELLER_API_URL}")
         print(f"=" * 60)
@@ -229,7 +237,6 @@ class BuyerAgent:
             print(f"✅ Mandate issued successfully")
             print(f"   Token: {mandate['mandate_token'][:50]}...")
             print(f"   Budget: ${budget_usd}")
-            print(f"   Remaining: ${budget_remaining}")
             print(f"   Purpose: {purpose}")
 
             return f"MANDATE_TOKEN:{token}"
@@ -344,14 +351,14 @@ class BuyerAgent:
             else:
                 return "Error: Failed to fetch commission configuration"
 
-            # Calculate amounts
+            # Calculate amounts (using config decimals)
             total_usd = payment_info['price_usd']
             commission_rate = payment_info['commission_rate']
             commission_usd = total_usd * commission_rate
             merchant_usd = total_usd - commission_usd
 
-            merchant_atomic = int(merchant_usd * (10 ** USDC_DECIMALS))
-            commission_atomic = int(commission_usd * (10 ** USDC_DECIMALS))
+            merchant_atomic = int(merchant_usd * (10 ** self.config.decimals))
+            commission_atomic = int(commission_usd * (10 ** self.config.decimals))
 
             print(f"   Merchant: ${merchant_usd:.4f} ({merchant_atomic} atomic)")
             print(f"   Commission: ${commission_usd:.4f} ({commission_atomic} atomic)")
@@ -371,12 +378,12 @@ class BuyerAgent:
 
             merchant_tx = {
                 'nonce': merchant_nonce,
-                'to': USDC_CONTRACT_BASE,
+                'to': self.config.token_contract,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': merchant_data,
-                'chainId': 8453
+                'chainId': self.config.chain_id
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
@@ -391,25 +398,17 @@ class BuyerAgent:
 
             commission_tx = {
                 'nonce': merchant_nonce + 1,
-                'to': USDC_CONTRACT_BASE,
+                'to': self.config.token_contract,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': commission_data,
-                'chainId': 8453
+                'chainId': self.config.chain_id
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
             tx_hash_commission = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             print(f"   ✅ Commission TX sent: {tx_hash_commission.hex()}")
-
-            # Wait for BOTH confirmations in parallel
-            print(f"   ⏳ Waiting for confirmations (parallel)...")
-            receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
-            print(f"   ✅ Merchant confirmed in block {receipt_merchant['blockNumber']}")
-
-            receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
-            print(f"   ✅ Commission confirmed in block {receipt_commission['blockNumber']}")
 
             # Store transaction hashes
             merchant_tx_hex = self.web3.to_hex(tx_hash_merchant)
@@ -418,27 +417,59 @@ class BuyerAgent:
             self.last_payment['merchant_tx'] = merchant_tx_hex
             self.last_payment['commission_tx'] = commission_tx_hex
 
-            # IMMEDIATELY submit to gateway (no agent delay!)
-            print(f"\n📤 Submitting payment to gateway...")
-            print(f"   Merchant TX: {merchant_tx_hex[:20]}...")
-            print(f"   Commission TX: {commission_tx_hex[:20]}...")
+            print(f"\n💳 Processing payment...")
 
-            # Build payment payload
-            payment_payload = {
-                "scheme": "eip3009",
-                "tx_hash": merchant_tx_hex,
-                "tx_hash_commission": commission_tx_hex
-            }
-            payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
+            # Thread-safe container for gateway response
+            gateway_result = {"response": None, "error": None}
 
-            headers = {
-                "x-api-key": BUYER_API_KEY,
-                "x-mandate": self.current_mandate['mandate_token'],
-                "x-payment": payment_b64
-            }
+            def submit_to_gateway():
+                """Submit payment to gateway in parallel thread"""
+                try:
+                    print(f"   📤 Submitting payment to gateway...")
+                    payment_payload = {
+                        "scheme": "eip3009",
+                        "tx_hash": merchant_tx_hex,
+                        "tx_hash_commission": commission_tx_hex
+                    }
+                    payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
 
-            url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={total_usd}"
-            response = requests.get(url, headers=headers)
+                    headers = {
+                        "x-api-key": BUYER_API_KEY,
+                        "x-mandate": self.current_mandate['mandate_token'],
+                        "x-payment": payment_b64
+                    }
+
+                    url = f"{AGENTPAY_API_URL}/x402/resource?chain={self.config.chain}&token={self.config.token}&price_usd={total_usd}"
+                    gateway_result["response"] = requests.get(url, headers=headers)
+                    print(f"   ✅ Gateway response received")
+                except Exception as e:
+                    gateway_result["error"] = str(e)
+                    print(f"   ❌ Gateway error: {e}")
+
+            # Start gateway submission in parallel thread
+            gateway_thread = threading.Thread(target=submit_to_gateway)
+            gateway_thread.start()
+
+            # Verify transactions on-chain
+            print(f"   🔍 Verifying transactions on-chain...")
+            try:
+                receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+                print(f"   ✅ Merchant TX confirmed (block {receipt_merchant['blockNumber']})")
+
+                receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
+                print(f"   ✅ Commission TX confirmed (block {receipt_commission['blockNumber']})")
+            except Exception as e:
+                print(f"   ⚠️  Verification failed: {e}")
+
+            # Wait for gateway thread to complete
+            gateway_thread.join(timeout=90)  # Max 90 seconds for gateway
+
+            if gateway_result["error"]:
+                return f"Gateway error: {gateway_result['error']}"
+
+            response = gateway_result["response"]
+            if not response:
+                return "Gateway timeout - please check payment status manually"
 
             if response.status_code >= 400:
                 result = response.json() if response.text else {}
@@ -526,68 +557,10 @@ class BuyerAgent:
 # LANGCHAIN AGENT
 # ========================================
 
-buyer = BuyerAgent()
-
-# Global variables for mandate (will be set from user input)
-mandate_ttl_minutes = 10080  # Default: 7 days
-mandate_purpose = "general purchases"  # Default purpose
-
-# Define tools
-tools = [
-    Tool(
-        name="issue_mandate",
-        func=lambda budget: buyer.issue_mandate(float(budget), mandate_ttl_minutes, mandate_purpose),
-        description="Issue AP2 payment mandate with specified budget (USD). Use FIRST before any purchases. Input: budget amount as number. Returns: MANDATE_TOKEN:{token}"
-    ),
-    Tool(
-        name="discover_catalog",
-        func=buyer.discover_catalog,
-        description="Discover resource catalog from seller API. Input: seller_url (e.g., 'http://localhost:8000')"
-    ),
-    Tool(
-        name="request_resource",
-        func=buyer.request_resource,
-        description="Request specific resource and get payment requirements. Input: resource_id string."
-    ),
-    Tool(
-        name="execute_payment",
-        func=lambda _: buyer.execute_payment(),
-        description="Execute blockchain payment (2 transactions) AND submit to gateway in one step. FAST - no delay between blockchain and gateway. No input needed. Returns budget remaining."
-    ),
-    Tool(
-        name="claim_resource",
-        func=lambda _: buyer.claim_resource(),
-        description="Claim resource after payment by submitting payment proof to seller. No input needed."
-    ),
-]
-
-# System prompt for agent behavior
-system_prompt = """You are an autonomous buyer agent that discovers and purchases resources from sellers.
-
-Workflow:
-1. Issue mandate with budget - Returns MANDATE_TOKEN:{token}
-2. Discover catalog from seller
-3. Request specific resource (gets payment requirements)
-4. Execute payment - Signs blockchain TX AND submits to gateway (single step, optimized for speed)
-5. Claim resource (submit payment proof to seller)
-
-IMPORTANT: The execute_payment tool is optimized for micro-transactions - it combines blockchain signing
-and gateway submission into ONE atomic operation with zero agent overhead.
-
-Think step by step and complete the workflow."""
-
-# Create agent (LangChain 1.x with LangGraph backend)
-llm = ChatOpenAI(
-    model="gpt-4",
-    temperature=0,
-    openai_api_key=os.getenv('OPENAI_API_KEY')
-)
-
-agent_executor = create_agent(
-    llm,
-    tools,
-    system_prompt=system_prompt
-)
+# Global variables (will be set in main())
+buyer = None
+mandate_ttl_minutes = 10080
+mandate_purpose = "general purchases"
 
 # ========================================
 # MAIN
@@ -602,6 +575,24 @@ if __name__ == "__main__":
     print("from seller APIs using blockchain payments.")
     print()
     print("=" * 60)
+
+    # ========================================
+    # STEP 0: LOAD CHAIN AND TOKEN FROM .ENV
+    # ========================================
+
+    print("\n🔧 CHAIN & TOKEN CONFIGURATION")
+    print("=" * 60)
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  RPC: {config.rpc_url}")
+    print(f"\nTo change: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
+    print("=" * 60)
+
+    # Initialize buyer agent (buyer is module-level, no global needed)
+    buyer = BuyerAgent(config)
 
     # ========================================
     # STEP 1: CONFIGURE MANDATE FIRST
@@ -636,7 +627,7 @@ if __name__ == "__main__":
         print(f"   Purpose: {mandate_purpose}")
         print(f"   Budget remaining: ${budget_remaining}")
         print(f"   Token: {existing_mandate.get('mandate_token', 'N/A')[:50]}...")
-        print(f"   To delete: Remove from ~/.agentgatepay_mandates.json\n")
+        print(f"   To delete: rm ../.agentgatepay_mandates.json\n")
         mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
         user_need = mandate_purpose  # Use mandate purpose for purchases
     else:
@@ -698,6 +689,63 @@ if __name__ == "__main__":
 
         # Set global mandate_purpose for tool use
         mandate_purpose = user_need
+
+    # Define tools after buyer is initialized
+    tools = [
+        Tool(
+            name="issue_mandate",
+            func=lambda budget: buyer.issue_mandate(float(budget), mandate_ttl_minutes, mandate_purpose),
+            description="Issue AP2 payment mandate with specified budget (USD). Use FIRST before any purchases. Input: budget amount as number. Returns: MANDATE_TOKEN:{token}"
+        ),
+        Tool(
+            name="discover_catalog",
+            func=buyer.discover_catalog,
+            description="Discover resource catalog from seller API. Input: seller_url (e.g., 'http://localhost:8000')"
+        ),
+        Tool(
+            name="request_resource",
+            func=buyer.request_resource,
+            description="Request specific resource and get payment requirements. Input: resource_id string."
+        ),
+        Tool(
+            name="execute_payment",
+            func=lambda _: buyer.execute_payment(),
+            description="Execute blockchain payment (2 transactions) AND submit to gateway in one step. FAST - no delay between blockchain and gateway. No input needed. Returns budget remaining."
+        ),
+        Tool(
+            name="claim_resource",
+            func=lambda _: buyer.claim_resource(),
+            description="Claim resource after payment by submitting payment proof to seller. No input needed."
+        ),
+    ]
+
+    # System prompt for agent behavior
+    system_prompt = """You are an autonomous buyer agent that discovers and purchases resources from sellers.
+
+Workflow:
+1. Issue mandate with budget - Returns MANDATE_TOKEN:{token}
+2. Discover catalog from seller
+3. Request specific resource (gets payment requirements)
+4. Execute payment - Signs blockchain TX AND submits to gateway (single step, optimized for speed)
+5. Claim resource (submit payment proof to seller)
+
+IMPORTANT: The execute_payment tool is optimized for micro-transactions - it combines blockchain signing
+and gateway submission into ONE atomic operation with zero agent overhead.
+
+Think step by step and complete the workflow."""
+
+    # Create agent (LangChain 1.x with LangGraph backend)
+    llm = ChatOpenAI(
+        model="gpt-4",
+        temperature=0,
+        openai_api_key=os.getenv('OPENAI_API_KEY')
+    )
+
+    agent_executor = create_agent(
+        llm,
+        tools,
+        system_prompt=system_prompt
+    )
 
     # ========================================
     # STEP 2: CHECK SELLER AVAILABILITY
@@ -762,11 +810,23 @@ if __name__ == "__main__":
         # Display final status
         if buyer.current_mandate:
             print(f"\n📊 Final Status:")
-            print(f"   Mandate budget: ${buyer.current_mandate.get('budget_usd', 'N/A')}")
+            print(f"   Budget remaining: ${buyer.current_mandate.get('budget_remaining', 'N/A')}")
 
         if buyer.last_payment and 'merchant_tx' in buyer.last_payment:
-            print(f"   Merchant TX: https://basescan.org/tx/{buyer.last_payment['merchant_tx']}")
-            print(f"   Commission TX: https://basescan.org/tx/{buyer.last_payment['commission_tx']}")
+            print(f"   Merchant TX: {config.explorer}/tx/{buyer.last_payment['merchant_tx']}")
+            print(f"   Commission TX: {config.explorer}/tx/{buyer.last_payment['commission_tx']}")
+
+            # Display gateway audit logs with curl commands
+            print(f"\nGateway Audit Logs (copy-paste these commands):")
+            print(f"\n# All payment logs:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&limit=10' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# This specific transaction:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{buyer.last_payment['merchant_tx']}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# Audit stats:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
 
         if buyer.last_payment and 'resource_data' in buyer.last_payment:
             print(f"\n📦 Received Resource:")

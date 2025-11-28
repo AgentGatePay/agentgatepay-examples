@@ -5,17 +5,25 @@ AgentGatePay + LangChain Integration - Basic Payment Flow (REST API)
 This example demonstrates a simple autonomous payment flow using:
 - AgentGatePay REST API (via published SDK v1.1.0)
 - LangChain agent with payment tools
-- Base network blockchain payments
+- Multi-chain blockchain payments (Base, Ethereum, Polygon, Arbitrum)
+- Multi-token support (USDC, USDT, DAI)
 
 Flow:
-1. Issue AP2 mandate ($100 budget)
-2. Sign blockchain transaction (USDC on Base)
-3. Submit payment proof to AgentGatePay
-4. Verify payment completion
+1. Configure chain and token (interactive selection on first run)
+2. Issue AP2 mandate ($100 budget)
+3. Sign blockchain transaction
+4. Submit payment proof to AgentGatePay
+5. Verify payment completion and view audit logs
 
 Requirements:
 - pip install agentgatepay-sdk langchain langchain-openai web3 python-dotenv
 - .env file with configuration (see .env.example)
+
+Multi-Chain Configuration:
+- Edit .env file: PAYMENT_CHAIN=base (options: base, ethereum, polygon, arbitrum)
+- Edit .env file: PAYMENT_TOKEN=USDC (options: USDC, USDT, DAI)
+- Note: USDT not available on Base, DAI uses 18 decimals
+- See README.md for complete chain/token compatibility matrix
 """
 
 import os
@@ -44,6 +52,11 @@ from utils import save_mandate, get_mandate, clear_mandate
 # Load environment variables
 load_dotenv()
 
+# Import chain configuration
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from chain_config import get_chain_config
+
 # ========================================
 # TRANSACTION SIGNING
 # ========================================
@@ -69,7 +82,7 @@ load_dotenv()
 
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
+BUYER_EMAIL = os.getenv('BUYER_EMAIL')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
 
@@ -77,27 +90,28 @@ SELLER_WALLET = os.getenv('SELLER_WALLET')
 RESOURCE_PRICE_USD = 0.01
 MANDATE_BUDGET_USD = 100.0
 
-# USDC contract on Base
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
+# Multi-chain/token configuration (set after interactive selection)
+# To manually configure without interactive prompt, uncomment and set:
+# config = ChainConfig(
+#     chain="ethereum",           # Options: base, ethereum, polygon, arbitrum
+#     token="USDT",               # Options: USDC, USDT, DAI (check availability per chain)
+#     chain_id=1,
+#     rpc_url="https://eth-mainnet.public.blastapi.io",
+#     token_contract="0xdAC17F958D2ee523a2206206994597C13D831ec7",
+#     decimals=6,
+#     explorer="https://etherscan.io"
+# )
+# Note: USDT not available on Base. DAI uses 18 decimals. See CHAIN_TOKEN_GUIDE.md
+config = None  # Will be set via get_or_create_config() in main()
 
 # ========================================
 # INITIALIZE CLIENTS
 # ========================================
+# Note: Clients initialized in main() after chain/token configuration
 
-# AgentGatePay SDK client
-agentpay = AgentGatePay(
-    api_url=AGENTPAY_API_URL,
-    api_key=BUYER_API_KEY
-)
-
-# Web3 client for blockchain interaction
-web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
-buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
-
-print(f"✅ Initialized AgentGatePay client: {AGENTPAY_API_URL}")
-print(f"✅ Initialized Web3 client (Base network)")
-print(f"✅ Buyer wallet: {buyer_account.address}\n")
+agentpay = None
+web3 = None
+buyer_account = None
 
 # ========================================
 # AGENT TOOLS
@@ -171,22 +185,18 @@ def issue_payment_mandate(budget_usd: float) -> str:
             ttl_minutes=168 * 60
         )
 
-        # Decode token to get budget
+        # Store mandate with budget info
         token = mandate['mandate_token']
-        token_data = decode_mandate_token(token)
-        budget_remaining = token_data.get('budget_remaining', str(budget_usd))
-
-        # Store with decoded budget
         mandate_with_budget = {
             **mandate,
             'budget_usd': budget_usd,
-            'budget_remaining': budget_remaining
+            'budget_remaining': budget_usd  # Initially, remaining = total
         }
 
         current_mandate = mandate_with_budget
         save_mandate(agent_id, mandate_with_budget)
 
-        print(f"✅ Mandate created (Budget: ${budget_remaining})")
+        print(f"✅ Mandate created (Budget: ${budget_usd})")
 
         return f"MANDATE_TOKEN:{token}"
 
@@ -211,14 +221,19 @@ def sign_blockchain_payment(payment_input: str) -> str:
         commission_address = commission_config['commission_address']
         commission_rate = commission_config['commission_rate']
 
-        print(f"\n💳 Signing payment (${amount_usd})...")
+        print(f"\n💳 Signing payment (${amount_usd} {config.token})...")
+        print(f"   Chain: {config.chain.title()} (ID: {config.chain_id})")
+        print(f"   Token: {config.token} ({config.decimals} decimals)")
 
         commission_amount_usd = amount_usd * commission_rate
         merchant_amount_usd = amount_usd - commission_amount_usd
-        merchant_amount_atomic = int(merchant_amount_usd * (10 ** USDC_DECIMALS))
-        commission_amount_atomic = int(commission_amount_usd * (10 ** USDC_DECIMALS))
+        merchant_amount_atomic = int(merchant_amount_usd * (10 ** config.decimals))
+        commission_amount_atomic = int(commission_amount_usd * (10 ** config.decimals))
 
         transfer_function_signature = web3.keccak(text="transfer(address,uint256)")[:4]
+
+        # Fetch nonce once for both transactions
+        nonce = web3.eth.get_transaction_count(buyer_account.address)
 
         print(f"   📤 TX 1/2 (merchant)...")
         recipient_clean = recipient.replace('0x', '').lower()
@@ -227,23 +242,19 @@ def sign_blockchain_payment(payment_input: str) -> str:
         merchant_data = transfer_function_signature + recipient_bytes + merchant_amount_atomic.to_bytes(32, byteorder='big')
 
         merchant_tx = {
-            'nonce': web3.eth.get_transaction_count(buyer_account.address),
-            'to': USDC_CONTRACT_BASE,
+            'nonce': nonce,
+            'to': config.token_contract,
             'value': 0,
             'gas': 100000,
             'gasPrice': web3.eth.gas_price,
             'data': merchant_data,
-            'chainId': 8453
+            'chainId': config.chain_id
         }
 
         signed_merchant_tx = buyer_account.sign_transaction(merchant_tx)
         tx_hash_merchant_raw = web3.eth.send_raw_transaction(signed_merchant_tx.raw_transaction)
         tx_hash_merchant = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
-
-        merchant_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
-        print(f"   ✅ TX 1/2 confirmed (block {merchant_receipt['blockNumber']})")
-
-        time.sleep(2)
+        print(f"   ✅ TX 1/2 sent: {tx_hash_merchant[:20]}...")
 
         print(f"   📤 TX 2/2 (commission)...")
         commission_addr_clean = commission_address.replace('0x', '').lower()
@@ -252,21 +263,19 @@ def sign_blockchain_payment(payment_input: str) -> str:
         commission_data = transfer_function_signature + commission_addr_bytes + commission_amount_atomic.to_bytes(32, byteorder='big')
 
         commission_tx = {
-            'nonce': web3.eth.get_transaction_count(buyer_account.address),
-            'to': USDC_CONTRACT_BASE,
+            'nonce': nonce + 1,
+            'to': config.token_contract,
             'value': 0,
             'gas': 100000,
             'gasPrice': web3.eth.gas_price,
             'data': commission_data,
-            'chainId': 8453
+            'chainId': config.chain_id
         }
 
         signed_commission_tx = buyer_account.sign_transaction(commission_tx)
         tx_hash_commission_raw = web3.eth.send_raw_transaction(signed_commission_tx.raw_transaction)
         tx_hash_commission = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
-
-        commission_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
-        print(f"   ✅ TX 2/2 confirmed (block {commission_receipt['blockNumber']})")
+        print(f"   ✅ TX 2/2 sent: {tx_hash_commission[:20]}...")
 
         global merchant_tx_hash, commission_tx_hash, signed_amount_usd
         merchant_tx_hash = tx_hash_merchant
@@ -309,7 +318,7 @@ def submit_and_verify_payment(payment_data: str) -> str:
             "x-payment": payment_b64
         }
 
-        url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={price_usd}"
+        url = f"{AGENTPAY_API_URL}/x402/resource?chain={config.chain}&token={config.token}&price_usd={price_usd}"
         response = requests.get(url, headers=headers)
 
         if response.status_code >= 400:
@@ -367,7 +376,7 @@ tools = [
     Tool(
         name="sign_payment",
         func=sign_blockchain_payment,
-        description="Sign and execute a blockchain payment in USDC on Base network. Creates two transactions: merchant payment and gateway commission. Input should be 'amount_usd,recipient_address'."
+        description="Sign and execute a blockchain payment on the configured network and token. Creates two transactions: merchant payment and gateway commission. Input should be 'amount_usd,recipient_address'."
     ),
     Tool(
         name="submit_payment",
@@ -421,16 +430,41 @@ agent_executor = create_agent(
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("🤖 AGENTGATEPAY + LANGCHAIN: BASIC PAYMENT DEMO (REST API)")
+    print("AGENTGATEPAY + LANGCHAIN: BASIC PAYMENT DEMO (REST API)")
     print("=" * 80)
     print()
     print("This demo shows an autonomous agent making a blockchain payment using:")
     print("  - AgentGatePay REST API (latest SDK)")
     print("  - LangChain agent framework")
-    print("  - USDC payments on Base")
+    print("  - Multi-chain blockchain payments (Base/Ethereum/Polygon/Arbitrum)")
+    print("  - Multi-token support (USDC/USDT/DAI)")
     print()
-    print("💡 Configuration: Edit lines 67-81 to change network/token/amounts")
+
+    # Load chain/token configuration from .env
+    print("\nCHAIN & TOKEN CONFIGURATION")
     print("=" * 80)
+
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  RPC: {config.rpc_url}")
+    print(f"  Contract: {config.token_contract}")
+    print(f"\nTo change chain/token: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
+    print("=" * 80)
+
+    # Initialize clients with selected configuration
+    agentpay = AgentGatePay(
+        api_url=AGENTPAY_API_URL,
+        api_key=BUYER_API_KEY
+    )
+    web3 = Web3(Web3.HTTPProvider(config.rpc_url))
+    buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
+
+    print(f"\nInitialized AgentGatePay client: {AGENTPAY_API_URL}")
+    print(f"Initialized Web3 client: {config.chain.title()} network")
+    print(f"Buyer wallet: {buyer_account.address}\n")
 
     agent_id = f"research-assistant-{buyer_account.address}"
     existing_mandate = get_mandate(agent_id)
@@ -455,7 +489,7 @@ if __name__ == "__main__":
 
         print(f"\n♻️  Using existing mandate (Budget: ${budget_remaining})")
         print(f"   Token: {existing_mandate.get('mandate_token', 'N/A')[:50]}...")
-        print(f"   To delete: Remove from ~/.agentgatepay_mandates.json\n")
+        print(f"   To delete: rm ../.agentgatepay_mandates.json\n")
         mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
         purpose = "research resource"
     else:
@@ -481,7 +515,7 @@ if __name__ == "__main__":
         result = agent_executor.invoke({"messages": [("user", task)]})
 
         print("\n" + "=" * 80)
-        print("✅ PAYMENT WORKFLOW COMPLETED")
+        print("PAYMENT WORKFLOW COMPLETED")
         print("=" * 80)
 
         # Extract final message from LangGraph response
@@ -493,13 +527,26 @@ if __name__ == "__main__":
 
         # Display final status
         if current_mandate:
-            print(f"\n📊 Final Status:")
-            print(f"   Mandate: {current_mandate.get('mandate_token', 'N/A')[:50]}...")
-            print(f"   Budget remaining: ${current_mandate.get('budget_remaining', 'N/A')}")
+            print(f"\nFinal Status:")
+            print(f"  Mandate: {current_mandate.get('mandate_token', 'N/A')[:50]}...")
+            print(f"  Budget remaining: ${current_mandate.get('budget_remaining', 'N/A')}")
 
         if 'merchant_tx_hash' in globals():
-            print(f"   Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")
-            print(f"   Commission TX: https://basescan.org/tx/{commission_tx_hash}")
+            print(f"\nBlockchain Transactions:")
+            print(f"  Merchant TX: {config.explorer}/tx/{merchant_tx_hash}")
+            print(f"  Commission TX: {config.explorer}/tx/{commission_tx_hash}")
+
+            # Display gateway audit logs with curl commands
+            print(f"\nGateway Audit Logs (copy-paste these commands):")
+            print(f"\n# All payment logs:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&limit=10' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# This specific transaction:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{merchant_tx_hash}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# Audit stats:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Demo interrupted by user")

@@ -36,6 +36,7 @@ import time
 import json
 import base64
 import requests
+import threading
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -50,6 +51,9 @@ from langchain.prompts import PromptTemplate
 
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
+
+# Chain configuration
+from chain_config import get_chain_config
 
 # Load environment variables
 load_dotenv()
@@ -77,20 +81,27 @@ load_dotenv()
 # CONFIGURATION
 # ========================================
 
+# Load chain/token configuration from .env
+chain_config = get_chain_config()
+
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
+MCP_API_URL = os.getenv('MCP_API_URL', 'https://mcp.agentgatepay.com')
 DEMO_MODE = os.getenv('DEMO_MODE', 'true').lower() == 'true'
 
-# MCP endpoint
-MCP_ENDPOINT = f"{AGENTPAY_API_URL}/mcp/tools/call"
+# MCP endpoint (using dedicated MCP subdomain)
+MCP_ENDPOINT = f"{MCP_API_URL}/mcp/tools/call"
 
-# Blockchain configuration
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
+# Blockchain configuration (from .env via chain_config)
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2')
 
-# USDC configuration
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
+# Payment configuration (from .env via chain_config)
+RPC_URL = chain_config.rpc_url
+CHAIN_ID = chain_config.chain_id
+TOKEN_CONTRACT = chain_config.token_contract
+TOKEN_DECIMALS = chain_config.decimals
+CHAIN_NAME = chain_config.chain
+TOKEN_NAME = chain_config.token
 COMMISSION_RATE = 0.005
 
 # ========================================
@@ -176,7 +187,7 @@ class MCPCompleteDemo:
         self.mcp_tools_used = []
 
         # Initialize Web3
-        self.web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
+        self.web3 = Web3(Web3.HTTPProvider(RPC_URL))
         if BUYER_PRIVATE_KEY:
             self.account = Account.from_key(BUYER_PRIVATE_KEY)
         else:
@@ -475,11 +486,14 @@ class MCPCompleteDemo:
             commission_usd = amount_usd * commission_rate
             merchant_usd = amount_usd - commission_usd
 
-            merchant_atomic = int(merchant_usd * (10 ** USDC_DECIMALS))
-            commission_atomic = int(commission_usd * (10 ** USDC_DECIMALS))
+            merchant_atomic = int(merchant_usd * (10 ** TOKEN_DECIMALS))
+            commission_atomic = int(commission_usd * (10 ** TOKEN_DECIMALS))
 
             # ERC-20 transfer
             transfer_sig = self.web3.keccak(text="transfer(address,uint256)")[:4]
+
+            # Get nonce once for both transactions
+            nonce = self.web3.eth.get_transaction_count(self.account.address)
 
             # Merchant TX
             merchant_data = transfer_sig + \
@@ -487,21 +501,18 @@ class MCPCompleteDemo:
                            merchant_atomic.to_bytes(32, byteorder='big')
 
             merchant_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
-                'to': USDC_CONTRACT_BASE,
+                'nonce': nonce,
+                'to': TOKEN_CONTRACT,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': merchant_data,
-                'chainId': 8453
+                'chainId': CHAIN_ID
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
             tx_hash_merchant_raw = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
-
-            # Fix TX hash format
             tx_hash_merchant_str = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
-            self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
 
             # Commission TX
             commission_data = transfer_sig + \
@@ -509,23 +520,36 @@ class MCPCompleteDemo:
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
-                'to': USDC_CONTRACT_BASE,
+                'nonce': nonce + 1,  # Use nonce+1 for second transaction
+                'to': TOKEN_CONTRACT,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': commission_data,
-                'chainId': 8453
+                'chainId': CHAIN_ID
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
             tx_hash_commission_raw = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
-
-            # Fix TX hash format
             tx_hash_commission_str = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
-            self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
 
-            print(f"✅ Blockchain payment executed!")
+            print(f"\n💳 Processing payment...")
+
+            def verify_locally():
+                try:
+                    print(f"   🔍 Verifying transactions on-chain...")
+                    receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
+                    print(f"   ✅ Merchant TX confirmed (block {receipt_merchant['blockNumber']})")
+
+                    receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
+                    print(f"   ✅ Commission TX confirmed (block {receipt_commission['blockNumber']})")
+                except Exception as e:
+                    print(f"   ⚠️  Verification failed: {e}")
+
+            verify_thread = threading.Thread(target=verify_locally)
+            verify_thread.start()
+
+            print(f"✅ Blockchain payment executed successfully!")
             print(f"   Merchant TX: {tx_hash_merchant_str[:20]}...")
             print(f"   Commission TX: {tx_hash_commission_str[:20]}...")
 
@@ -562,8 +586,8 @@ class MCPCompleteDemo:
                 "mandate_token": self.current_mandate['mandate_token'],
                 "tx_hash_merchant": merchant_tx,
                 "tx_hash_commission": commission_tx,
-                "chain": "base",
-                "token": "USDC"
+                "chain": CHAIN_NAME,
+                "token": TOKEN_NAME
             }, self.api_key)
 
             self.track_tool("agentpay_submit_payment")
@@ -590,7 +614,7 @@ class MCPCompleteDemo:
         try:
             result = call_mcp_tool("agentpay_verify_payment", {
                 "tx_hash": tx_hash,
-                "chain": "base"
+                "chain": CHAIN_NAME
             })
 
             self.track_tool("agentpay_verify_payment")
@@ -757,7 +781,7 @@ tools = [
     ),
     Tool(
         name="mcp_add_wallet",
-        func=lambda chain: demo.mcp_add_wallet(chain if chain else "base"),
+        func=lambda chain: demo.mcp_add_wallet(chain if chain else CHAIN_NAME),
         description="MCP: Add blockchain wallet. Input: chain (base/ethereum/polygon/arbitrum)"
     ),
 

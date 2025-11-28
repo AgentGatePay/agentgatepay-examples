@@ -13,8 +13,9 @@ This example demonstrates ALL AgentGatePay features in a single comprehensive fl
 8. Comprehensive Audit Logging
 9. Webhook Configuration
 10. System Health Monitoring
+11. Payment Monitoring & Analytics Dashboard (NEW)
 
-This matches the complete feature set shown in n8n workflows.
+This matches the complete feature set shown in n8n workflows with multi-chain/token support.
 
 Usage:
     python 7_api_complete_features.py
@@ -25,7 +26,9 @@ Requirements:
 """
 
 import os
+import sys
 import time
+import threading
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -40,8 +43,17 @@ from langchain.agents import AgentExecutor, create_react_agent
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 
+# Add parent directory to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
+
+# Chain configuration from .env
+from chain_config import get_chain_config, ChainConfig
+
+# Monitoring module for dashboard feature only
+from monitoring import MonitoringDashboard
 
 # Load environment variables
 load_dotenv()
@@ -73,13 +85,11 @@ AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 DEMO_MODE = os.getenv('DEMO_MODE', 'true').lower() == 'true'
 
 # Blockchain configuration
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2')
 
-# USDC configuration
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
+# Chain/token configuration - loaded from .env in main()
+CHAIN_CONFIG = None  # Set in main() from .env
 COMMISSION_RATE = 0.005
 
 # ========================================
@@ -110,7 +120,7 @@ def get_commission_config(api_key: str = None) -> dict:
 class AgentPayCompleteDemo:
     """Demonstrates all AgentGatePay features"""
 
-    def __init__(self):
+    def __init__(self, config: ChainConfig):
         self.agentpay = None
         self.api_key = os.getenv('BUYER_API_KEY') if not DEMO_MODE else None
         self.user_info = None
@@ -118,9 +128,10 @@ class AgentPayCompleteDemo:
         self.current_mandate = None
         self.payment_history = []
         self.webhook_id = None
+        self.config = config
 
-        # Initialize Web3
-        self.web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
+        # Initialize Web3 with config RPC
+        self.web3 = Web3(Web3.HTTPProvider(config.rpc_url))
         if BUYER_PRIVATE_KEY:
             self.account = Account.from_key(BUYER_PRIVATE_KEY)
         else:
@@ -136,6 +147,9 @@ class AgentPayCompleteDemo:
         print(f"=" * 70)
         print(f"Mode: {'DEMO (will create new user)' if DEMO_MODE else 'PRODUCTION'}")
         print(f"Wallet: {self.account.address}")
+        print(f"Chain: {config.chain.upper()} (ID: {config.chain_id})")
+        print(f"Token: {config.token} ({config.decimals} decimals)")
+        print(f"RPC: {config.rpc_url[:50]}...")
         print(f"API URL: {AGENTPAY_API_URL}")
         print(f"=" * 70)
 
@@ -334,57 +348,82 @@ class AgentPayCompleteDemo:
             commission_address = commission_config['commission_address']
             commission_rate = commission_config.get('commission_rate', COMMISSION_RATE)
 
-            # Calculate amounts
+            # Calculate amounts (using config decimals)
             commission_usd = amount_usd * commission_rate
             merchant_usd = amount_usd - commission_usd
 
-            merchant_atomic = int(merchant_usd * (10 ** USDC_DECIMALS))
-            commission_atomic = int(commission_usd * (10 ** USDC_DECIMALS))
+            merchant_atomic = int(merchant_usd * (10 ** self.config.decimals))
+            commission_atomic = int(commission_usd * (10 ** self.config.decimals))
 
             # ERC-20 transfer
             transfer_sig = self.web3.keccak(text="transfer(address,uint256)")[:4]
 
-            # Merchant TX
+            # OPTIMIZATION: Get nonce ONCE before both transactions (parallel execution)
+            merchant_nonce = self.web3.eth.get_transaction_count(self.account.address)
+            print(f"   📊 Current nonce: {merchant_nonce}")
+
+            # TX 1: Merchant payment
+            print(f"   📤 Signing merchant transaction...")
             merchant_data = transfer_sig + \
                            self.web3.to_bytes(hexstr=SELLER_WALLET).rjust(32, b'\x00') + \
                            merchant_atomic.to_bytes(32, byteorder='big')
 
             merchant_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
-                'to': USDC_CONTRACT_BASE,
+                'nonce': merchant_nonce,
+                'to': self.config.token_contract,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': merchant_data,
-                'chainId': 8453
+                'chainId': self.config.chain_id
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
             tx_hash_merchant_raw = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
             tx_hash_merchant = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
-            self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
+            print(f"   ✅ Merchant TX sent: {tx_hash_merchant[:20]}...")
 
-            # Commission TX
+            # TX 2: Commission payment (sign and send immediately - parallel execution)
+            print(f"   📤 Signing commission transaction...")
             commission_data = transfer_sig + \
                              self.web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
-                'to': USDC_CONTRACT_BASE,
+                'nonce': merchant_nonce + 1,
+                'to': self.config.token_contract,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': commission_data,
-                'chainId': 8453
+                'chainId': self.config.chain_id
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
             tx_hash_commission_raw = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
             tx_hash_commission = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
-            self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
+            print(f"   ✅ Commission TX sent: {tx_hash_commission[:20]}...")
 
-            print(f"✅ Payment executed!")
+            print(f"\n💳 Processing payment...")
+
+            # Verify transactions on-chain in background
+            def verify_locally():
+                """Verify transactions on-chain in background thread"""
+                try:
+                    print(f"   🔍 Verifying transactions on-chain...")
+                    receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
+                    print(f"   ✅ Merchant TX confirmed (block {receipt_merchant['blockNumber']})")
+
+                    receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
+                    print(f"   ✅ Commission TX confirmed (block {receipt_commission['blockNumber']})")
+                except Exception as e:
+                    print(f"   ⚠️  Verification failed: {e}")
+
+            # Start verification in background thread
+            verify_thread = threading.Thread(target=verify_locally)
+            verify_thread.start()
+
+            print(f"✅ Payment executed successfully!")
             print(f"   Merchant TX: {tx_hash_merchant[:20]}...")
             print(f"   Commission TX: {tx_hash_commission[:20]}...")
 
@@ -577,12 +616,64 @@ class AgentPayCompleteDemo:
             print(f"❌ {error_msg}")
             return error_msg
 
+    # ========================================
+    # FEATURE 11: MONITORING DASHBOARD
+    # ========================================
+
+    def show_monitoring_dashboard(self) -> str:
+        """Display comprehensive monitoring dashboard with analytics and alerts"""
+        if not self.agentpay:
+            return "Error: Not authenticated."
+
+        print(f"\n📊 [MONITORING] Generating payment monitoring dashboard...")
+
+        try:
+            # Create monitoring dashboard
+            dashboard = MonitoringDashboard(
+                api_url=AGENTPAY_API_URL,
+                api_key=self.api_key,
+                wallet=self.account.address,
+                config=self.config
+            )
+
+            # Fetch all data
+            dashboard.fetch_analytics()
+            dashboard.fetch_payment_history(limit=50)
+            dashboard.fetch_audit_logs(hours=24, limit=50)
+            dashboard.fetch_mandates()
+
+            # Generate report
+            report = dashboard.generate_report()
+            stats = report['stats']
+            alerts = report['alerts']
+
+            print(f"\n✅ Monitoring Dashboard Generated:")
+            print(f"   Total Spent: ${stats['total_spent']:.2f}")
+            print(f"   Payments: {stats['payment_count']}")
+            print(f"   Budget Remaining: ${stats['budget_remaining']:.2f}")
+            print(f"   Budget Utilization: {stats['budget_utilization_pct']:.1f}%")
+            print(f"   Active Mandates: {stats['active_mandates']}")
+            print(f"   Last 24h: {stats['payments_last_24h']} payments (${stats['spent_last_24h']:.2f})")
+
+            if alerts:
+                print(f"\n   🚨 Alerts ({len(alerts)}):")
+                for i, alert in enumerate(alerts[:3], 1):
+                    print(f"      {i}. [{alert.severity.value.upper()}] {alert.message}")
+
+            return f"Monitoring: ${stats['total_spent']:.2f} spent, {stats['payment_count']} payments, {len(alerts)} alerts"
+
+        except Exception as e:
+            error_msg = f"Monitoring dashboard failed: {str(e)}"
+            print(f"❌ {error_msg}")
+            return error_msg
+
 
 # ========================================
 # LANGCHAIN AGENT
 # ========================================
 
-demo = AgentPayCompleteDemo()
+# Demo will be initialized in main() after config selection
+demo = None
 
 # Define tools for all features
 tools = [
@@ -675,6 +766,13 @@ tools = [
         func=lambda _: demo.check_system_health(),
         description="Check system health. No input needed."
     ),
+
+    # Feature 11: Monitoring
+    Tool(
+        name="show_monitoring_dashboard",
+        func=lambda _: demo.show_monitoring_dashboard(),
+        description="Show comprehensive monitoring dashboard with analytics and alerts. No input needed."
+    ),
 ]
 
 # Agent prompt
@@ -713,14 +811,33 @@ if __name__ == "__main__":
     print("  2. Wallet Management")
     print("  3. API Key Management")
     print("  4. Mandate Management")
-    print("  5. Payment Execution")
+    print("  5. Payment Execution (optimized with nonce management)")
     print("  6. Payment History")
     print("  7. Merchant Analytics")
     print("  8. Audit Logging")
     print("  9. Webhook Configuration")
     print("  10. System Health Monitoring")
+    print("  11. Monitoring Dashboard (NEW)")
     print()
     print("=" * 70)
+
+    # ========================================
+    # STEP 0: LOAD CHAIN AND TOKEN FROM .ENV
+    # ========================================
+
+    print("\n🔧 CHAIN & TOKEN CONFIGURATION")
+    print("=" * 70)
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  RPC: {config.rpc_url[:50]}...")
+    print(f"\nTo change: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
+    print("=" * 70)
+
+    # Initialize demo with selected config
+    demo = AgentPayCompleteDemo(config)
 
     # Agent task
     task = """
@@ -739,8 +856,9 @@ if __name__ == "__main__":
     11. Configure webhook: https://example.com/webhooks/agentpay
     12. Test webhook delivery
     13. Check system health
+    14. Show monitoring dashboard (NEW - analytics + alerts)
 
-    Complete ALL 13 steps systematically.
+    Complete ALL 14 steps systematically.
     """
 
     try:
@@ -758,14 +876,15 @@ if __name__ == "__main__":
         print(f"   ✓ Wallet management")
         print(f"   ✓ API key management")
         print(f"   ✓ Mandates (AP2)")
-        print(f"   ✓ Payments (2-TX model)")
+        print(f"   ✓ Payments (2-TX model with nonce optimization)")
         print(f"   ✓ Payment history")
         print(f"   ✓ Revenue analytics")
         print(f"   ✓ Audit logging")
         print(f"   ✓ Webhooks")
         print(f"   ✓ System health")
+        print(f"   ✓ Monitoring dashboard (analytics + alerts)")
 
-        print(f"\n🎉 ALL 10 AGENTGATEPAY FEATURES DEMONSTRATED!")
+        print(f"\n🎉 ALL 11 AGENTGATEPAY FEATURES DEMONSTRATED!")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Demo interrupted by user")

@@ -24,6 +24,7 @@ Requirements:
 """
 
 import os
+import sys
 import time
 import hmac
 import hashlib
@@ -32,8 +33,14 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from agentgatepay_sdk import AgentGatePay
 
-# Load environment variables
+# Add parent directory to path for chain_config import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+# Load environment variables FIRST
 load_dotenv()
+
+# Chain configuration from .env
+from chain_config import get_chain_config, ChainConfig
 
 # ========================================
 # CONFIGURATION
@@ -45,6 +52,9 @@ SELLER_WALLET = os.getenv('SELLER_WALLET')
 COMMISSION_RATE = 0.005  # 0.5%
 
 SELLER_API_PORT = int(os.getenv('SELLER_API_PORT', 8000))
+
+# Chain/token configuration - will be selected interactively on first run
+CHAIN_CONFIG = None  # Set in main() from monitoring config
 
 # Fetch commission address from API dynamically
 def get_commission_address():
@@ -79,12 +89,15 @@ class SellerAgent:
     - Automatic resource delivery after payment
     """
 
-    def __init__(self):
+    def __init__(self, config: ChainConfig):
         # Initialize AgentGatePay client
         self.agentpay = AgentGatePay(
             api_url=AGENTPAY_API_URL,
             api_key=SELLER_API_KEY
         )
+
+        # Store chain/token config
+        self.config = config
 
         # Webhook tracking
         self.pending_deliveries = {}  # {tx_hash: resource_id}
@@ -148,6 +161,9 @@ class SellerAgent:
         print(f"\n💲 SELLER AGENT INITIALIZED")
         print(f"=" * 60)
         print(f"Wallet: {SELLER_WALLET}")
+        print(f"Chain: {config.chain.upper()} (ID: {config.chain_id})")
+        print(f"Token: {config.token} ({config.decimals} decimals)")
+        print(f"Explorer: {config.explorer}")
         print(f"API URL: {AGENTPAY_API_URL}")
         print(f"Catalog: {len(self.catalog)} resources available")
         print(f"Listening on: http://localhost:{SELLER_API_PORT}/resource")
@@ -273,9 +289,12 @@ class SellerAgent:
             ],
             "total_resources": len(self.catalog),
             "payment_info": {
+                "chain": self.config.chain,
+                "token": self.config.token,
                 "chains_supported": ["ethereum", "base", "polygon", "arbitrum"],
                 "tokens_supported": ["USDC", "USDT", "DAI"],
-                "commission_rate": COMMISSION_RATE
+                "commission_rate": COMMISSION_RATE,
+                "explorer": self.config.explorer
             }
         }
 
@@ -323,8 +342,10 @@ class SellerAgent:
                     },
                     "payment_info": {
                         "recipient_wallet": SELLER_WALLET,
-                        "chain": "base",
-                        "token": "USDC",
+                        "chain": self.config.chain,
+                        "token": self.config.token,
+                        "token_contract": self.config.token_contract,
+                        "decimals": self.config.decimals,
                         "commission_address": COMMISSION_ADDRESS,
                         "commission_rate": COMMISSION_RATE,
                         "total_amount_usd": resource['price_usd'],
@@ -342,92 +363,133 @@ class SellerAgent:
         # Payment provided → Verify
         print(f"\n🔍 [SELLER] Verifying payment for: {resource['name']}")
 
-        try:
-            # Parse payment header
-            parts = payment_header.split(',')
-            if len(parts) != 2:
-                print(f"   ❌ Invalid payment header format")
-                return {
-                    "status": 400,
-                    "body": {
-                        "error": "Invalid payment header format",
-                        "expected_format": "merchant_tx_hash,commission_tx_hash",
-                        "received": payment_header
-                    }
-                }
-
-            tx_hash_merchant = parts[0].strip()
-            tx_hash_commission = parts[1].strip()
-
-            print(f"   Merchant TX: {tx_hash_merchant[:20]}...")
-            print(f"   Commission TX: {tx_hash_commission[:20]}...")
-
-            # Verify merchant payment via AgentGatePay API
-            print(f"   📡 Calling AgentGatePay API for verification...")
-            verification = self.agentpay.payments.verify(tx_hash_merchant)
-
-            if not verification.get('verified'):
-                error_msg = verification.get('error', 'Unknown verification error')
-                print(f"   ❌ Payment verification failed: {error_msg}")
-                return {
-                    "status": 403,
-                    "body": {
-                        "error": "Payment verification failed",
-                        "message": error_msg,
-                        "tx_hash": tx_hash_merchant
-                    }
-                }
-
-            # Verify amount matches resource price (allow $0.01 tolerance)
-            paid_amount = float(verification.get('amount_usd', 0))
-            expected_merchant_amount = resource['price_usd'] * (1 - COMMISSION_RATE)
-
-            if abs(paid_amount - expected_merchant_amount) > 0.01:
-                print(f"   ❌ Amount mismatch: expected ${expected_merchant_amount:.2f}, got ${paid_amount:.2f}")
-                return {
-                    "status": 403,
-                    "body": {
-                        "error": "Payment amount mismatch",
-                        "expected_usd": expected_merchant_amount,
-                        "received_usd": paid_amount,
-                        "tolerance": 0.01
-                    }
-                }
-
-            # Payment verified → Deliver resource
-            print(f"   ✅ Payment verified successfully!")
-            print(f"   💰 Amount: ${paid_amount:.2f}")
-            print(f"   📦 Delivering resource to buyer...")
-
+        # Parse payment header
+        parts = payment_header.split(',')
+        if len(parts) != 2:
+            print(f"   ❌ Invalid payment header format")
             return {
-                "status": 200,
+                "status": 400,
                 "body": {
-                    "message": "Payment verified. Resource access granted.",
-                    "resource": resource['data'],
-                    "payment_confirmation": {
-                        "merchant_tx": tx_hash_merchant,
-                        "commission_tx": tx_hash_commission,
-                        "amount_verified_usd": paid_amount,
-                        "verification_time": verification.get('timestamp'),
-                        "blockchain_explorer": f"https://basescan.org/tx/{tx_hash_merchant}"
-                    },
-                    "delivery_info": {
-                        "resource_id": resource['id'],
-                        "resource_name": resource['name'],
-                        "delivered_at": verification.get('timestamp')
-                    }
+                    "error": "Invalid payment header format",
+                    "expected_format": "merchant_tx_hash,commission_tx_hash",
+                    "received": payment_header
                 }
             }
+
+        tx_hash_merchant = parts[0].strip()
+        tx_hash_commission = parts[1].strip()
+
+        print(f"   Merchant TX: {tx_hash_merchant[:20]}...")
+        print(f"   Commission TX: {tx_hash_commission[:20]}...")
+
+        # Verify merchant payment via AgentGatePay API with retry logic
+        # (handles optimistic processing delays for USDT/Ethereum)
+        print(f"   📡 Calling AgentGatePay API for verification...")
+
+        max_retries = 3
+        retry_delay = 2  # seconds
+        verification = None
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                verification = self.agentpay.payments.verify(tx_hash_merchant)
+
+                if verification.get('verified'):
+                    # Payment verified successfully
+                    break
+                elif verification.get('error') == 'Payment not found' and attempt < max_retries - 1:
+                    # Gateway may still be processing (optimistic mode)
+                    print(f"   ⏳ Payment not found yet (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # exponential backoff
+                else:
+                    # Final attempt failed or different error
+                    last_error = verification.get('error', 'Unknown verification error')
+                    break
+            except Exception as e:
+                # SDK threw exception - retry if not last attempt
+                last_error = str(e)
+                if attempt < max_retries - 1:
+                    print(f"   ⏳ Verification error (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
+                    print(f"      Error: {last_error}")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    break
+
+        if not verification or not verification.get('verified'):
+            error_msg = last_error or 'Unknown verification error'
+            print(f"   ❌ Payment verification failed: {error_msg}")
+            return {
+                "status": 403,
+                "body": {
+                    "error": "Payment verification failed",
+                    "message": error_msg,
+                    "tx_hash": tx_hash_merchant
+                }
+            }
+
+        # Verify amount matches resource price (allow $0.01 tolerance)
+        paid_amount = float(verification.get('amount_usd', 0))
+        expected_merchant_amount = resource['price_usd'] * (1 - COMMISSION_RATE)
+
+        if abs(paid_amount - expected_merchant_amount) > 0.01:
+            print(f"   ❌ Amount mismatch: expected ${expected_merchant_amount:.2f}, got ${paid_amount:.2f}")
+            return {
+                "status": 403,
+                "body": {
+                    "error": "Payment amount mismatch",
+                    "expected_usd": expected_merchant_amount,
+                    "received_usd": paid_amount,
+                    "tolerance": 0.01
+                }
+            }
+
+        # Payment verified → Deliver resource
+        print(f"   ✅ Payment verified successfully!")
+        print(f"   💰 Amount: ${paid_amount:.2f}")
+        print(f"   📦 Delivering resource to buyer...")
+
+        return {
+            "status": 200,
+            "body": {
+                "message": "Payment verified. Resource access granted.",
+                "resource": resource['data'],
+                "payment_confirmation": {
+                    "merchant_tx": tx_hash_merchant,
+                    "commission_tx": tx_hash_commission,
+                    "amount_verified_usd": paid_amount,
+                    "verification_time": verification.get('timestamp'),
+                    "blockchain_explorer": f"{self.config.explorer}/tx/{tx_hash_merchant}"
+                },
+                "delivery_info": {
+                    "resource_id": resource['id'],
+                    "resource_name": resource['name'],
+                    "delivered_at": verification.get('timestamp')
+                }
+            }
+        }
+
+    def fetch_revenue_summary(self) -> dict:
+        """Fetch revenue summary from AgentGatePay API"""
+        import requests
+        try:
+            response = requests.get(
+                f"{AGENTPAY_API_URL}/v1/merchant/revenue",
+                headers={"x-api-key": SELLER_API_KEY},
+                params={"merchant_wallet": SELLER_WALLET}
+            )
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"⚠️  Failed to fetch revenue: HTTP {response.status_code}")
+                return {}
 
         except Exception as e:
-            print(f"   ❌ Verification error: {str(e)}")
-            return {
-                "status": 500,
-                "body": {
-                    "error": "Internal server error during payment verification",
-                    "message": str(e)
-                }
-            }
+            print(f"⚠️  Failed to fetch revenue: {e}")
+            return {}
 
 
 # ========================================
@@ -435,7 +497,7 @@ class SellerAgent:
 # ========================================
 
 app = Flask(__name__)
-seller = SellerAgent()
+seller = None  # Will be initialized in main() after config selection
 
 
 @app.route('/resource', methods=['GET'])
@@ -498,6 +560,23 @@ if __name__ == "__main__":
     print("This agent provides resources for sale to buyer agents.")
     print("Buyers can discover resources and purchase with blockchain payments.")
     print()
+
+    # ========================================
+    # STEP 0: LOAD CHAIN AND TOKEN FROM .ENV
+    # ========================================
+
+    print("\n🔧 CHAIN & TOKEN CONFIGURATION")
+    print("=" * 60)
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  To change: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
+    print("=" * 60)
+
+    # Initialize seller agent with selected config
+    seller = SellerAgent(config)
 
     # Ask user to set resource prices
     print(f"\n💵 Set resource prices (press Enter for default $0.01):")
@@ -563,6 +642,41 @@ if __name__ == "__main__":
     else:
         print(f"\n⚠️  Skipping webhook configuration (using manual verification)")
         print(f"   Note: For production, webhooks provide better UX and scalability")
+
+    print()
+    print("=" * 60)
+    # ========================================
+    # REVENUE SUMMARY (Before starting server)
+    # ========================================
+
+    print("\n" + "=" * 60)
+    print("📊 REVENUE SUMMARY")
+    print("=" * 60)
+    print("   Fetching your payment history from AgentGatePay...")
+    print()
+
+    revenue_data = seller.fetch_revenue_summary()
+
+    if revenue_data:
+        stats = revenue_data.get('summary', {})
+        print(f"   💰 Total Revenue: ${stats.get('total_revenue_usd', 0):.2f}")
+        print(f"   📈 Payment Count: {stats.get('payment_count', 0)}")
+        print(f"   📊 Average Payment: ${stats.get('average_payment_usd', 0):.2f}")
+        print(f"   📅 Last 7 Days: ${stats.get('last_7_days_usd', 0):.2f}")
+        print(f"   📅 Last 30 Days: ${stats.get('last_30_days_usd', 0):.2f}")
+
+        # Show recent payments
+        payments = revenue_data.get('recent_payments', [])
+        if payments:
+            print(f"\n   💳 Recent Payments ({len(payments)}):")
+            for i, payment in enumerate(payments[:5], 1):
+                amount = payment.get('amount_usd', 0)
+                timestamp = payment.get('paid_at', 'N/A')[:19]
+                tx_hash = payment.get('tx_hash', 'N/A')[:20]
+                print(f"      {i}. ${amount:.2f} - {timestamp} - {tx_hash}...")
+    else:
+        print("   ℹ️  No revenue data found yet.")
+        print("   💡 Start receiving payments to see your revenue here!")
 
     print()
     print("=" * 60)

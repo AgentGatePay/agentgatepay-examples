@@ -73,7 +73,7 @@ load_dotenv()
 # ========================================
 
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
-AGENTPAY_MCP_ENDPOINT = f"{AGENTPAY_API_URL}/mcp"
+AGENTPAY_MCP_ENDPOINT = os.getenv('MCP_API_URL', 'https://mcp.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
 BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')

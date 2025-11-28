@@ -8,17 +8,20 @@
 
 ## Overview
 
-This repository contains **9 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **10 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1-3:** REST API basics (payment, buyer/seller, audit logs)
 - **Examples 4-6:** MCP tools basics (same features as 1-3 using MCP)
-- **Example 7:** REST API complete (ALL 10 AgentGatePay features)
+- **Example 7:** REST API complete (ALL 11 AgentGatePay features with optimizations)
 - **Example 8:** MCP complete (ALL 15 MCP tools - 100% coverage)
 - **Example 9:** External TX service
+- **Example 10:** Standalone Monitoring Dashboard (n8n equivalent)
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
 - **MCP version** - Uses AgentGatePay's 15 MCP tools (Model Context Protocol)
+
+**Multi-Chain/Token Support** - All examples support **4 chains** (Base, Ethereum, Polygon, Arbitrum) and **3 tokens** (USDC, USDT, DAI) with interactive selection on first run.
 
 ## What You'll Learn
 
@@ -121,10 +124,21 @@ Required variables:
 # AgentGatePay
 AGENTPAY_API_URL=https://api.agentgatepay.com
 BUYER_API_KEY=pk_live_YOUR_BUYER_KEY
+BUYER_EMAIL=your-buyer-email@example.com
 SELLER_API_KEY=pk_live_YOUR_SELLER_KEY
+SELLER_EMAIL=your-seller-email@example.com
 
-# Blockchain
+# Multi-Chain Payment Configuration
+PAYMENT_CHAIN=base          # Options: base, ethereum, polygon, arbitrum
+PAYMENT_TOKEN=USDC          # Options: USDC, USDT, DAI
+
+# Blockchain RPC Endpoints (pre-configured)
 BASE_RPC_URL=https://mainnet.base.org
+ETHEREUM_RPC_URL=https://eth-mainnet.public.blastapi.io
+POLYGON_RPC_URL=https://polygon-rpc.com
+ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
+
+# Wallet Configuration
 BUYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY
 BUYER_WALLET=0xYOUR_BUYER_WALLET
 SELLER_WALLET=0xYOUR_SELLER_WALLET
@@ -206,7 +220,7 @@ python examples/5_mcp_buyer_seller.py
 # Example 6: Audit logging (MCP tools)
 python examples/6_mcp_with_audit.py
 
-# Example 7: Complete features demo (REST API) - ALL 10 FEATURES
+# Example 7: Complete features demo (REST API) - ALL 11 FEATURES + OPTIMIZATIONS
 python examples/7_api_complete_features.py
 
 # Example 8: Complete features demo (MCP tools) - ALL 15 MCP TOOLS
@@ -214,6 +228,43 @@ python examples/8_mcp_complete_features.py
 
 # Example 9: Production TX signing (external service) - PRODUCTION READY 🚀
 python examples/9_api_with_tx_service.py
+
+# Example 10: Monitoring dashboard (STANDALONE TOOL) - 🆕 NEW
+python examples/10_monitoring_dashboard.py
+
+# Run with exports
+python examples/10_monitoring_dashboard.py --export-csv --export-json
+```
+
+### Multi-Chain/Token Configuration
+
+All examples support **4 chains** and **3 tokens**. Simply edit your `.env` file:
+
+```bash
+# In .env file:
+PAYMENT_CHAIN=base          # Options: base, ethereum, polygon, arbitrum
+PAYMENT_TOKEN=USDC          # Options: USDC, USDT, DAI
+```
+
+**Chain/Token Compatibility Matrix:**
+
+| Chain | USDC | USDT | DAI | Gas Cost | Speed |
+|-------|------|------|-----|----------|-------|
+| Base (recommended) | ✅ | ❌ | ✅ | ~$0.001 | 2-5 sec |
+| Ethereum | ✅ | ✅ | ✅ | ~$0.50 | 12-15 sec |
+| Polygon | ✅ | ✅ | ✅ | ~$0.01 | 2-5 sec |
+| Arbitrum | ✅ | ✅ | ✅ | ~$0.01 | 2-5 sec |
+
+**Important Notes:**
+- USDT is NOT available on Base
+- DAI uses 18 decimals (USDC/USDT use 6 decimals)
+- Base recommended for lowest fees and fastest transactions
+
+**To switch chains:** Just edit `.env` and restart the script:
+```bash
+# Change from Base to Ethereum with USDT
+nano .env  # Edit PAYMENT_CHAIN=ethereum and PAYMENT_TOKEN=USDT
+python examples/1_api_basic_payment.py
 ```
 
 ## Examples Overview
@@ -458,44 +509,52 @@ MCP version of Example 3, demonstrating comprehensive audit logging using MCP to
 
 ---
 
-### Example 7: Complete Features Demo (REST API) ⭐ **ALL FEATURES**
+### Example 7: Complete Features Demo (REST API)
 
 **File:** `examples/7_api_complete_features.py`
 
-**Comprehensive demonstration of ALL 10 AgentGatePay features** matching n8n workflow capabilities.
+Comprehensive demonstration of all 11 AgentGatePay features matching n8n workflow capabilities with production optimizations.
 
 **Features Demonstrated:**
-1. ✅ User Authentication & Signup
-2. ✅ Wallet Management
-3. ✅ API Key Management (create, list, revoke)
-4. ✅ Mandate Management (issue, verify, budget tracking)
-5. ✅ Payment Execution (2-TX model)
-6. ✅ Payment History Retrieval
-7. ✅ Merchant Revenue Analytics
-8. ✅ Comprehensive Audit Logging
-9. ✅ Webhook Configuration & Testing
-10. ✅ System Health Monitoring
+1. User Authentication & Signup
+2. Wallet Management
+3. API Key Management (create, list, revoke)
+4. Mandate Management (issue, verify, budget tracking)
+5. Payment Execution (2-TX model with nonce optimization)
+6. Payment History Retrieval
+7. Merchant Revenue Analytics
+8. Comprehensive Audit Logging
+9. Webhook Configuration & Testing
+10. System Health Monitoring
+11. Monitoring Dashboard (analytics with smart alerts)
+
+**Key Capabilities:**
+- **Multi-chain support**: Interactive chain selection (Base/Ethereum/Polygon/Arbitrum)
+- **Multi-token support**: USDC, USDT, or DAI selection
+- **Nonce optimization**: Single nonce fetch for parallel TX submission
+- **Monitoring dashboard**: Real-time analytics with alert system
 
 **Why This Example Matters:**
-- Shows COMPLETE platform capabilities
+- Shows complete platform capabilities
 - Matches n8n buyer + seller + monitoring workflows combined
-- Production-ready feature coverage
+- Production-ready feature coverage with optimizations
 - Demonstrates full agent economy ecosystem
 
 **Output:**
 ```
-✅ Features Demonstrated: 10/10
-   ✓ User authentication & signup
-   ✓ Wallet management
-   ✓ API key management
-   ✓ Mandates (AP2)
-   ✓ Payments (2-TX model)
-   ✓ Payment history
-   ✓ Revenue analytics
-   ✓ Audit logging
-   ✓ Webhooks
-   ✓ System health
-🎉 ALL 10 AGENTGATEPAY FEATURES DEMONSTRATED!
+Features Demonstrated: 11/11
+   User authentication & signup
+   Wallet management
+   API key management
+   Mandates (AP2)
+   Payments (2-TX model with nonce optimization)
+   Payment history
+   Revenue analytics
+   Audit logging
+   Webhooks
+   System health
+   Monitoring dashboard (analytics + alerts)
+ALL 11 AGENTGATEPAY FEATURES DEMONSTRATED
 ```
 
 ---
@@ -621,6 +680,101 @@ response = requests.post(
 
 ---
 
+### Example 10: Monitoring Dashboard
+
+**File:** `examples/10_monitoring_dashboard.py`
+
+Standalone monitoring tool for tracking AgentGatePay payments - similar to n8n monitoring workflows but as a Python CLI tool.
+
+**Features:**
+- **Multi-chain/token support**: Ethereum, Base, Polygon, Arbitrum with USDC/USDT/DAI
+- **Spending analytics**: Total spent, payment count, average payment, 24h activity
+- **Budget tracking**: Mandate budgets, utilization percentage, remaining budget
+- **Smart alerts**: Budget warnings (critical/high/medium), mandate expiration, failed payments, spending anomalies
+- **Payment history**: Last 100 payments with merchant vs commission breakdown
+- **CSV/JSON exports**: Export reports for offline analysis
+- **curl commands**: Ready-to-use API exploration commands
+
+**Usage:**
+```bash
+# Standalone mode (prompts for credentials)
+python examples/10_monitoring_dashboard.py
+
+# With arguments
+python examples/10_monitoring_dashboard.py --api-key pk_live_... --wallet 0xABC...
+
+# Export reports
+python examples/10_monitoring_dashboard.py --export-csv --export-json
+
+# Disable alerts
+python examples/10_monitoring_dashboard.py --no-alerts
+```
+
+**Interactive Chain/Token Selection:**
+On first run, you'll be prompted to select:
+1. **Chain**: Base (recommended), Ethereum, Polygon, or Arbitrum
+2. **Token**: USDC (recommended), USDT, or DAI
+
+Your choice is saved to `~/.agentgatepay_config.json` and reused in future runs.
+
+**Output:**
+```
+AGENTGATEPAY MONITORING DASHBOARD
+==============================================================
+Generated: 2025-11-28T12:00:00
+Chain: BASE (ID: 8453)
+Token: USDC (6 decimals)
+Wallet: 0x9752717...A3b844Bc
+
+SPENDING SUMMARY
+Total Spent: $47.50 USD
+Payment Count: 12
+Average Payment: $3.96 USD
+Last 24h: 5 payments ($18.75 USD)
+Spending Trend: increasing
+
+BUDGET STATUS
+Total Allocated: $100.00 USD
+Remaining: $52.50 USD
+Utilization: 47.5%
+Active Mandates: 2
+
+ALERTS (3)
+Critical: 0 | High: 1 | Medium: 2 | Low: 0
+
+1. [HIGH] BUDGET WARNING: Only $52.50 remaining (47.5% used)
+   Action: Issue new mandate or reduce spending
+
+2. [MEDIUM] High Spending: $18.75 spent in 24h (10x average)
+   Action: Verify spending is intentional
+
+3. [MEDIUM] Budget Notice: $52.50 remaining (47.5% used)
+   Action: Monitor spending
+
+RECENT PAYMENTS (Last 10)
+1. $5.00 to 0x742d35Cc... | confirmed | 0xabc123def456...
+2. $3.50 to 0x742d35Cc... | confirmed | 0xdef456abc123...
+
+EXPLORE YOUR DATA (CURL COMMANDS)
+# Last 24 hours of activity
+curl 'https://api.agentgatepay.com/audit/logs?client_id=0x...&hours=24' \
+  -H 'x-api-key: pk_live_...'
+
+EXPORT OPTIONS
+Run with --export-csv or --export-json to export reports
+```
+
+**Why This Matters:**
+- Equivalent to n8n monitoring workflow but as standalone Python tool
+- No n8n required - just Python + pip install
+- Can be run anytime to check payment status
+- Useful for debugging, auditing, and budget tracking
+- CSV/JSON exports for integration with other tools
+
+**See:** [CHAIN_TOKEN_GUIDE.md](CHAIN_TOKEN_GUIDE.md) for multi-chain configuration details
+
+---
+
 ## Architecture
 
 ### Payment Flow (Buyer/Seller Pattern)
@@ -737,6 +891,8 @@ mandate = call_mcp_tool("agentpay_issue_mandate", {"subject": "...", "budget_usd
 
 ## Documentation
 
+### Core Guides
+- **[CHAIN_TOKEN_GUIDE.md](CHAIN_TOKEN_GUIDE.md)** - 🆕 Multi-chain/token configuration guide
 - **[API_INTEGRATION.md](docs/API_INTEGRATION.md)** - Complete REST API guide
 - **[MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md)** - Complete MCP tools guide
 - **[API_VS_MCP.md](docs/API_VS_MCP.md)** - Detailed comparison

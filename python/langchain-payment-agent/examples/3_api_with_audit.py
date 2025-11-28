@@ -4,20 +4,29 @@ AgentGatePay + LangChain Integration - Payment with Audit Logs (REST API)
 
 This example demonstrates payment tracking and audit logging using:
 - AgentGatePay REST API (via SDK v1.1.0)
+- Multi-chain blockchain payments (Base, Ethereum, Polygon, Arbitrum)
+- Multi-token support (USDC, USDT, DAI)
 - Comprehensive audit log retrieval
 - Budget tracking and analytics
 - Transaction history monitoring
 
 Features demonstrated:
-1. Issue mandate with budget tracking
-2. Execute payment with automatic audit logging
-3. Retrieve audit logs filtered by event type
-4. Analyze spending patterns
-5. Monitor budget utilization
+1. Configure chain and token (interactive selection)
+2. Issue mandate with budget tracking
+3. Execute payment with automatic audit logging
+4. Retrieve audit logs filtered by event type
+5. Analyze spending patterns
+6. Monitor budget utilization with live updates
 
 Requirements:
 - pip install agentgatepay-sdk langchain langchain-openai web3 python-dotenv
 - .env file with buyer credentials
+
+Multi-Chain Configuration:
+- Interactive chain/token selection on first run
+- Configuration saved to ~/.agentgatepay_config.json
+- To change: Delete config file and run again
+- See CHAIN_TOKEN_GUIDE.md for details
 """
 
 import os
@@ -44,6 +53,9 @@ from utils import save_mandate, get_mandate, clear_mandate
 # Load environment variables
 load_dotenv()
 
+# Import monitoring module for chain/token configuration
+from chain_config import get_chain_config, ChainConfig
+
 # ========================================
 # TRANSACTION SIGNING
 # ========================================
@@ -69,28 +81,27 @@ load_dotenv()
 
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
 
-# USDC configuration
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
 COMMISSION_RATE = 0.005
+
+# Multi-chain configuration (set in main() after interactive selection)
+config = None
+COMMISSION_ADDRESS = None  # Fetched from API
 
 # ========================================
 # INITIALIZE CLIENTS
 # ========================================
+# Note: Clients initialized in main() after chain/token configuration
 
-agentpay = AgentGatePay(api_url=AGENTPAY_API_URL, api_key=BUYER_API_KEY)
-web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
-buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
+agentpay = None
+web3 = None
+buyer_account = None
 
 # State
 current_mandate = None
 payment_history = []
-
-print(f"✅ Initialized with buyer wallet: {buyer_account.address}\n")
 
 # ========================================
 # HELPER FUNCTIONS
@@ -98,13 +109,16 @@ print(f"✅ Initialized with buyer wallet: {buyer_account.address}\n")
 
 def get_commission_config() -> dict:
     """Fetch live commission configuration from AgentGatePay API"""
+    global COMMISSION_ADDRESS
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/v1/config/commission",
             headers={"x-api-key": BUYER_API_KEY}
         )
         response.raise_for_status()
-        return response.json()
+        commission_config = response.json()
+        COMMISSION_ADDRESS = commission_config['commission_address']
+        return commission_config
     except Exception as e:
         print(f"⚠️  Failed to fetch commission config: {e}")
         return None
@@ -150,7 +164,7 @@ def submit_and_verify_payment(payment_data: str) -> str:
             "x-payment": payment_b64
         }
 
-        url = f"{AGENTPAY_API_URL}/x402/resource?chain=base&token=USDC&price_usd={price_usd}"
+        url = f"{AGENTPAY_API_URL}/x402/resource?chain={config.chain}&token={config.token}&price_usd={price_usd}"
         response = requests.get(url, headers=headers)
 
         if response.status_code >= 400:
@@ -218,19 +232,23 @@ def execute_tracked_payment(amount_usd: float, recipient: str, description: str 
     """Execute payment and track in history"""
     global payment_history
 
-    print(f"\n💳 Executing payment: ${amount_usd} to {recipient[:10]}...")
+    print(f"\n💳 Executing payment: ${amount_usd} {config.token} to {recipient[:10]}...")
     print(f"   Description: {description}")
+    print(f"   Chain: {config.chain.title()} (ID: {config.chain_id})")
 
     try:
         # Calculate amounts
         commission_usd = amount_usd * COMMISSION_RATE
         merchant_usd = amount_usd - commission_usd
 
-        merchant_atomic = int(merchant_usd * (10 ** USDC_DECIMALS))
-        commission_atomic = int(commission_usd * (10 ** USDC_DECIMALS))
+        merchant_atomic = int(merchant_usd * (10 ** config.decimals))
+        commission_atomic = int(commission_usd * (10 ** config.decimals))
 
         # ERC-20 transfer
         transfer_sig = web3.keccak(text="transfer(address,uint256)")[:4]
+
+        # Get nonce once for parallel submission
+        nonce = web3.eth.get_transaction_count(buyer_account.address)
 
         # Merchant transaction
         print(f"   📤 Merchant TX: ${merchant_usd:.4f}")
@@ -239,41 +257,42 @@ def execute_tracked_payment(amount_usd: float, recipient: str, description: str 
                        merchant_atomic.to_bytes(32, byteorder='big')
 
         merchant_tx = {
-            'nonce': web3.eth.get_transaction_count(buyer_account.address),
-            'to': USDC_CONTRACT_BASE,
+            'nonce': nonce,
+            'to': config.token_contract,
             'value': 0,
             'gas': 100000,
             'gasPrice': web3.eth.gas_price,
             'data': merchant_data,
-            'chainId': 8453
+            'chainId': config.chain_id
         }
 
         signed_merchant = buyer_account.sign_transaction(merchant_tx)
         tx_hash_merchant = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
-        merchant_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
 
-        print(f"   ✅ Merchant TX confirmed: {tx_hash_merchant.hex()[:20]}...")
-
-        # Commission transaction
+        # Commission transaction (nonce + 1 for parallel submission)
         print(f"   📤 Commission TX: ${commission_usd:.4f}")
         commission_data = transfer_sig + \
                          web3.to_bytes(hexstr=COMMISSION_ADDRESS).rjust(32, b'\x00') + \
                          commission_atomic.to_bytes(32, byteorder='big')
 
         commission_tx = {
-            'nonce': web3.eth.get_transaction_count(buyer_account.address),
-            'to': USDC_CONTRACT_BASE,
+            'nonce': nonce + 1,
+            'to': config.token_contract,
             'value': 0,
             'gas': 100000,
             'gasPrice': web3.eth.gas_price,
             'data': commission_data,
-            'chainId': 8453
+            'chainId': config.chain_id
         }
 
         signed_commission = buyer_account.sign_transaction(commission_tx)
         tx_hash_commission = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
-        commission_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
 
+        # Wait for confirmations in parallel
+        merchant_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+        print(f"   ✅ Merchant TX confirmed: {tx_hash_merchant.hex()[:20]}...")
+
+        commission_receipt = web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
         print(f"   ✅ Commission TX confirmed: {tx_hash_commission.hex()[:20]}...")
 
         # Track payment locally
@@ -283,7 +302,9 @@ def execute_tracked_payment(amount_usd: float, recipient: str, description: str 
             "commission_tx": tx_hash_commission.hex(),
             "recipient": recipient,
             "description": description,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "chain": config.chain,
+            "token": config.token
         }
         payment_history.append(payment_record)
 
@@ -516,16 +537,43 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, max_itera
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("🤖 AGENTGATEPAY + LANGCHAIN: AUDIT LOGGING DEMO (REST API)")
+    print("AGENTGATEPAY + LANGCHAIN: AUDIT LOGGING DEMO (REST API)")
     print("=" * 80)
     print()
     print("This demo shows comprehensive payment tracking and audit logging:")
-    print("  - Mandate budget tracking")
+    print("  - Multi-chain blockchain payments (Base/Ethereum/Polygon/Arbitrum)")
+    print("  - Multi-token support (USDC/USDT/DAI)")
+    print("  - Mandate budget tracking with live updates")
     print("  - Automatic payment logging")
     print("  - Audit log retrieval and analysis")
     print("  - Spending pattern analytics")
     print()
+
+    # Interactive chain/token selection
+    print("\nCHAIN & TOKEN CONFIGURATION")
     print("=" * 80)
+
+    # Get chain/token configuration from .env
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  Contract: {config.token_contract}")
+    print(f"\nTo change: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
+    print("=" * 80)
+
+    # Initialize clients with selected configuration
+    agentpay = AgentGatePay(api_url=AGENTPAY_API_URL, api_key=BUYER_API_KEY)
+    web3 = Web3(Web3.HTTPProvider(config.rpc_url))
+    buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
+
+    # Fetch commission configuration
+    get_commission_config()
+
+    print(f"\nInitialized with buyer wallet: {buyer_account.address}")
+    print(f"Connected to {config.chain.title()} network")
+    print()
 
     # Agent task: Make multiple payments and analyze
     task = f"""
@@ -547,30 +595,44 @@ if __name__ == "__main__":
         result = agent_executor.invoke({"input": task})
 
         print("\n" + "=" * 80)
-        print("✅ AUDIT LOGGING DEMO COMPLETED")
+        print("AUDIT LOGGING DEMO COMPLETED")
         print("=" * 80)
         print(f"\nResult: {result['output']}")
 
         # Display final summary
-        print(f"\n📊 FINAL SUMMARY:")
-        print(f"   Total payments made: {len(payment_history)}")
+        print(f"\nFINAL SUMMARY:")
+        print(f"  Total payments made: {len(payment_history)}")
+        print(f"  Chain: {config.chain.title()}")
+        print(f"  Token: {config.token}")
 
         if payment_history:
             total_spent = sum(p['amount_usd'] for p in payment_history)
-            print(f"   Total amount spent: ${total_spent:.2f}")
-            print(f"\n   Payment History:")
+            print(f"  Total amount spent: ${total_spent:.2f} {config.token}")
+            print(f"\n  Payment History:")
             for i, payment in enumerate(payment_history, 1):
-                print(f"      {i}. ${payment['amount_usd']:.2f} - {payment['description']}")
-                print(f"         TX: {payment['merchant_tx'][:20]}...")
+                print(f"    {i}. ${payment['amount_usd']:.2f} {payment.get('token', config.token)} - {payment['description']}")
+                print(f"       TX: {payment['merchant_tx'][:20]}...")
 
         if current_mandate:
-            print(f"\n   Mandate Status:")
-            print(f"      ID: {current_mandate.get('id', 'N/A')}")
-            print(f"      Budget allocated: ${current_mandate.get('budget_usd', 'N/A')}")
+            print(f"\n  Mandate Status:")
+            print(f"    ID: {current_mandate.get('id', 'N/A')}")
+            print(f"    Budget allocated: ${current_mandate.get('budget_usd', 'N/A')}")
 
-        print(f"\n🔗 View transactions on BaseScan:")
+        print(f"\nBlockchain Transactions:")
         for payment in payment_history:
-            print(f"   https://basescan.org/tx/{payment['merchant_tx']}")
+            print(f"  {config.explorer}/tx/{payment['merchant_tx']}")
+
+        print(f"\nGateway Audit Logs (copy-paste these commands):")
+        print(f"\n# All logs:")
+        print(f"curl '{AGENTPAY_API_URL}/audit/logs' \\")
+        print(f"  -H 'x-api-key: {BUYER_API_KEY}'")
+        if payment_history:
+            print(f"\n# First transaction:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{payment_history[0]['merchant_tx']}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}'")
+        print(f"\n# Stats:")
+        print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
+        print(f"  -H 'x-api-key: {BUYER_API_KEY}'")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Demo interrupted by user")

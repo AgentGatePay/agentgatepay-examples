@@ -31,6 +31,7 @@ import time
 import json
 import base64
 import requests
+import threading
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
@@ -44,6 +45,9 @@ from langchain.prompts import PromptTemplate
 
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
+
+# Chain configuration
+from chain_config import get_chain_config
 
 # Load environment variables
 load_dotenv()
@@ -71,21 +75,27 @@ load_dotenv()
 # CONFIGURATION
 # ========================================
 
+# Load chain/token configuration from .env
+chain_config = get_chain_config()
+
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
+MCP_API_URL = os.getenv('MCP_API_URL', 'https://mcp.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 
-# MCP endpoint
-MCP_ENDPOINT = f"{AGENTPAY_API_URL}/mcp/tools/call"
+# MCP endpoint (using dedicated MCP subdomain)
+MCP_ENDPOINT = f"{MCP_API_URL}/mcp/tools/call"
 
-# Payment configuration
+# Payment configuration (from .env via chain_config)
+RPC_URL = chain_config.rpc_url
+CHAIN_ID = chain_config.chain_id
+TOKEN_CONTRACT = chain_config.token_contract
+TOKEN_DECIMALS = chain_config.decimals
+CHAIN_NAME = chain_config.chain
+TOKEN_NAME = chain_config.token
+
 MANDATE_BUDGET_USD = float(os.getenv('MANDATE_BUDGET_USD', 100.0))
 SELLER_WALLET = os.getenv('SELLER_WALLET', '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2')
-
-# USDC contract on Base
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
 COMMISSION_RATE = 0.005
 
 # ========================================
@@ -169,7 +179,7 @@ class BuyerAgentMCP:
 
     def __init__(self):
         # Initialize Web3 for blockchain signing
-        self.web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
+        self.web3 = Web3(Web3.HTTPProvider(RPC_URL))
         self.account = Account.from_key(BUYER_PRIVATE_KEY)
 
         # State
@@ -292,8 +302,8 @@ class BuyerAgentMCP:
             commission_usd = total_usd * commission_rate
             merchant_usd = total_usd - commission_usd
 
-            merchant_atomic = int(merchant_usd * (10 ** USDC_DECIMALS))
-            commission_atomic = int(commission_usd * (10 ** USDC_DECIMALS))
+            merchant_atomic = int(merchant_usd * (10 ** TOKEN_DECIMALS))
+            commission_atomic = int(commission_usd * (10 ** TOKEN_DECIMALS))
 
             print(f"   Merchant: ${merchant_usd:.4f} ({merchant_atomic} atomic)")
             print(f"   Commission: ${commission_usd:.4f} ({commission_atomic} atomic)")
@@ -307,27 +317,23 @@ class BuyerAgentMCP:
                            self.web3.to_bytes(hexstr=payment_info['recipient']).rjust(32, b'\x00') + \
                            merchant_atomic.to_bytes(32, byteorder='big')
 
+            # Get nonce once for both transactions
+            nonce = self.web3.eth.get_transaction_count(self.account.address)
+
             merchant_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
-                'to': USDC_CONTRACT_BASE,
+                'nonce': nonce,
+                'to': TOKEN_CONTRACT,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': merchant_data,
-                'chainId': 8453  # Base mainnet
+                'chainId': CHAIN_ID
             }
 
             signed_merchant = self.account.sign_transaction(merchant_tx)
             tx_hash_merchant_raw = self.web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
-
-            # Fix TX hash format
             tx_hash_merchant_str = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
-            print(f"   ✅ Merchant TX sent: {tx_hash_merchant_str}")
-
-            # Wait for confirmation
-            print(f"   ⏳ Waiting for confirmation...")
-            receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
-            print(f"   ✅ Confirmed in block {receipt_merchant['blockNumber']}")
+            print(f"   ✅ TX 1/2 sent: {tx_hash_merchant_str[:20]}...")
 
             # TX 2: Commission payment
             print(f"   📤 Signing commission transaction...")
@@ -336,30 +342,43 @@ class BuyerAgentMCP:
                              commission_atomic.to_bytes(32, byteorder='big')
 
             commission_tx = {
-                'nonce': self.web3.eth.get_transaction_count(self.account.address),
-                'to': USDC_CONTRACT_BASE,
+                'nonce': nonce + 1,  # Use nonce+1 for second transaction
+                'to': TOKEN_CONTRACT,
                 'value': 0,
                 'gas': 100000,
                 'gasPrice': self.web3.eth.gas_price,
                 'data': commission_data,
-                'chainId': 8453
+                'chainId': CHAIN_ID
             }
 
             signed_commission = self.account.sign_transaction(commission_tx)
             tx_hash_commission_raw = self.web3.eth.send_raw_transaction(signed_commission.raw_transaction)
-
-            # Fix TX hash format
             tx_hash_commission_str = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
-            print(f"   ✅ Commission TX sent: {tx_hash_commission_str}")
+            print(f"   ✅ TX 2/2 sent: {tx_hash_commission_str[:20]}...")
 
-            # Wait for confirmation
-            receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
-            print(f"   ✅ Confirmed in block {receipt_commission['blockNumber']}")
+            print(f"\n💳 Processing payment...")
+
+            def verify_locally():
+                """Verify TXs on-chain in background thread"""
+                try:
+                    print(f"   🔍 Verifying transactions on-chain...")
+                    receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
+                    print(f"   ✅ Merchant TX confirmed (block {receipt_merchant['blockNumber']})")
+
+                    receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
+                    print(f"   ✅ Commission TX confirmed (block {receipt_commission['blockNumber']})")
+                except Exception as e:
+                    print(f"   ⚠️  Verification failed: {e}")
+
+            # Start verification in background thread
+            verify_thread = threading.Thread(target=verify_locally)
+            verify_thread.start()
 
             # Store transaction hashes in proper format
             self.last_payment['merchant_tx'] = tx_hash_merchant_str
             self.last_payment['commission_tx'] = tx_hash_commission_str
 
+            print(f"✅ Payment executed successfully!")
             return f"Payment executed! Merchant TX: {tx_hash_merchant_str}, Commission TX: {tx_hash_commission_str}"
 
         except Exception as e:
@@ -381,8 +400,8 @@ class BuyerAgentMCP:
                 "mandate_token": self.current_mandate['mandate_token'],
                 "tx_hash_merchant": payment_info['merchant_tx'],
                 "tx_hash_commission": payment_info['commission_tx'],
-                "chain": "base",
-                "token": "USDC"
+                "chain": CHAIN_NAME,
+                "token": TOKEN_NAME
             })
 
             print(f"✅ Payment submitted via MCP")
@@ -405,7 +424,7 @@ class BuyerAgentMCP:
         try:
             result = call_mcp_tool("agentpay_verify_payment", {
                 "tx_hash": tx_hash,
-                "chain": "base"
+                "chain": CHAIN_NAME
             })
 
             verified = result.get('verified', False)
@@ -580,8 +599,9 @@ if __name__ == "__main__":
             print(f"   Mandate budget: ${buyer.current_mandate.get('budget_usd', 'N/A')}")
 
         if buyer.last_payment and 'merchant_tx' in buyer.last_payment:
-            print(f"   Merchant TX: https://basescan.org/tx/{buyer.last_payment['merchant_tx']}")
-            print(f"   Commission TX: https://basescan.org/tx/{buyer.last_payment['commission_tx']}")
+            explorer_url = chain_config.explorer
+            print(f"   Merchant TX: {explorer_url}/tx/{buyer.last_payment['merchant_tx']}")
+            print(f"   Commission TX: {explorer_url}/tx/{buyer.last_payment['commission_tx']}")
 
         if buyer.last_payment and 'charge_id' in buyer.last_payment:
             print(f"   Charge ID: {buyer.last_payment['charge_id']}")
