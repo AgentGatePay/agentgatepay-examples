@@ -731,14 +731,16 @@ if __name__ == "__main__":
 Workflow:
 1. Issue mandate with budget - Returns MANDATE_TOKEN:{token}
 2. Discover catalog from seller
-3. Request specific resource (gets payment requirements)
+3. Request ONE specific resource (gets payment requirements)
 4. Execute payment - Signs blockchain TX AND submits to gateway (single step, optimized for speed)
 5. Claim resource (submit payment proof to seller)
 
-IMPORTANT: The execute_payment tool is optimized for micro-transactions - it combines blockchain signing
-and gateway submission into ONE atomic operation with zero agent overhead.
+CRITICAL RULES:
+- Buy ONE resource at a time (never request multiple resources simultaneously)
+- Complete the full workflow (request → pay → claim) for one resource before considering another
+- The execute_payment tool is optimized for micro-transactions - combines blockchain signing and gateway submission into ONE atomic operation
 
-Think step by step and complete the workflow."""
+Think step by step and complete the workflow for ONE resource."""
 
     # Create agent (LangChain 1.x with LangGraph backend)
     llm = ChatOpenAI(
