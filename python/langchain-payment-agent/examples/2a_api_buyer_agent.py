@@ -478,8 +478,14 @@ class BuyerAgent:
                 return f"Failed: {error}"
 
             result = response.json()
-            if result.get('message') or result.get('success') or result.get('paid') or result.get('status') == 'confirmed':
-                print(f"✅ Payment recorded successfully")
+            print(f"   🔍 Gateway response: {result}")
+
+            if result.get('message') or result.get('success') or result.get('paid') or result.get('status') in ['confirmed', 'pending']:
+                status = result.get('status', 'unknown')
+                if status == 'pending':
+                    print(f"✅ Payment accepted (OPTIMISTIC MODE - pending background verification)")
+                else:
+                    print(f"✅ Payment recorded successfully")
 
                 # Fetch updated budget
                 print(f"   🔍 Fetching updated budget...")
