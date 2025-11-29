@@ -383,11 +383,23 @@ class SellerAgent:
         print(f"   Commission TX: {tx_hash_commission[:20]}...")
 
         # Verify merchant payment via AgentGatePay API with retry logic
-        # (handles optimistic processing delays for USDT/Ethereum)
+        # (handles optimistic processing delays for USDT/Ethereum <$1)
         print(f"   📡 Calling AgentGatePay API for verification...")
 
-        max_retries = 3
-        retry_delay = 2  # seconds
+        # Adaptive retry strategy based on payment amount
+        # <$1 (optimistic mode): Wait for background worker (runs every 1 min)
+        # ≥$1 (synchronous mode): Quick retries only (on-chain verification should be instant)
+        if resource['price_usd'] < 1.0:
+            max_retries = 6  # More retries for optimistic mode
+            retry_delay = 10  # Longer delays (background worker runs every 1 min)
+            print(f"   💨 Optimistic mode expected (payment <$1)")
+            print(f"   ⏳ Will retry up to {max_retries} times over ~90 seconds (background verification)")
+        else:
+            max_retries = 3  # Quick retries for synchronous mode
+            retry_delay = 3  # Shorter delays (on-chain verification should be fast)
+            print(f"   ✅ Synchronous mode expected (payment ≥$1)")
+            print(f"   ⏳ Will retry up to {max_retries} times over ~15 seconds (on-chain verification)")
+
         verification = None
         last_error = None
 
@@ -395,14 +407,26 @@ class SellerAgent:
             try:
                 verification = self.agentpay.payments.verify(tx_hash_merchant)
 
+                # Check verification result
                 if verification.get('verified'):
                     # Payment verified successfully
+                    status = verification.get('status', 'unknown')
+                    if status == 'pending':
+                        print(f"   💨 Payment verified (OPTIMISTIC MODE - pending blockchain confirmation)")
+                        print(f"   ✅ Accepting payment, background worker will finalize within 1-2 minutes")
+                    else:
+                        print(f"   ✅ Payment verified (ON-CHAIN CONFIRMED)")
                     break
+                elif verification.get('status') == 'pending' and attempt < max_retries - 1:
+                    # Gateway accepted optimistically, still pending background verification
+                    print(f"   ⏳ Payment status: PENDING (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                    if resource['price_usd'] >= 1.0:
+                        retry_delay = min(retry_delay * 1.5, 10)  # Cap at 10s for large payments
                 elif verification.get('error') == 'Payment not found' and attempt < max_retries - 1:
-                    # Gateway may still be processing (optimistic mode)
+                    # Gateway may still be processing (optimistic mode RPC delay)
                     print(f"   ⏳ Payment not found yet (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
-                    retry_delay *= 2  # exponential backoff
                 else:
                     # Final attempt failed or different error
                     last_error = verification.get('error', 'Unknown verification error')
@@ -414,7 +438,6 @@ class SellerAgent:
                     print(f"   ⏳ Verification error (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
                     print(f"      Error: {last_error}")
                     time.sleep(retry_delay)
-                    retry_delay *= 2
                 else:
                     break
 

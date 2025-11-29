@@ -499,9 +499,9 @@ class BuyerAgent:
                         agent_id = f"buyer-agent-{self.account.address}"
                         save_mandate(agent_id, self.current_mandate)
 
-                    return f"Success! Paid: ${total_usd}, Remaining: ${new_budget}"
+                    return f"Payment successful! Paid ${total_usd}, Budget remaining: ${new_budget}. IMPORTANT: Now call claim_resource to submit payment proof to seller and receive the resource."
                 else:
-                    return f"Success! Paid: ${total_usd}"
+                    return f"Payment successful! Paid ${total_usd}. IMPORTANT: Now call claim_resource to submit payment proof to seller and receive the resource."
             else:
                 error = result.get('error', 'Unknown error')
                 print(f"❌ Failed: {error}")
@@ -710,7 +710,7 @@ if __name__ == "__main__":
         Tool(
             name="execute_payment",
             func=lambda _: buyer.execute_payment(),
-            description="Execute blockchain payment (2 transactions) AND submit to gateway in one step. FAST - no delay between blockchain and gateway. No input needed. Returns budget remaining."
+            description="Execute blockchain payment (2 transactions) AND submit to gateway. No input needed. After this succeeds, you MUST call claim_resource to complete the purchase and get the resource."
         ),
         Tool(
             name="claim_resource",
@@ -736,7 +736,7 @@ Think step by step and complete the workflow."""
 
     # Create agent (LangChain 1.x with LangGraph backend)
     llm = ChatOpenAI(
-        model="gpt-4",
+        model="gpt-4o-mini",
         temperature=0,
         openai_api_key=os.getenv('OPENAI_API_KEY')
     )
