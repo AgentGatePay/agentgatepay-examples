@@ -709,12 +709,12 @@ if __name__ == "__main__":
         ),
         Tool(
             name="execute_payment",
-            func=lambda _: buyer.execute_payment(),
+            func=buyer.execute_payment,
             description="Execute blockchain payment (2 transactions) AND submit to gateway. No input needed. After this succeeds, you MUST call claim_resource to complete the purchase and get the resource."
         ),
         Tool(
             name="claim_resource",
-            func=lambda _: buyer.claim_resource(),
+            func=buyer.claim_resource,
             description="Claim resource after payment by submitting payment proof to seller. No input needed."
         ),
     ]
