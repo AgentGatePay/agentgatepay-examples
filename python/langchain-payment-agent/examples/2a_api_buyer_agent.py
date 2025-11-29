@@ -39,7 +39,7 @@ from eth_account import Account
 from agentgatepay_sdk import AgentGatePay
 
 # LangChain imports (LangChain 1.x compatible)
-from langchain_core.tools import Tool
+from langchain_core.tools import Tool, StructuredTool
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
 
@@ -707,14 +707,14 @@ if __name__ == "__main__":
             func=buyer.request_resource,
             description="Request specific resource and get payment requirements. Input: resource_id string."
         ),
-        Tool(
+        StructuredTool.from_function(
+            func=buyer.execute_payment,
             name="execute_payment",
-            func=lambda x: buyer.execute_payment(),
             description="Execute blockchain payment (2 transactions) AND submit to gateway. No input needed. After this succeeds, you MUST call claim_resource to complete the purchase and get the resource."
         ),
-        Tool(
+        StructuredTool.from_function(
+            func=buyer.claim_resource,
             name="claim_resource",
-            func=lambda x: buyer.claim_resource(),
             description="Claim resource after payment by submitting payment proof to seller. No input needed."
         ),
     ]
