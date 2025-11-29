@@ -502,6 +502,10 @@ class BuyerAgent:
 
                     if self.current_mandate:
                         self.current_mandate['budget_remaining'] = new_budget
+                        # Also sync budget_usd from gateway (in case SDK created mandate with different amount)
+                        budget_allocated = verify_data.get('budget_allocated')
+                        if budget_allocated is not None:
+                            self.current_mandate['budget_usd'] = budget_allocated
                         agent_id = f"buyer-agent-{self.account.address}"
                         save_mandate(agent_id, self.current_mandate)
 
