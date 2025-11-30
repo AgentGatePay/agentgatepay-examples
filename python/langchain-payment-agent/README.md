@@ -132,7 +132,8 @@ SELLER_EMAIL=your-seller-email@example.com
 PAYMENT_CHAIN=base          # Options: base, ethereum, polygon, arbitrum
 PAYMENT_TOKEN=USDC          # Options: USDC, USDT, DAI
 
-# Blockchain RPC Endpoints (pre-configured)
+# Blockchain RPC Endpoints (free RPCs work, premium RPCs are faster)
+# See docs/RPC_CONFIGURATION.md for Alchemy/Infura setup (10-20x faster for Ethereum)
 BASE_RPC_URL=https://mainnet.base.org
 ETHEREUM_RPC_URL=https://eth-mainnet.public.blastapi.io
 POLYGON_RPC_URL=https://polygon-rpc.com
