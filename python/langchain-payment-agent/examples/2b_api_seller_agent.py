@@ -395,10 +395,10 @@ class SellerAgent:
             print(f"   💨 Optimistic mode expected (payment <$1)")
             print(f"   ⏳ Will retry up to {max_retries} times over ~90 seconds (background verification)")
         else:
-            max_retries = 3  # Quick retries for synchronous mode
-            retry_delay = 3  # Shorter delays (on-chain verification should be fast)
+            max_retries = 12  # Extended retries for public RPC propagation
+            retry_delay = 10  # Covers gateway processing time (56s × 2 TXs = 112s)
             print(f"   ✅ Synchronous mode expected (payment ≥$1)")
-            print(f"   ⏳ Will retry up to {max_retries} times over ~15 seconds (on-chain verification)")
+            print(f"   ⏳ Will retry up to {max_retries} times over ~120 seconds (gateway processing + public RPC)")
 
         verification = None
         last_error = None

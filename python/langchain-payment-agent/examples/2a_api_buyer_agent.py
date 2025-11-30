@@ -440,7 +440,7 @@ class BuyerAgent:
                     }
 
                     url = f"{AGENTPAY_API_URL}/x402/resource?chain={self.config.chain}&token={self.config.token}&price_usd={total_usd}"
-                    gateway_result["response"] = requests.get(url, headers=headers, timeout=60)
+                    gateway_result["response"] = requests.get(url, headers=headers, timeout=120)
                     print(f"   ✅ Gateway response received")
                 except Exception as e:
                     gateway_result["error"] = str(e)
@@ -530,9 +530,9 @@ class BuyerAgent:
         payment_info = self.last_payment
         print(f"\n📦 [BUYER] Claiming resource: {payment_info['resource_name']}")
 
-        # Retry claim up to 3 times with 5-second delays (handles DynamoDB propagation)
-        max_retries = 3
-        retry_delay = 5  # seconds
+        # Retry claim up to 12 times with 10-second delays (handles gateway processing time)
+        max_retries = 12
+        retry_delay = 10  # seconds (covers gateway 56s × 2 TXs = 112s + buffer)
 
         for attempt in range(max_retries):
             try:
