@@ -36,11 +36,10 @@ from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
 
-# LangChain imports
+# LangChain imports (updated for LangChain 1.x)
 from langchain_core.tools import Tool
-from langchain.agents import AgentExecutor, create_react_agent
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
 
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
@@ -356,46 +355,42 @@ tools = [
 ]
 
 # ========================================
-# AGENT PROMPT
+# CREATE AGENT (LangChain 1.x)
 # ========================================
 
-agent_prompt = PromptTemplate.from_template("""
-You are an autonomous AI agent using AgentGatePay MCP tools for payments.
-
-Available tools:
-{tools}
-
-Tool Names: {tool_names}
-
-Task: {input}
-
-Workflow:
-1. Issue mandate using MCP tool (issue_mandate_mcp)
-2. Sign blockchain payment locally (sign_payment)
-3. Submit payment and verify budget using MCP tool (submit_and_verify_payment)
-
-Think step by step:
-{agent_scratchpad}
-""")
-
-# ========================================
-# CREATE AGENT
-# ========================================
-
+# Initialize LLM
 llm = ChatOpenAI(
     model="gpt-4",
     temperature=0,
     openai_api_key=os.getenv('OPENAI_API_KEY')
 )
 
-agent = create_react_agent(llm=llm, tools=tools, prompt=agent_prompt)
+# System prompt for agent behavior
+system_prompt = """You are an autonomous AI agent using AgentGatePay MCP tools for payments.
 
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    max_iterations=10,
-    handle_parsing_errors=True
+Follow this workflow:
+1. Issue mandate using MCP tool (issue_mandate_mcp) with the specified budget
+   - The tool returns: "Mandate issued via MCP. Budget: $X, Token: ..."
+   - Extract the mandate information from the response
+2. Sign blockchain payment locally (sign_payment) for the specified amount to the recipient
+   - Input format: 'amount_usd,recipient_address'
+   - The tool returns: "TX_HASHES:{merchant_tx},{commission_tx}"
+   - Extract both transaction hashes after the colon
+3. Submit payment and verify budget using MCP tool (submit_and_verify_payment)
+   - This tool automatically uses the mandate and transaction hashes from previous steps
+   - Returns updated budget after payment
+
+IMPORTANT:
+- All three steps must complete successfully
+- Parse tool outputs to extract values
+- If any tool returns an error, STOP immediately and report the error
+- Do NOT retry failed operations"""
+
+# Create agent (LangChain 1.x with LangGraph backend)
+agent_executor = create_agent(
+    llm,
+    tools,
+    system_prompt=system_prompt
 )
 
 # ========================================
@@ -426,13 +421,19 @@ if __name__ == "__main__":
     """
 
     try:
-        # Run agent
-        result = agent_executor.invoke({"input": task})
+        # Run agent (LangGraph format expects messages)
+        result = agent_executor.invoke({"messages": [("user", task)]})
 
         print("\n" + "=" * 80)
         print("✅ MCP PAYMENT WORKFLOW COMPLETED")
         print("=" * 80)
-        print(f"\nResult: {result['output']}")
+
+        # Extract final message from LangGraph response
+        if "messages" in result:
+            final_message = result["messages"][-1].content if result["messages"] else "No output"
+            print(f"\nResult: {final_message}")
+        else:
+            print(f"\nResult: {result}")
 
         # Display final status
         if current_mandate:
