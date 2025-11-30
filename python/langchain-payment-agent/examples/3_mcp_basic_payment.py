@@ -27,6 +27,7 @@ Requirements:
 """
 
 import os
+import sys
 import time
 import json
 import base64
@@ -40,6 +41,9 @@ from eth_account import Account
 from langchain_core.tools import Tool
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
+
+# Add parent directory to path for utils import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Utils for mandate storage
 from utils import save_mandate, get_mandate, clear_mandate
