@@ -207,7 +207,9 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
     """
     global merchant_tx_hash, commission_tx_hash
 
-    print(f"\n💳 Signing blockchain payment: ${amount_usd} to {recipient[:10]}...")
+    print(f"\n💳 Signing payment (${amount_usd} USDC)...")
+    print(f"   Chain: Base (ID: 8453)")
+    print(f"   Token: USDC (6 decimals)")
 
     try:
         # Fetch commission configuration from API
@@ -215,32 +217,28 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         if not commission_config:
             return "Error: Failed to fetch commission configuration"
 
-        commission_address = commission_config.get('commission_address')
-        commission_rate = commission_config.get('commission_rate', COMMISSION_RATE)
-
-        print(f"   Using commission address: {commission_address[:10]}...")
-        print(f"   Commission rate: {commission_rate * 100}%")
+        commission_address = commission_config['commission_address']
+        commission_rate = commission_config['commission_rate']
 
         # Calculate amounts
         commission_amount_usd = amount_usd * commission_rate
         merchant_amount_usd = amount_usd - commission_amount_usd
-
         merchant_amount_atomic = int(merchant_amount_usd * (10 ** USDC_DECIMALS))
         commission_amount_atomic = int(commission_amount_usd * (10 ** USDC_DECIMALS))
 
-        print(f"   Merchant: ${merchant_amount_usd:.4f}, Commission: ${commission_amount_usd:.4f}")
+        transfer_function_signature = web3.keccak(text="transfer(address,uint256)")[:4]
 
-        # ERC-20 transfer function
-        transfer_sig = web3.keccak(text="transfer(address,uint256)")[:4]
+        # Fetch nonce once for both transactions
+        nonce = web3.eth.get_transaction_count(buyer_account.address)
 
-        # TX 1: Merchant payment
-        print(f"   📤 Signing merchant transaction...")
-        merchant_data = transfer_sig + \
-                       web3.to_bytes(hexstr=recipient).rjust(32, b'\x00') + \
-                       merchant_amount_atomic.to_bytes(32, byteorder='big')
+        print(f"   📤 TX 1/2 (merchant)...")
+        recipient_clean = recipient.replace('0x', '').lower()
+        recipient_bytes = bytes.fromhex(recipient_clean).rjust(32, b'\x00')
+
+        merchant_data = transfer_function_signature + recipient_bytes + merchant_amount_atomic.to_bytes(32, byteorder='big')
 
         merchant_tx = {
-            'nonce': web3.eth.get_transaction_count(buyer_account.address),
+            'nonce': nonce,
             'to': USDC_CONTRACT_BASE,
             'value': 0,
             'gas': 100000,
@@ -249,25 +247,19 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
             'chainId': 8453
         }
 
-        signed_merchant = buyer_account.sign_transaction(merchant_tx)
-        tx_hash_merchant_raw = web3.eth.send_raw_transaction(signed_merchant.raw_transaction)
+        signed_merchant_tx = buyer_account.sign_transaction(merchant_tx)
+        tx_hash_merchant_raw = web3.eth.send_raw_transaction(signed_merchant_tx.raw_transaction)
+        tx_hash_merchant = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
+        print(f"   ✅ TX 1/2 sent: {tx_hash_merchant[:20]}...")
 
-        # Fix TX hash format
-        tx_hash_merchant_str = f"0x{tx_hash_merchant_raw.hex()}" if not tx_hash_merchant_raw.hex().startswith('0x') else tx_hash_merchant_raw.hex()
-        print(f"   ✅ Merchant TX sent: {tx_hash_merchant_str}")
+        print(f"   📤 TX 2/2 (commission)...")
+        commission_addr_clean = commission_address.replace('0x', '').lower()
+        commission_addr_bytes = bytes.fromhex(commission_addr_clean).rjust(32, b'\x00')
 
-        # Wait for confirmation
-        receipt_merchant = web3.eth.wait_for_transaction_receipt(tx_hash_merchant_raw, timeout=60)
-        print(f"   ✅ Confirmed in block {receipt_merchant['blockNumber']}")
-
-        # TX 2: Commission payment
-        print(f"   📤 Signing commission transaction...")
-        commission_data = transfer_sig + \
-                         web3.to_bytes(hexstr=commission_address).rjust(32, b'\x00') + \
-                         commission_amount_atomic.to_bytes(32, byteorder='big')
+        commission_data = transfer_function_signature + commission_addr_bytes + commission_amount_atomic.to_bytes(32, byteorder='big')
 
         commission_tx = {
-            'nonce': web3.eth.get_transaction_count(buyer_account.address),
+            'nonce': nonce + 1,
             'to': USDC_CONTRACT_BASE,
             'value': 0,
             'gas': 100000,
@@ -276,27 +268,19 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
             'chainId': 8453
         }
 
-        signed_commission = buyer_account.sign_transaction(commission_tx)
-        tx_hash_commission_raw = web3.eth.send_raw_transaction(signed_commission.raw_transaction)
+        signed_commission_tx = buyer_account.sign_transaction(commission_tx)
+        tx_hash_commission_raw = web3.eth.send_raw_transaction(signed_commission_tx.raw_transaction)
+        tx_hash_commission = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
+        print(f"   ✅ TX 2/2 sent: {tx_hash_commission[:20]}...")
 
-        # Fix TX hash format
-        tx_hash_commission_str = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
-        print(f"   ✅ Commission TX sent: {tx_hash_commission_str}")
+        merchant_tx_hash = tx_hash_merchant
+        commission_tx_hash = tx_hash_commission
 
-        # Wait for confirmation
-        receipt_commission = web3.eth.wait_for_transaction_receipt(tx_hash_commission_raw, timeout=60)
-        print(f"   ✅ Confirmed in block {receipt_commission['blockNumber']}")
-
-        # Store hashes in proper format
-        merchant_tx_hash = tx_hash_merchant_str
-        commission_tx_hash = tx_hash_commission_str
-
-        return f"TX_HASHES:{merchant_tx_hash},{commission_tx_hash}"
+        return f"TX_HASHES:{tx_hash_merchant},{tx_hash_commission}"
 
     except Exception as e:
-        error_msg = f"Payment failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        return error_msg
+        print(f"❌ Payment failed: {str(e)}")
+        raise Exception(f"Payment failed: {str(e)}")
 
 
 def mcp_submit_and_verify_payment() -> str:
