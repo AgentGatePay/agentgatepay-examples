@@ -245,23 +245,23 @@ python examples/2b_api_seller_agent.py
 # Terminal 2:
 python examples/2a_api_buyer_agent.py
 
-# Example 3: Payment with audit logs
-python examples/3_api_with_audit.py
+# Example 3: Basic payment using MCP tools
+python examples/3_mcp_basic_payment.py
 
-# Example 4: Basic payment using MCP tools
-python examples/4_mcp_basic_payment.py
+# Example 6: ALL 11 features (comprehensive demo)
+python examples/6_api_complete_features.py
 
-# Example 7: ALL 10 features (comprehensive demo)
-python examples/7_api_complete_features.py
+# Example 7: ALL 15 MCP tools (100% coverage)
+python examples/7_mcp_complete_features.py
 
-# Example 8: ALL 15 MCP tools (100% coverage)
-python examples/8_mcp_complete_features.py
+# Example 8: Production signing (external service) - PRODUCTION READY 🚀
+python examples/8_api_with_tx_service.py
 
-# Example 9: Production signing (external service) - PRODUCTION READY 🚀
-python examples/9_api_with_tx_service.py
+# Example 9: Monitoring dashboard (analytics & audit logs)
+python examples/9_monitoring_dashboard.py
 ```
 
-**Example 9 Requirements:**
+**Example 8 Requirements:**
 - TX signing service must be deployed (see Step 4, Option B)
 - `TX_SIGNING_SERVICE` must be set in `.env` file
 - Uses external service for secure transaction signing (NO private key in code)

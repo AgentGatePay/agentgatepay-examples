@@ -8,14 +8,14 @@
 
 ## Overview
 
-This repository contains **10 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **9 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
-- **Examples 1-3:** REST API basics (payment, buyer/seller, audit logs)
-- **Examples 4-6:** MCP tools basics (same features as 1-3 using MCP)
-- **Example 7:** REST API complete (ALL 11 AgentGatePay features with optimizations)
-- **Example 8:** MCP complete (ALL 15 MCP tools - 100% coverage)
-- **Example 9:** External TX service
-- **Example 10:** Standalone Monitoring Dashboard (n8n equivalent)
+- **Examples 1-2:** REST API basics (payment, buyer/seller marketplace)
+- **Examples 3-5:** MCP tools basics (same features as 1-2 using MCP)
+- **Example 6:** REST API complete (ALL 11 AgentGatePay features with optimizations)
+- **Example 7:** MCP complete (ALL 15 MCP tools - 100% coverage)
+- **Example 8:** External TX service (production-ready signing)
+- **Example 9:** Standalone Monitoring Dashboard (analytics & audit logs)
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -27,10 +27,10 @@ This repository contains **10 complete examples** demonstrating how to integrate
 
 - ✅ How to create autonomous agents that make blockchain payments
 - ✅ Buyer/seller marketplace interactions (like n8n workflows)
-- ✅ Complete audit logging and payment tracking
 - ✅ Mandate budget management and verification
 - ✅ Two-transaction commission model (merchant + gateway)
 - ✅ Comparison of REST API vs MCP tools approaches
+- ✅ Complete audit logging and analytics (via monitoring dashboard)
 
 ## Features
 
@@ -210,32 +210,29 @@ python examples/2b_api_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/2a_api_buyer_agent.py
 
-# Example 3: Payment with audit logs (REST API)
-python examples/3_api_with_audit.py
+# Example 3: Basic payment (MCP tools)
+python examples/3_mcp_basic_payment.py
 
-# Example 4: Basic payment (MCP tools)
-python examples/4_mcp_basic_payment.py
+# Example 4: Buyer/seller marketplace (MCP tools)
+python examples/4_mcp_buyer_seller.py
 
-# Example 5: Buyer/seller marketplace (MCP tools)
-python examples/5_mcp_buyer_seller.py
+# Example 5: Audit logging (MCP tools)
+python examples/5_mcp_with_audit.py
 
-# Example 6: Audit logging (MCP tools)
-python examples/6_mcp_with_audit.py
+# Example 6: Complete features demo (REST API) - ALL 11 FEATURES + OPTIMIZATIONS
+python examples/6_api_complete_features.py
 
-# Example 7: Complete features demo (REST API) - ALL 11 FEATURES + OPTIMIZATIONS
-python examples/7_api_complete_features.py
+# Example 7: Complete features demo (MCP tools) - ALL 15 MCP TOOLS
+python examples/7_mcp_complete_features.py
 
-# Example 8: Complete features demo (MCP tools) - ALL 15 MCP TOOLS
-python examples/8_mcp_complete_features.py
+# Example 8: Production TX signing (external service) - PRODUCTION READY 🚀
+python examples/8_api_with_tx_service.py
 
-# Example 9: Production TX signing (external service) - PRODUCTION READY 🚀
-python examples/9_api_with_tx_service.py
-
-# Example 10: Monitoring dashboard (STANDALONE TOOL) - 🆕 NEW
-python examples/10_monitoring_dashboard.py
+# Example 9: Monitoring dashboard (STANDALONE TOOL) - ANALYTICS & AUDIT LOGS
+python examples/9_monitoring_dashboard.py
 
 # Run with exports
-python examples/10_monitoring_dashboard.py --export-csv --export-json
+python examples/9_monitoring_dashboard.py --export-csv --export-json
 ```
 
 ### Multi-Chain/Token Configuration
@@ -393,31 +390,9 @@ Enter public webhook URL: https://your-seller.com/webhooks/payment
 
 ---
 
-### Example 3: Payment with Audit Logs (REST API)
+### Example 3: Basic Payment Flow (MCP Tools)
 
-**File:** `examples/3_api_with_audit.py`
-
-Demonstrates comprehensive payment tracking:
-- Multiple payments with descriptions
-- Budget utilization monitoring
-- Spending pattern analysis
-- Transaction history retrieval
-- Audit log filtering by event type
-
-**Analytics:**
-```
-📊 Spending Analysis:
-   Total payments: 5
-   Total spent: $47.50
-   Average payment: $9.50
-   Budget utilization: 47.5%
-```
-
----
-
-### Example 4: Basic Payment Flow (MCP Tools)
-
-**File:** `examples/4_mcp_basic_payment.py`
+**File:** `examples/3_mcp_basic_payment.py`
 
 MCP version of Example 1, demonstrating the same payment flow using AgentGatePay's MCP tools instead of REST API.
 
@@ -443,9 +418,9 @@ MCP version of Example 1, demonstrating the same payment flow using AgentGatePay
 
 ---
 
-### Example 5: Buyer/Seller Marketplace (MCP Tools)
+### Example 4: Buyer/Seller Marketplace (MCP Tools)
 
-**File:** `examples/5_mcp_buyer_seller.py`
+**File:** `examples/4_mcp_buyer_seller.py`
 
 MCP version of Example 2, demonstrating marketplace interactions using MCP tools for all AgentGatePay operations.
 
@@ -477,11 +452,11 @@ MCP version of Example 2, demonstrating marketplace interactions using MCP tools
 
 ---
 
-### Example 6: Payment with Audit Logs (MCP Tools)
+### Example 5: Payment with Audit Logs (MCP Tools)
 
-**File:** `examples/6_mcp_with_audit.py`
+**File:** `examples/5_mcp_with_audit.py`
 
-MCP version of Example 3, demonstrating comprehensive audit logging using MCP tools.
+Demonstrates comprehensive audit logging using MCP tools for payment tracking and analytics.
 
 **Features:**
 - Mandate issuance via MCP
@@ -514,9 +489,9 @@ MCP version of Example 3, demonstrating comprehensive audit logging using MCP to
 
 ---
 
-### Example 7: Complete Features Demo (REST API)
+### Example 6: Complete Features Demo (REST API)
 
-**File:** `examples/7_api_complete_features.py`
+**File:** `examples/6_api_complete_features.py`
 
 Comprehensive demonstration of all 11 AgentGatePay features matching n8n workflow capabilities with production optimizations.
 
@@ -564,9 +539,9 @@ ALL 11 AGENTGATEPAY FEATURES DEMONSTRATED
 
 ---
 
-### Example 8: Complete Features Demo (MCP Tools) ⭐ **ALL 15 MCP TOOLS**
+### Example 7: Complete Features Demo (MCP Tools) ⭐ **ALL 15 MCP TOOLS**
 
-**File:** `examples/8_mcp_complete_features.py`
+**File:** `examples/7_mcp_complete_features.py`
 
 **Comprehensive demonstration of ALL 15 AgentGatePay MCP tools** - 100% coverage.
 
@@ -609,9 +584,9 @@ ALL 11 AGENTGATEPAY FEATURES DEMONSTRATED
 
 ---
 
-### Example 9: Production TX Signing (External Service) ⭐ **PRODUCTION READY**
+### Example 8: Production TX Signing (External Service) ⭐ **PRODUCTION READY**
 
-**File:** `examples/9_api_with_tx_service.py`
+**File:** `examples/8_api_with_tx_service.py`
 
 **PRODUCTION-READY payment flow using external transaction signing service:**
 - ✅ NO private key in application code
@@ -651,7 +626,7 @@ response = requests.post(
 **Setup:**
 1. Deploy TX signing service ([Render one-click](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX) or Docker)
 2. Add `TX_SIGNING_SERVICE=https://your-service.onrender.com` to `.env`
-3. Run `python examples/9_api_with_tx_service.py`
+3. Run `python examples/8_api_with_tx_service.py`
 
 **Output:**
 ```
@@ -685,9 +660,9 @@ response = requests.post(
 
 ---
 
-### Example 10: Monitoring Dashboard
+### Example 9: Monitoring Dashboard
 
-**File:** `examples/10_monitoring_dashboard.py`
+**File:** `examples/9_monitoring_dashboard.py`
 
 Standalone monitoring tool for tracking AgentGatePay payments - similar to n8n monitoring workflows but as a Python CLI tool.
 
@@ -703,16 +678,16 @@ Standalone monitoring tool for tracking AgentGatePay payments - similar to n8n m
 **Usage:**
 ```bash
 # Standalone mode (prompts for credentials)
-python examples/10_monitoring_dashboard.py
+python examples/9_monitoring_dashboard.py
 
 # With arguments
-python examples/10_monitoring_dashboard.py --api-key pk_live_... --wallet 0xABC...
+python examples/9_monitoring_dashboard.py --api-key pk_live_... --wallet 0xABC...
 
 # Export reports
-python examples/10_monitoring_dashboard.py --export-csv --export-json
+python examples/9_monitoring_dashboard.py --export-csv --export-json
 
 # Disable alerts
-python examples/10_monitoring_dashboard.py --no-alerts
+python examples/9_monitoring_dashboard.py --no-alerts
 ```
 
 **Interactive Chain/Token Selection:**
