@@ -227,7 +227,7 @@ def mcp_issue_mandate(budget_usd: float) -> str:
             "subject": agent_id,
             "budget_usd": budget_usd,
             "scope": "resource.read,payment.execute",
-            "ttl_hours": 168
+            "ttl_minutes": 168 * 60
         })
 
         # Store mandate with budget info (MCP response only includes token)
@@ -446,25 +446,62 @@ agent_executor = create_agent(
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("🤖 AGENTGATEPAY + LANGCHAIN: BASIC PAYMENT DEMO (MCP TOOLS)")
+    print("AGENTGATEPAY + LANGCHAIN: BASIC PAYMENT DEMO (MCP TOOLS)")
     print("=" * 80)
     print()
-    print("This demo shows the SAME payment flow as the REST API version,")
-    print("but using AgentGatePay's 15 MCP tools instead:")
-    print("  - agentpay_issue_mandate (MCP tool)")
-    print("  - agentpay_submit_payment (MCP tool)")
-    print("  - agentpay_verify_mandate (MCP tool)")
+    print("This demo shows an autonomous agent making a blockchain payment using:")
+    print("  - AgentGatePay MCP tools (JSON-RPC 2.0)")
+    print("  - LangChain agent framework")
+    print("  - USDC payments on Base network")
     print()
-    print("MCP Advantages: Native tool discovery, standardized protocol, future-proof")
-    print("=" * 80)
 
+    print(f"Initialized AgentGatePay MCP client: {AGENTPAY_MCP_ENDPOINT}")
+    print(f"Buyer wallet: {buyer_account.address}\n")
+
+    agent_id = f"research-assistant-{buyer_account.address}"
+    existing_mandate = get_mandate(agent_id)
+
+    if existing_mandate:
+        token = existing_mandate.get('mandate_token')
+
+        # Get LIVE budget from gateway (via MCP verify tool)
+        try:
+            verify_result = call_mcp_tool("agentpay_verify_mandate", {
+                "mandate_token": token
+            })
+
+            if verify_result.get('valid'):
+                budget_remaining = verify_result.get('budget_remaining', 'Unknown')
+            else:
+                # Fallback to JWT decode if MCP verify fails
+                token_data = decode_mandate_token(token)
+                budget_remaining = token_data.get('budget_remaining', 'Unknown')
+        except:
+            # Fallback to JWT if MCP call fails
+            token_data = decode_mandate_token(token)
+            budget_remaining = token_data.get('budget_remaining', 'Unknown')
+
+        print(f"\n♻️  Using existing mandate (Budget: ${budget_remaining})")
+        print(f"   Token: {existing_mandate.get('mandate_token', 'N/A')[:50]}...")
+        print(f"   To delete: rm ../.agentgatepay_mandates.json\n")
+        mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
+        purpose = "research resource"
+    else:
+        budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
+        mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
+        purpose = input("📝 Enter payment purpose (default: research resource): ").strip()
+        purpose = purpose if purpose else "research resource"
+
+    # Agent task
     task = f"""
-    Purchase a research resource for ${RESOURCE_PRICE_USD} USD using MCP tools.
+    Purchase a {purpose} for ${RESOURCE_PRICE_USD} USD.
 
     Steps:
-    1. Issue a payment mandate with ${MANDATE_BUDGET_USD} budget using MCP
-    2. Sign blockchain payment of ${RESOURCE_PRICE_USD} to {SELLER_WALLET}
-    3. Submit payment proof and verify budget via MCP tool
+    1. Issue a payment mandate with a ${mandate_budget} budget (or reuse existing)
+    2. Sign blockchain payment of ${RESOURCE_PRICE_USD} to seller: {SELLER_WALLET}
+    3. Submit payment proof to AgentGatePay with mandate token
+
+    The mandate token and transaction hashes will be available after steps 1 and 2.
     """
 
     try:
@@ -472,7 +509,7 @@ if __name__ == "__main__":
         result = agent_executor.invoke({"messages": [("user", task)]})
 
         print("\n" + "=" * 80)
-        print("✅ MCP PAYMENT WORKFLOW COMPLETED")
+        print("PAYMENT WORKFLOW COMPLETED")
         print("=" * 80)
 
         # Extract final message from LangGraph response
@@ -484,15 +521,17 @@ if __name__ == "__main__":
 
         # Display final status
         if current_mandate:
-            print(f"\n📊 Final Status:")
-            print(f"   Mandate: {current_mandate.get('mandate_token', 'N/A')[:50]}...")
+            print(f"\nFinal Status:")
+            print(f"  Mandate: {current_mandate.get('mandate_token', 'N/A')[:50]}...")
+            print(f"  Budget remaining: ${current_mandate.get('budget_remaining', 'N/A')}")
 
-        if merchant_tx_hash:
-            print(f"   Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")
-            print(f"   Commission TX: https://basescan.org/tx/{commission_tx_hash}")
+        if 'merchant_tx_hash' in globals():
+            print(f"\nBlockchain Transactions:")
+            print(f"  Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")
+            print(f"  Commission TX: https://basescan.org/tx/{commission_tx_hash}")
 
             # Display gateway audit logs with curl commands
-            print(f"\n📋 Gateway Audit Logs (copy-paste these commands):")
+            print(f"\nGateway Audit Logs (copy-paste these commands):")
             print(f"\n# All payment logs:")
             print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&limit=10' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
@@ -502,8 +541,6 @@ if __name__ == "__main__":
             print(f"\n# Audit stats:")
             print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-
-        print(f"\n🎉 SUCCESS: Payment completed using MCP tools!")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Demo interrupted by user")
