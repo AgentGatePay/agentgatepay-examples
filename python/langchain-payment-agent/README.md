@@ -249,12 +249,15 @@ PAYMENT_TOKEN=USDC          # Options: USDC, USDT, DAI
 
 **Chain/Token Compatibility Matrix:**
 
-| Chain | USDC | USDT | DAI | Gas Cost | Speed |
-|-------|------|------|-----|----------|-------|
-| Base (recommended) | ✅ | ❌ | ✅ | ~$0.001 | 2-5 sec |
-| Ethereum | ✅ | ✅ | ✅ | ~$0.50 | 12-15 sec |
-| Polygon | ✅ | ✅ | ✅ | ~$0.01 | 2-5 sec |
-| Arbitrum | ✅ | ✅ | ✅ | ~$0.01 | 2-5 sec |
+| Chain | USDC | USDT | DAI | Gas Cost | Payment Speed* |
+|-------|------|------|-----|----------|----------------|
+| Base (recommended) | ✅ | ❌ | ✅ | ~$0.001 | 5-15 sec |
+| Ethereum | ✅ | ✅ | ✅ | ~$0.50 | 10-120 sec** |
+| Polygon | ✅ | ✅ | ✅ | ~$0.01 | 5-15 sec |
+| Arbitrum | ✅ | ✅ | ✅ | ~$0.01 | 5-15 sec |
+
+\* Payment speed includes gateway verification. **Optimistic mode** for USDT ETH <$1 settles in 4-10s.
+\*\* Ethereum speed depends on RPC provider. See [RPC_CONFIGURATION.md](docs/RPC_CONFIGURATION.md) for 10-20x speedup.
 
 **Important Notes:**
 - USDT is NOT available on Base

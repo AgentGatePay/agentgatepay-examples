@@ -253,6 +253,58 @@ except Exception as e:
 
 ---
 
+### Error: "Transaction not found after 120 seconds" (Ethereum/Slow RPC)
+
+**Symptom:**
+```
+⚠️ Verification failed: Transaction HexBytes('0x...') is not in the chain after 120 seconds
+```
+
+**Root Cause**: Free public RPCs (like BlastAPI) can take 60-120+ seconds to return transaction receipts for Ethereum, even though the transaction is confirmed on-chain in 12-30 seconds.
+
+**Solution 1: Use Premium RPC (Recommended - 10-20x faster)**
+
+Free premium RPCs with fast response times:
+
+1. **Alchemy** (Recommended):
+   ```bash
+   # Sign up: https://www.alchemy.com/ (free tier: 300M compute units/month)
+   # Get your API key and update .env:
+   ETHEREUM_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+   ```
+   **Result**: 60-120s → 5-10s ⚡
+
+2. **Infura**:
+   ```bash
+   # Sign up: https://www.infura.io/ (free tier: 100K requests/day)
+   ETHEREUM_RPC_URL=https://mainnet.infura.io/v3/YOUR_PROJECT_ID
+   ```
+
+**Solution 2: Use Faster Chain (if compatible)**
+
+If your use case allows, switch to faster chains with free RPCs:
+```bash
+# In .env file:
+PAYMENT_CHAIN=base          # 5-15 sec (free RPC works great)
+# Or
+PAYMENT_CHAIN=polygon       # 5-15 sec (free RPC works great)
+# Or
+PAYMENT_CHAIN=arbitrum      # 5-15 sec (free RPC works great)
+```
+
+**Verification**:
+```bash
+# Check transaction on blockchain explorer (confirms it's on-chain)
+# Ethereum: https://etherscan.io/tx/YOUR_TX_HASH
+# If transaction shows 50+ confirmations but script times out = RPC issue
+```
+
+**See**: [RPC_CONFIGURATION.md](RPC_CONFIGURATION.md) for complete setup guide.
+
+**Note**: Gateway uses fast RPCs (Cloudflare), so payments succeed quickly. Your local script's timeout is from YOUR configured RPC, not the gateway.
+
+---
+
 ### Error: "Insufficient USDC balance"
 
 **Symptom:**
