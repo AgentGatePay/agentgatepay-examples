@@ -107,6 +107,21 @@ def get_commission_config() -> dict:
         print(f"⚠️  Failed to fetch commission config: {e}")
         return None
 
+def decode_mandate_token(token: str) -> dict:
+    """Decode AP2 mandate token to extract payload"""
+    try:
+        parts = token.split('.')
+        if len(parts) != 3:
+            return {}
+        payload_b64 = parts[1]
+        padding = 4 - (len(payload_b64) % 4)
+        if padding != 4:
+            payload_b64 += '=' * padding
+        payload_json = base64.urlsafe_b64decode(payload_b64)
+        return json.loads(payload_json)
+    except:
+        return {}
+
 # ========================================
 # MCP TOOL WRAPPER
 # ========================================
@@ -174,30 +189,65 @@ commission_tx_hash = None
 
 
 def mcp_issue_mandate(budget_usd: float) -> str:
-    """Issue mandate using MCP tool"""
+    """Issue mandate using MCP tool (with reuse logic matching Script 1)"""
     global current_mandate
 
-    print(f"\n🔐 [MCP] Issuing mandate with ${budget_usd} budget...")
+    try:
+        agent_id = f"research-assistant-{buyer_account.address}"
+        existing_mandate = get_mandate(agent_id)
 
-    mandate = call_mcp_tool("agentpay_issue_mandate", {
-        "subject": f"research-assistant-{buyer_account.address}",
-        "budget_usd": budget_usd,
-        "scope": "resource.read,payment.execute",
-        "ttl_hours": 168
-    })
+        if existing_mandate:
+            token = existing_mandate.get('mandate_token')
 
-    # Store mandate with budget info (MCP response only includes token)
-    current_mandate = {
-        **mandate,
-        'budget_usd': budget_usd,
-        'budget_remaining': budget_usd  # Initially, remaining = total
-    }
+            # Get LIVE budget from gateway (via MCP verify tool)
+            try:
+                verify_result = call_mcp_tool("agentpay_verify_mandate", {
+                    "mandate_token": token
+                })
 
-    print(f"✅ Mandate issued via MCP")
-    print(f"   Token: {mandate['mandate_token'][:50]}...")
-    print(f"   Budget: ${budget_usd}")
+                if verify_result.get('valid'):
+                    budget_remaining = verify_result.get('budget_remaining', 'Unknown')
+                else:
+                    # Fallback to JWT decode if MCP verify fails
+                    token_data = decode_mandate_token(token)
+                    budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
+            except:
+                # Fallback to JWT if MCP call fails
+                token_data = decode_mandate_token(token)
+                budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
 
-    return f"Mandate issued via MCP. Budget: ${budget_usd}, Token: {mandate['mandate_token'][:50]}..."
+            print(f"\n♻️  Reusing mandate (Budget: ${budget_remaining})")
+            current_mandate = existing_mandate
+            current_mandate['budget_remaining'] = budget_remaining
+            return f"MANDATE_TOKEN:{token}"
+
+        print(f"\n🔐 Creating mandate (${budget_usd})...")
+
+        mandate = call_mcp_tool("agentpay_issue_mandate", {
+            "subject": agent_id,
+            "budget_usd": budget_usd,
+            "scope": "resource.read,payment.execute",
+            "ttl_hours": 168
+        })
+
+        # Store mandate with budget info (MCP response only includes token)
+        token = mandate['mandate_token']
+        mandate_with_budget = {
+            **mandate,
+            'budget_usd': budget_usd,
+            'budget_remaining': budget_usd  # Initially, remaining = total
+        }
+
+        current_mandate = mandate_with_budget
+        save_mandate(agent_id, mandate_with_budget)
+
+        print(f"✅ Mandate created (Budget: ${budget_usd})")
+
+        return f"MANDATE_TOKEN:{token}"
+
+    except Exception as e:
+        print(f"❌ Mandate failed: {str(e)}")
+        return f"Failed: {str(e)}"
 
 
 def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
@@ -305,7 +355,7 @@ def mcp_submit_and_verify_payment() -> str:
         print(f"✅ Payment submitted via MCP")
         print(f"   Status: {result.get('status', 'N/A')}")
 
-        # Verify mandate to get updated budget (same as API version)
+        # Verify mandate to get updated budget
         print(f"   🔍 Fetching updated budget...")
         verify_result = call_mcp_tool("agentpay_verify_mandate", {
             "mandate_token": current_mandate['mandate_token']
@@ -315,12 +365,16 @@ def mcp_submit_and_verify_payment() -> str:
             new_budget = verify_result.get('budget_remaining', 'Unknown')
             print(f"   ✅ Budget updated: ${new_budget}")
 
-            # Update current mandate
-            current_mandate['budget_remaining'] = new_budget
+            # Update and save mandate (matching Script 1)
+            if current_mandate:
+                current_mandate['budget_remaining'] = new_budget
+                agent_id = f"research-assistant-{buyer_account.address}"
+                save_mandate(agent_id, current_mandate)
 
-            return f"Success! Payment submitted via MCP. Budget remaining: ${new_budget}"
+            return f"Success! Paid: ${RESOURCE_PRICE_USD}, Remaining: ${new_budget}"
         else:
-            return f"Payment submitted but mandate verification failed"
+            print(f"   ⚠️  Could not fetch updated budget")
+            return f"Success! Paid: ${RESOURCE_PRICE_USD}"
 
     except Exception as e:
         error_msg = f"Payment submission failed: {str(e)}"
