@@ -186,11 +186,16 @@ def mcp_issue_mandate(budget_usd: float) -> str:
         "ttl_hours": 168
     })
 
-    current_mandate = mandate
+    # Store mandate with budget info (MCP response only includes token)
+    current_mandate = {
+        **mandate,
+        'budget_usd': budget_usd,
+        'budget_remaining': budget_usd  # Initially, remaining = total
+    }
 
     print(f"✅ Mandate issued via MCP")
     print(f"   Token: {mandate['mandate_token'][:50]}...")
-    print(f"   Budget: ${mandate['budget_usd']}")
+    print(f"   Budget: ${budget_usd}")
 
     return f"Mandate issued via MCP. Budget: ${budget_usd}, Token: {mandate['mandate_token'][:50]}..."
 
