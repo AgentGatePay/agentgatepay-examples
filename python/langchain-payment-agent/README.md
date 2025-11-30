@@ -3,7 +3,7 @@
 **Autonomous AI agent payments using blockchain and LangChain framework**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.3+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
+[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.4+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
 [![LangChain](https://img.shields.io/badge/langchain-1.0.0+-orange.svg)](https://www.langchain.com/)
 
 ## Overview
@@ -87,7 +87,7 @@ This repository contains **10 complete examples** demonstrating how to integrate
 
 4. **LLM API key** (for LangChain agent intelligence)
 
-   Examples use **OpenAI** by default (`OPENAI_API_KEY`), but any LangChain-supported LLM works (Anthropic, Google, local models, etc.). Swap by changing model initialization in scripts.
+   Examples use **OpenAI** by default, but any LangChain-supported LLM works (Anthropic Claude, Google Gemini, local models, etc.). Configure your preferred LLM provider's API key in `.env` as `OPENAI_API_KEY` (or rename variable and update model initialization in scripts for other providers).
 
 ### Installation
 
@@ -121,8 +121,9 @@ nano .env
 
 Required variables:
 ```bash
-# AgentGatePay
+# AgentGatePay API Configuration
 AGENTPAY_API_URL=https://api.agentgatepay.com
+MCP_API_URL=https://mcp.agentgatepay.com
 BUYER_API_KEY=pk_live_YOUR_BUYER_KEY
 BUYER_EMAIL=your-buyer-email@example.com
 SELLER_API_KEY=pk_live_YOUR_SELLER_KEY
@@ -144,7 +145,7 @@ BUYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY
 BUYER_WALLET=0xYOUR_BUYER_WALLET
 SELLER_WALLET=0xYOUR_SELLER_WALLET
 
-# OpenAI
+# LLM API Key (OpenAI example - swap for other providers)
 OPENAI_API_KEY=sk-YOUR_OPENAI_KEY
 
 # Optional: External TX Signing Service (recommended for production)
@@ -251,13 +252,13 @@ PAYMENT_TOKEN=USDC          # Options: USDC, USDT, DAI
 
 | Chain | USDC | USDT | DAI | Gas Cost | Payment Speed* |
 |-------|------|------|-----|----------|----------------|
-| Base (recommended) | ✅ | ❌ | ✅ | ~$0.001 | 5-15 sec |
-| Ethereum | ✅ | ✅ | ✅ | ~$0.50 | 10-120 sec** |
-| Polygon | ✅ | ✅ | ✅ | ~$0.01 | 5-15 sec |
-| Arbitrum | ✅ | ✅ | ✅ | ~$0.01 | 5-15 sec |
+| Base (recommended) | ✅ | ❌ | ✅ | Very Low | Quick |
+| Ethereum | ✅ | ✅ | ✅ | High | Variable** |
+| Polygon | ✅ | ✅ | ✅ | Low | Quick |
+| Arbitrum | ✅ | ✅ | ✅ | Low | Quick |
 
-\* Payment speed includes gateway verification. **Optimistic mode** for USDT ETH <$1 settles in 4-10s.
-\*\* Ethereum speed depends on RPC provider. See [RPC_CONFIGURATION.md](docs/RPC_CONFIGURATION.md) for 10-20x speedup.
+\* Payment speed includes gateway verification. **Optimistic mode** for USDT ETH <$1 provides faster settlement.
+\*\* Ethereum speed depends on RPC provider quality. Premium RPCs (Alchemy/Infura) provide significantly faster verification. See [RPC_CONFIGURATION.md](docs/RPC_CONFIGURATION.md) for optimization guide.
 
 **Important Notes:**
 - USDT is NOT available on Base
