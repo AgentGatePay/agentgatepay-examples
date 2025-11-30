@@ -440,7 +440,7 @@ class BuyerAgent:
                     }
 
                     url = f"{AGENTPAY_API_URL}/x402/resource?chain={self.config.chain}&token={self.config.token}&price_usd={total_usd}"
-                    gateway_result["response"] = requests.get(url, headers=headers)
+                    gateway_result["response"] = requests.get(url, headers=headers, timeout=60)
                     print(f"   ✅ Gateway response received")
                 except Exception as e:
                     gateway_result["error"] = str(e)
@@ -450,13 +450,13 @@ class BuyerAgent:
             gateway_thread = threading.Thread(target=submit_to_gateway)
             gateway_thread.start()
 
-            # Verify transactions on-chain
+            # Verify transactions on-chain (120s timeout for Ethereum public RPCs)
             print(f"   🔍 Verifying transactions on-chain...")
             try:
-                receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=60)
+                receipt_merchant = self.web3.eth.wait_for_transaction_receipt(tx_hash_merchant, timeout=120)
                 print(f"   ✅ Merchant TX confirmed (block {receipt_merchant['blockNumber']})")
 
-                receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=60)
+                receipt_commission = self.web3.eth.wait_for_transaction_receipt(tx_hash_commission, timeout=120)
                 print(f"   ✅ Commission TX confirmed (block {receipt_commission['blockNumber']})")
             except Exception as e:
                 print(f"   ⚠️  Verification failed: {e}")
@@ -523,44 +523,69 @@ class BuyerAgent:
             return error_msg
 
     def claim_resource(self) -> str:
-        """Claim resource by submitting payment proof"""
+        """Claim resource by submitting payment proof (with retry logic for DynamoDB propagation delays)"""
         if not self.last_payment or 'merchant_tx' not in self.last_payment:
             return "Error: No payment executed. Call sign_and_pay first."
 
         payment_info = self.last_payment
         print(f"\n📦 [BUYER] Claiming resource: {payment_info['resource_name']}")
 
-        try:
-            # Submit payment proof to seller
-            payment_header = f"{payment_info['merchant_tx']},{payment_info['commission_tx']}"
+        # Retry claim up to 3 times with 5-second delays (handles DynamoDB propagation)
+        max_retries = 3
+        retry_delay = 5  # seconds
 
-            response = requests.get(
-                f"{SELLER_API_URL}/resource",
-                params={"resource_id": payment_info['resource_id']},
-                headers={"x-payment": payment_header},
-                timeout=30  # Allow time for verification
-            )
+        for attempt in range(max_retries):
+            try:
+                # Submit payment proof to seller
+                payment_header = f"{payment_info['merchant_tx']},{payment_info['commission_tx']}"
 
-            if response.status_code == 200:
-                data = response.json()
-                print(f"✅ Resource delivered!")
-                print(f"   Resource: {payment_info['resource_name']}")
-                print(f"   Payment verified: {data['payment_confirmation']['amount_verified_usd']} USD")
+                response = requests.get(
+                    f"{SELLER_API_URL}/resource",
+                    params={"resource_id": payment_info['resource_id']},
+                    headers={"x-payment": payment_header},
+                    timeout=30  # Allow time for verification
+                )
 
-                # Store resource
-                self.last_payment['resource_data'] = data['resource']
+                if response.status_code == 200:
+                    # SUCCESS - resource delivered
+                    data = response.json()
+                    print(f"✅ Resource delivered!")
+                    print(f"   Resource: {payment_info['resource_name']}")
+                    print(f"   Payment verified: {data['payment_confirmation']['amount_verified_usd']} USD")
 
-                return f"Resource '{payment_info['resource_name']}' received successfully! Payment verified: ${data['payment_confirmation']['amount_verified_usd']}"
+                    # Store resource
+                    self.last_payment['resource_data'] = data['resource']
 
-            else:
-                error = response.json().get('error', 'Unknown error')
-                print(f"❌ Claim failed: {error}")
-                return f"Claim failed: {error}"
+                    return f"Resource '{payment_info['resource_name']}' received successfully! Payment verified: ${data['payment_confirmation']['amount_verified_usd']}"
 
-        except Exception as e:
-            error_msg = f"Claim error: {str(e)}"
-            print(f"❌ {error_msg}")
-            return error_msg
+                else:
+                    error = response.json().get('error', 'Unknown error')
+
+                    # If this is not the last attempt, retry after delay
+                    if attempt < max_retries - 1:
+                        print(f"⚠️  Claim attempt {attempt + 1} failed: {error}")
+                        print(f"   Retrying in {retry_delay} seconds (payment may still be propagating)...")
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        # Last attempt failed
+                        print(f"❌ Claim failed after {max_retries} attempts: {error}")
+                        return f"Claim failed after {max_retries} retries: {error}. Payment was recorded, but seller couldn't verify it. Try claiming again manually."
+
+            except Exception as e:
+                # If this is not the last attempt, retry after delay
+                if attempt < max_retries - 1:
+                    print(f"⚠️  Claim attempt {attempt + 1} error: {str(e)}")
+                    print(f"   Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    # Last attempt failed
+                    error_msg = f"Claim error after {max_retries} attempts: {str(e)}"
+                    print(f"❌ {error_msg}")
+                    return error_msg
+
+        return "Claim failed: Maximum retries exceeded"
 
 
 # ========================================
