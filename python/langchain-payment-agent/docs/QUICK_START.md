@@ -291,7 +291,7 @@ python examples/9_api_with_tx_service.py
 **Solution:** Set OPENAI_API_KEY in `.env` file
 
 ### Error: "Transaction not found on blockchain"
-**Solution:** Wait 10-15 seconds for Base network confirmation, then retry
+**Solution:** Wait 10-15 seconds for Base network confirmation, then retry. For Ethereum, see [RPC_CONFIGURATION.md](RPC_CONFIGURATION.md) for 10-20x speedup with Alchemy/Infura.
 
 For more troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
