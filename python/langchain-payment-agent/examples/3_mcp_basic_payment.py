@@ -51,6 +51,11 @@ from utils import save_mandate, get_mandate, clear_mandate
 # Load environment variables
 load_dotenv()
 
+# Import chain configuration
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from chain_config import get_chain_config
+
 # ========================================
 # TRANSACTION SIGNING
 # ========================================
@@ -77,18 +82,26 @@ load_dotenv()
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 AGENTPAY_MCP_ENDPOINT = os.getenv('MCP_API_URL', 'https://mcp.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
-BASE_RPC_URL = os.getenv('BASE_RPC_URL', 'https://mainnet.base.org')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
 
 # Payment configuration
 RESOURCE_PRICE_USD = 0.01
 MANDATE_BUDGET_USD = 100.0
-COMMISSION_RATE = 0.005
 
-# USDC contract on Base
-USDC_CONTRACT_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-USDC_DECIMALS = 6
+# Multi-chain/token configuration (set after interactive selection)
+# To manually configure without interactive prompt, uncomment and set:
+# config = ChainConfig(
+#     chain="ethereum",           # Options: base, ethereum, polygon, arbitrum
+#     token="USDT",               # Options: USDC, USDT, DAI (check availability per chain)
+#     chain_id=1,
+#     rpc_url="https://eth-mainnet.public.blastapi.io",
+#     token_contract="0xdAC17F958D2ee523a2206206994597C13D831ec7",
+#     decimals=6,
+#     explorer="https://etherscan.io"
+# )
+# Note: USDT not available on Base. DAI uses 18 decimals. See CHAIN_TOKEN_GUIDE.md
+config = None  # Will be set via get_chain_config() in main()
 
 # ========================================
 # HELPER FUNCTIONS
@@ -168,15 +181,12 @@ def call_mcp_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ========================================
-# INITIALIZE WEB3
+# INITIALIZE CLIENTS
 # ========================================
+# Note: Clients initialized in main() after chain/token configuration
 
-web3 = Web3(Web3.HTTPProvider(BASE_RPC_URL))
-buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
-
-print(f"✅ Initialized AgentGatePay MCP client")
-print(f"   Endpoint: {AGENTPAY_MCP_ENDPOINT}")
-print(f"   Buyer wallet: {buyer_account.address}\n")
+web3 = None
+buyer_account = None
 
 # ========================================
 # AGENT TOOLS (MCP-BASED)
@@ -257,9 +267,9 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
     """
     global merchant_tx_hash, commission_tx_hash
 
-    print(f"\n💳 Signing payment (${amount_usd} USDC)...")
-    print(f"   Chain: Base (ID: 8453)")
-    print(f"   Token: USDC (6 decimals)")
+    print(f"\n💳 Signing payment (${amount_usd} {config.token})...")
+    print(f"   Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"   Token: {config.token} ({config.decimals} decimals)")
 
     try:
         # Fetch commission configuration from API
@@ -273,8 +283,8 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         # Calculate amounts
         commission_amount_usd = amount_usd * commission_rate
         merchant_amount_usd = amount_usd - commission_amount_usd
-        merchant_amount_atomic = int(merchant_amount_usd * (10 ** USDC_DECIMALS))
-        commission_amount_atomic = int(commission_amount_usd * (10 ** USDC_DECIMALS))
+        merchant_amount_atomic = int(merchant_amount_usd * (10 ** config.decimals))
+        commission_amount_atomic = int(commission_amount_usd * (10 ** config.decimals))
 
         transfer_function_signature = web3.keccak(text="transfer(address,uint256)")[:4]
 
@@ -289,12 +299,12 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
 
         merchant_tx = {
             'nonce': nonce,
-            'to': USDC_CONTRACT_BASE,
+            'to': config.token_contract,
             'value': 0,
             'gas': 100000,
             'gasPrice': web3.eth.gas_price,
             'data': merchant_data,
-            'chainId': 8453
+            'chainId': config.chain_id
         }
 
         signed_merchant_tx = buyer_account.sign_transaction(merchant_tx)
@@ -310,12 +320,12 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
 
         commission_tx = {
             'nonce': nonce + 1,
-            'to': USDC_CONTRACT_BASE,
+            'to': config.token_contract,
             'value': 0,
             'gas': 100000,
             'gasPrice': web3.eth.gas_price,
             'data': commission_data,
-            'chainId': 8453
+            'chainId': config.chain_id
         }
 
         signed_commission_tx = buyer_account.sign_transaction(commission_tx)
@@ -348,8 +358,8 @@ def mcp_submit_and_verify_payment() -> str:
             "mandate_token": current_mandate['mandate_token'],
             "tx_hash": merchant_tx_hash,
             "tx_hash_commission": commission_tx_hash,
-            "chain": "base",
-            "token": "USDC"
+            "chain": config.chain,
+            "token": config.token
         })
 
         print(f"✅ Payment submitted via MCP")
@@ -452,10 +462,30 @@ if __name__ == "__main__":
     print("This demo shows an autonomous agent making a blockchain payment using:")
     print("  - AgentGatePay MCP tools (JSON-RPC 2.0)")
     print("  - LangChain agent framework")
-    print("  - USDC payments on Base network")
+    print("  - Multi-chain blockchain payments (Base/Ethereum/Polygon/Arbitrum)")
+    print("  - Multi-token support (USDC/USDT/DAI)")
     print()
 
-    print(f"Initialized AgentGatePay MCP client: {AGENTPAY_MCP_ENDPOINT}")
+    # Load chain/token configuration from .env
+    print("\nCHAIN & TOKEN CONFIGURATION")
+    print("=" * 80)
+
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  RPC: {config.rpc_url}")
+    print(f"  Contract: {config.token_contract}")
+    print(f"\nTo change chain/token: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
+    print("=" * 80)
+
+    # Initialize clients with selected configuration
+    web3 = Web3(Web3.HTTPProvider(config.rpc_url))
+    buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
+
+    print(f"\nInitialized AgentGatePay MCP client: {AGENTPAY_MCP_ENDPOINT}")
+    print(f"Initialized Web3 client: {config.chain.title()} network")
     print(f"Buyer wallet: {buyer_account.address}\n")
 
     agent_id = f"research-assistant-{buyer_account.address}"
@@ -527,8 +557,8 @@ if __name__ == "__main__":
 
         if 'merchant_tx_hash' in globals():
             print(f"\nBlockchain Transactions:")
-            print(f"  Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")
-            print(f"  Commission TX: https://basescan.org/tx/{commission_tx_hash}")
+            print(f"  Merchant TX: {config.explorer}/tx/{merchant_tx_hash}")
+            print(f"  Commission TX: {config.explorer}/tx/{commission_tx_hash}")
 
             # Display gateway audit logs with curl commands
             print(f"\nGateway Audit Logs (copy-paste these commands):")
