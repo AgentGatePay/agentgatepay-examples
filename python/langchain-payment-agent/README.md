@@ -10,8 +10,8 @@
 
 This repository contains **9 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
-- **Examples 1-2:** REST API basics (payment, buyer/seller marketplace)
-- **Examples 3-5:** MCP tools basics (same features as 1-2 using MCP)
+- **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
+- **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP)
 - **Example 6:** REST API complete (ALL 11 AgentGatePay features with optimizations)
 - **Example 7:** MCP complete (ALL 15 MCP tools - 100% coverage)
 - **Example 8:** External TX service (production-ready signing)
@@ -213,11 +213,12 @@ python examples/2a_api_buyer_agent.py
 # Example 3: Basic payment (MCP tools)
 python examples/3_mcp_basic_payment.py
 
-# Example 4: Buyer/seller marketplace (MCP tools)
-python examples/4_mcp_buyer_seller.py
+# Example 4: Buyer/seller marketplace (MCP tools) - TWO SCRIPTS
+# Terminal 1: Start seller first
+python examples/4b_mcp_seller_agent.py
 
-# Example 5: Audit logging (MCP tools)
-python examples/5_mcp_with_audit.py
+# Terminal 2: Then run buyer
+python examples/4a_mcp_buyer_agent.py
 
 # Example 6: Complete features demo (REST API) - ALL 11 FEATURES + OPTIMIZATIONS
 python examples/6_api_complete_features.py
@@ -399,8 +400,7 @@ MCP version of Example 1, demonstrating the same payment flow using AgentGatePay
 **Flow:**
 1. Issue mandate via `agentpay_issue_mandate` tool
 2. Sign blockchain transactions (Web3.py - merchant + commission)
-3. Submit payment proof via `agentpay_submit_payment` tool
-4. Gateway verifies on-chain and updates budget automatically
+3. Submit payment and verify budget via `agentpay_submit_payment` + `agentpay_verify_mandate` (combined)
 
 **MCP Advantages:**
 - Native tool discovery (frameworks auto-list all 15 tools)
@@ -408,84 +408,82 @@ MCP version of Example 1, demonstrating the same payment flow using AgentGatePay
 - Future-proof (Anthropic-backed)
 - Cleaner tool abstraction
 
+**Key Features:**
+- Matches Script 1 exact flow (3 steps)
+- Combined submit+verify for efficiency
+- Audit log curl commands for verification
+- Same output format as REST API version
+
 **Output:**
 ```
 ✅ Mandate issued via MCP
-💳 Payment sent: $10 to 0x742d35...
-✅ Payment verified via MCP
-📊 MCP Tools Used: 3
+💳 Payment executed: $0.01 to 0x742d35...
+✅ Payment submitted via MCP
+   ✅ Budget updated: $99.99
+
+📋 Gateway Audit Logs (copy-paste these commands):
+# All payment logs:
+curl 'https://api.agentgatepay.com/audit/logs?...' | python3 -m json.tool
 ```
 
 ---
 
-### Example 4: Buyer/Seller Marketplace (MCP Tools)
+### Example 4: Buyer/Seller Marketplace (MCP Tools) ⭐ **SEPARATE SCRIPTS**
 
-**File:** `examples/4_mcp_buyer_seller.py`
+**Files:**
+- `examples/4a_mcp_buyer_agent.py` - Autonomous buyer agent (MCP)
+- `examples/4b_mcp_seller_agent.py` - Resource seller API (MCP)
 
-MCP version of Example 2, demonstrating marketplace interactions using MCP tools for all AgentGatePay operations.
+**Complete marketplace interaction** using MCP tools (matches Example 2 pattern):
 
-**Features:**
-- Mandate issuance via MCP (`agentpay_issue_mandate`)
-- Payment submission via MCP (`agentpay_submit_payment`)
-- Payment verification via MCP (`agentpay_verify_payment`)
-- Simulated catalog discovery and resource delivery
-- Two-transaction commission model (blockchain)
+**BUYER AGENT** (`4a_mcp_buyer_agent.py`):
+- **Autonomous** resource discovery from ANY seller
+- Issues mandate via MCP (`agentpay_issue_mandate`)
+- Signs blockchain payment (2 TX: merchant + commission)
+- Submits payment via MCP (`agentpay_submit_payment`)
+- Claims resource after payment
+- Can discover from multiple sellers
+
+**SELLER AGENT** (`4b_mcp_seller_agent.py`):
+- **Independent** Flask API service
+- Provides resource catalog
+- Returns 402 Payment Required
+- **Verifies payment via MCP** (`agentpay_verify_payment`) instead of REST API SDK
+- Delivers resource (200 OK)
+- Serves ANY buyer agent
 
 **Flow:**
-1. Issue mandate (MCP)
-2. Discover catalog (simulated)
-3. Request resource (simulated 402)
-4. Sign blockchain payment (Web3.py)
-5. Submit payment proof (MCP)
-6. Verify payment (MCP)
-7. Claim resource (simulated)
+```
+[SELLER] Start Flask API (localhost:8000) → [SELLER] Wait for buyers
+   ↓
+[BUYER] Issue mandate via MCP → [BUYER] Discover catalog → [SELLER] Return catalog
+   ↓
+[BUYER] Request resource → [SELLER] 402 Payment Required
+   ↓
+[BUYER] Sign blockchain TX (2 transactions: merchant + commission)
+   ↓
+[BUYER] Submit payment to gateway via MCP → [GATEWAY] Verify on-chain
+   ↓
+[BUYER] Claim resource with proof → [SELLER] Verify via MCP → [SELLER] Deliver (200 OK)
+```
 
-**Why Simulated Seller:**
-- Focus is on demonstrating MCP tool integration
-- Real seller API shown in Example 2b (REST API version)
-- Production sellers would use same MCP tools for verification
+**Why Separate Scripts:**
+- ✅ **Realistic** - Buyer and seller are separate entities
+- ✅ **Flexible** - Buyer can buy from multiple sellers
+- ✅ **Scalable** - Seller can serve multiple buyers
+- ✅ **MCP Focus** - Shows MCP tools in production marketplace pattern
 
 **MCP Tools Used:**
-- `agentpay_issue_mandate` - Issue payment mandate
-- `agentpay_submit_payment` - Submit payment proof
-- `agentpay_verify_payment` - Verify payment status
-
----
-
-### Example 5: Payment with Audit Logs (MCP Tools)
-
-**File:** `examples/5_mcp_with_audit.py`
-
-Demonstrates comprehensive audit logging using MCP tools for payment tracking and analytics.
+- **Buyer:** `agentpay_issue_mandate`, `agentpay_submit_payment`
+- **Seller:** `agentpay_verify_payment` (instead of REST API SDK)
 
 **Features:**
-- Mandate issuance via MCP
-- Multiple payments with blockchain signing
-- Payment submission via MCP
-- Audit log retrieval via MCP (`agentpay_list_audit_logs`)
-- Spending pattern analysis via MCP
-- Budget monitoring via MCP (`agentpay_verify_mandate`)
-
-**Analytics:**
-```
-📊 Spending Analysis (via MCP):
-   Total payments: 5
-   Total spent: $47.50
-   Average payment: $9.50
-   Budget utilization: 47.5%
-```
-
-**MCP Tools Used:**
-- `agentpay_issue_mandate` - Issue mandate
-- `agentpay_submit_payment` - Submit payments
-- `agentpay_verify_mandate` - Check budget
-- `agentpay_list_audit_logs` - Retrieve logs
-
-**Demonstrates:**
-- Complete audit trail via MCP
-- Payment tracking across multiple transactions
-- Budget utilization monitoring
-- Spending pattern analysis
+- HTTP 402 Payment Required protocol
+- Two-transaction commission model
+- Real Flask API for seller (production-ready)
+- Adaptive retry logic for payment verification
+- Comprehensive error handling
+- Audit log commands at end
 
 ---
 

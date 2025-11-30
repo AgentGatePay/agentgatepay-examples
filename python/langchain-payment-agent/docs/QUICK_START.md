@@ -248,6 +248,13 @@ python examples/2a_api_buyer_agent.py
 # Example 3: Basic payment using MCP tools
 python examples/3_mcp_basic_payment.py
 
+# Example 4: Buyer/Seller marketplace (MCP tools) - run seller first
+# Terminal 1:
+python examples/4b_mcp_seller_agent.py
+
+# Terminal 2:
+python examples/4a_mcp_buyer_agent.py
+
 # Example 6: ALL 11 features (comprehensive demo)
 python examples/6_api_complete_features.py
 

@@ -19,8 +19,7 @@ MCP Tools Used:
 Flow:
 1. Issue AP2 mandate ($100 budget)
 2. Sign blockchain transaction (USDC on Base)
-3. Submit payment via MCP tool
-4. Verify payment completion
+3. Submit payment and verify budget via MCP tool
 
 Requirements:
 - pip install langchain langchain-openai web3 python-dotenv requests
@@ -292,14 +291,17 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         return error_msg
 
 
-def mcp_submit_payment() -> str:
-    """Submit payment proof using MCP tool"""
+def mcp_submit_and_verify_payment() -> str:
+    """Submit payment proof using MCP tool and verify budget (combined)"""
+    global current_mandate
+
     if not current_mandate or not merchant_tx_hash:
         return "Error: Must issue mandate and sign payment first"
 
     print(f"\n📤 [MCP] Submitting payment proof...")
 
     try:
+        # Submit payment via MCP
         result = call_mcp_tool("agentpay_submit_payment", {
             "mandate_token": current_mandate['mandate_token'],
             "tx_hash": merchant_tx_hash,
@@ -311,34 +313,25 @@ def mcp_submit_payment() -> str:
         print(f"✅ Payment submitted via MCP")
         print(f"   Status: {result.get('status', 'N/A')}")
 
-        return f"Payment submitted via MCP! Status: {result.get('status')}, TX: {merchant_tx_hash[:20]}..."
-
-    except Exception as e:
-        error_msg = f"Payment submission failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        return error_msg
-
-
-def mcp_verify_mandate() -> str:
-    """Verify mandate using MCP tool"""
-    if not current_mandate:
-        return "Error: No mandate issued yet"
-
-    print(f"\n🔍 [MCP] Verifying mandate...")
-
-    try:
-        result = call_mcp_tool("agentpay_verify_mandate", {
+        # Verify mandate to get updated budget (same as API version)
+        print(f"   🔍 Fetching updated budget...")
+        verify_result = call_mcp_tool("agentpay_verify_mandate", {
             "mandate_token": current_mandate['mandate_token']
         })
 
-        print(f"✅ Mandate verified via MCP")
-        print(f"   Valid: {result.get('valid', False)}")
-        print(f"   Budget remaining: ${result.get('budget_remaining', 'N/A')}")
+        if verify_result.get('valid'):
+            new_budget = verify_result.get('budget_remaining', 'Unknown')
+            print(f"   ✅ Budget updated: ${new_budget}")
 
-        return f"Mandate valid: {result.get('valid')}. Budget remaining: ${result.get('budget_remaining')}"
+            # Update current mandate
+            current_mandate['budget_remaining'] = new_budget
+
+            return f"Success! Payment submitted via MCP. Budget remaining: ${new_budget}"
+        else:
+            return f"Payment submitted but mandate verification failed"
 
     except Exception as e:
-        error_msg = f"Mandate verification failed: {str(e)}"
+        error_msg = f"Payment submission failed: {str(e)}"
         print(f"❌ {error_msg}")
         return error_msg
 
@@ -356,14 +349,9 @@ tools = [
         description="Sign blockchain payment locally (Web3). Input: 'amount_usd,recipient_address'"
     ),
     Tool(
-        name="submit_payment_mcp",
-        func=lambda _: mcp_submit_payment(),
-        description="Submit payment proof to AgentGatePay via MCP tool. No input needed."
-    ),
-    Tool(
-        name="verify_mandate_mcp",
-        func=lambda _: mcp_verify_mandate(),
-        description="Verify mandate validity via MCP tool. No input needed."
+        name="submit_and_verify_payment",
+        func=lambda _: mcp_submit_and_verify_payment(),
+        description="Submit payment proof via MCP and verify updated budget. No input needed."
     ),
 ]
 
@@ -384,8 +372,7 @@ Task: {input}
 Workflow:
 1. Issue mandate using MCP tool (issue_mandate_mcp)
 2. Sign blockchain payment locally (sign_payment)
-3. Submit payment proof using MCP tool (submit_payment_mcp)
-4. Verify mandate status using MCP tool (verify_mandate_mcp)
+3. Submit payment and verify budget using MCP tool (submit_and_verify_payment)
 
 Think step by step:
 {agent_scratchpad}
@@ -435,8 +422,7 @@ if __name__ == "__main__":
     Steps:
     1. Issue a payment mandate with ${MANDATE_BUDGET_USD} budget using MCP
     2. Sign blockchain payment of ${RESOURCE_PRICE_USD} to {SELLER_WALLET}
-    3. Submit payment proof via MCP tool
-    4. Verify mandate status via MCP tool
+    3. Submit payment proof and verify budget via MCP tool
     """
 
     try:
@@ -456,6 +442,18 @@ if __name__ == "__main__":
         if merchant_tx_hash:
             print(f"   Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")
             print(f"   Commission TX: https://basescan.org/tx/{commission_tx_hash}")
+
+            # Display gateway audit logs with curl commands
+            print(f"\n📋 Gateway Audit Logs (copy-paste these commands):")
+            print(f"\n# All payment logs:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&limit=10' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# This specific transaction:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{merchant_tx_hash}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# Audit stats:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
 
         print(f"\n🎉 SUCCESS: Payment completed using MCP tools!")
 
