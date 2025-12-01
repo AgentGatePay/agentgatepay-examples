@@ -709,7 +709,7 @@ Think step by step:
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
             print(f"\n# This specific transaction:")
             print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&limit=50' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | grep -A 50 '{buyer.last_payment['merchant_tx']}' | python3 -m json.tool")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | jq '.logs[] | select(.details.tx_hash == \"{buyer.last_payment['merchant_tx']}\" or .details.merchant_tx_hash == \"{buyer.last_payment['merchant_tx']}\")'")
             print(f"\n# Audit stats (24h):")
             print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&hours=24' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
