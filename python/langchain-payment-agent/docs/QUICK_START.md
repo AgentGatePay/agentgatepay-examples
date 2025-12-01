@@ -102,7 +102,7 @@ AgentGatePay requires blockchain transactions to be signed. You have 2 options:
 ✅ **Best for:** Testing and learning
 ⚠️ **NOT recommended for production**
 
-Private key stored in `.env` file. Used in examples 1-8.
+Private key stored in `.env` file. Used in examples 1-6.
 
 **Setup:** Continue to Step 5 below (configure `.env` file)
 
@@ -128,8 +128,8 @@ Private key stored in `.env` file. Used in examples 1-8.
    # Add to .env file
    TX_SIGNING_SERVICE=https://your-service.onrender.com
 
-   # Run Example 9 (uses external signing)
-   python examples/9_api_with_tx_service.py
+   # Run Example 5 (uses external signing)
+   python examples/5_api_with_tx_service.py
    ```
 
 **See:** [TX_SIGNING_OPTIONS.md](TX_SIGNING_OPTIONS.md) for all signing methods (Docker, Railway, self-hosted, etc.)
@@ -255,17 +255,25 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2:
 python examples/4a_mcp_buyer_agent.py
 
-# Example 8: Production signing (external service) - PRODUCTION READY 🚀
-python examples/8_api_with_tx_service.py
+# Example 5: Production signing (external service) - PRODUCTION READY 🚀
+python examples/5_api_with_tx_service.py
 
-# Example 9: Monitoring dashboard (analytics & audit logs)
-python examples/9_monitoring_dashboard.py
+# Example 6a: Buyer monitoring dashboard (spending & budgets)
+python examples/6a_monitoring_buyer.py
+
+# Example 6b: Seller monitoring dashboard (revenue & webhooks)
+python examples/6b_monitoring_seller.py
 ```
 
-**Example 8 Requirements:**
+**Example 5 Requirements:**
 - TX signing service must be deployed (see Step 4, Option B)
 - `TX_SIGNING_SERVICE` must be set in `.env` file
 - Uses external service for secure transaction signing (NO private key in code)
+
+**Examples 6a/6b:**
+- Separate monitoring dashboards for buyers (spending) and sellers (revenue)
+- Matches n8n monitoring workflow pattern
+- Can be run anytime to check payment status
 
 ### Learn More
 

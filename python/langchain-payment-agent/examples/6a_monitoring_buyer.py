@@ -1,35 +1,34 @@
 #!/usr/bin/env python3
 """
-AgentGatePay + LangChain Integration - MONITORING DASHBOARD (Standalone)
+AgentGatePay + LangChain Integration - BUYER MONITORING DASHBOARD
 
-This is a standalone monitoring tool for tracking AgentGatePay payments, similar to
-the n8n monitoring workflow. Run this AFTER making payments to see analytics.
-
-Features:
-- Multi-chain/token support (Ethereum, Base, Polygon, Arbitrum + USDC/USDT/DAI)
+Monitor your payment activity as a BUYER (outgoing payments):
 - Spending analytics and budget tracking
+- Payment history (what you paid to merchants)
+- Active mandates and budget utilization
 - Smart alerts (budget warnings, mandate expiration, failed payments)
-- Payment history with merchant vs commission breakdown
 - CSV/JSON exports
-- curl commands for further exploration
+
+This is for buyers who SEND payments. For sellers who RECEIVE payments,
+use 6b_monitoring_seller.py instead.
+
+Features (Buyer-Focused):
+- Total spent, payment count, average payment
+- Budget tracking and mandate management
+- Outgoing payment history (what you paid)
+- Budget alerts and spending trends
+- Mandate expiration warnings
 
 Usage:
     # Standalone mode (will prompt for credentials)
-    python 10_monitoring_dashboard.py
+    python 6a_monitoring_buyer.py
 
     # With arguments
-    python 10_monitoring_dashboard.py --api-key pk_live_... --wallet 0xABC...
-
-    # Import as module
-    from monitoring import MonitoringDashboard
-    from chain_config import get_chain_config
-    config = get_chain_config()
-    dashboard = MonitoringDashboard(api_url, api_key, wallet, config)
-    dashboard.print_dashboard()
+    python 6a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
 
 Requirements:
 - pip install agentgatepay-sdk>=1.1.3 python-dotenv
-- .env file with API_KEY (optional if passed as argument)
+- .env file with BUYER_API_KEY and BUYER_WALLET
 """
 
 import os
@@ -44,7 +43,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Chain configuration from .env
 from chain_config import get_chain_config
 
-# Import monitoring module (for dashboard features only)
+# Import monitoring module
 from monitoring import (
     MonitoringDashboard,
     CSVExporter,
@@ -67,9 +66,9 @@ AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 
 if __name__ == "__main__":
     # Parse arguments
-    parser = argparse.ArgumentParser(description='AgentGatePay Monitoring Dashboard')
+    parser = argparse.ArgumentParser(description='AgentGatePay Buyer Monitoring Dashboard')
     parser.add_argument('--api-key', help='AgentGatePay API key', default=None)
-    parser.add_argument('--wallet', help='Wallet address', default=None)
+    parser.add_argument('--wallet', help='Buyer wallet address', default=None)
     parser.add_argument('--export-csv', action='store_true', help='Export CSV report')
     parser.add_argument('--export-json', action='store_true', help='Export JSON report')
     parser.add_argument('--no-alerts', action='store_true', help='Disable alerts')
@@ -77,14 +76,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     print("=" * 70)
-    print("📊 AGENTGATEPAY MONITORING DASHBOARD (Standalone)")
+    print("📊 BUYER MONITORING DASHBOARD (Outgoing Payments)")
     print("=" * 70)
     print()
-    print("This tool analyzes your AgentGatePay payment activity and provides:")
-    print("  - Spending analytics and budget tracking")
-    print("  - Smart alerts (budget warnings, failed payments)")
-    print("  - Payment history with merchant/commission breakdown")
-    print("  - CSV/JSON exports")
+    print("This dashboard tracks your SPENDING as a buyer:")
+    print("  ✅ Total spent and payment count")
+    print("  ✅ Budget tracking and mandate status")
+    print("  ✅ Payment history (what you paid to merchants)")
+    print("  ✅ Spending alerts and budget warnings")
+    print()
+    print("For REVENUE tracking (incoming payments), use 6b_monitoring_seller.py")
     print()
     print("=" * 70)
 
@@ -92,9 +93,9 @@ if __name__ == "__main__":
     api_key = args.api_key or os.getenv('BUYER_API_KEY') or os.getenv('AGENTGATEPAY_API_KEY')
 
     if not api_key:
-        print("\n⚠️  API key required!")
+        print("\n⚠️  Buyer API key required!")
         print()
-        api_key = input("Enter your AgentGatePay API key (pk_live_...): ").strip()
+        api_key = input("Enter your buyer API key (pk_live_...): ").strip()
 
         if not api_key or not api_key.startswith('pk_'):
             print("❌ Invalid API key format. Expected: pk_live_...")
@@ -105,7 +106,7 @@ if __name__ == "__main__":
 
     if not wallet:
         print()
-        wallet_input = input("Enter your wallet address (0x...) [optional, press Enter to skip]: ").strip()
+        wallet_input = input("Enter your buyer wallet address (0x...) [optional, press Enter to skip]: ").strip()
         if wallet_input:
             wallet = wallet_input
 
@@ -121,7 +122,7 @@ if __name__ == "__main__":
 
     # Create monitoring dashboard
     print()
-    print("🔄 Fetching data from AgentGatePay API...")
+    print("🔄 Fetching buyer data from AgentGatePay API...")
     print()
 
     dashboard = MonitoringDashboard(
@@ -131,7 +132,7 @@ if __name__ == "__main__":
         config=config
     )
 
-    # Fetch all data
+    # Fetch all buyer-specific data
     try:
         dashboard.fetch_analytics()
         dashboard.fetch_payment_history(limit=100)
@@ -141,8 +142,8 @@ if __name__ == "__main__":
         print(f"❌ Failed to fetch data: {e}")
         print()
         print("Please check:")
-        print("  - API key is valid")
-        print("  - Wallet address is correct (if provided)")
+        print("  - Buyer API key is valid")
+        print("  - Buyer wallet address is correct (if provided)")
         print("  - Network connection is working")
         sys.exit(1)
 
@@ -152,31 +153,31 @@ if __name__ == "__main__":
     alerts = report['alerts']
 
     # ========================================
-    # DISPLAY DASHBOARD
+    # DISPLAY BUYER DASHBOARD
     # ========================================
 
     print("\n" + "=" * 70)
-    print("📊 AGENTGATEPAY MONITORING DASHBOARD")
+    print("📊 BUYER MONITORING DASHBOARD")
     print("=" * 70)
     print(f"\nGenerated: {report['generated_at']}")
     print(f"Chain: {report['config']['chain'].upper()}")
     print(f"Token: {report['config']['token']}")
     if wallet:
-        print(f"Wallet: {wallet[:10]}...{wallet[-8:]}")
+        print(f"Buyer Wallet: {wallet[:10]}...{wallet[-8:]}")
     print()
 
-    # Key Metrics
+    # Key Metrics - BUYER FOCUS
     print("━" * 70)
     print("💰 SPENDING SUMMARY")
     print("━" * 70)
     print(f"Total Spent: ${stats['total_spent']:.2f} USD")
-    print(f"Payment Count: {stats['payment_count']}")
+    print(f"Payment Count: {stats['payment_count']} (outgoing payments)")
     print(f"Average Payment: ${stats['average_payment']:.2f} USD")
     print(f"Last 24h: {stats['payments_last_24h']} payments (${stats['spent_last_24h']:.2f} USD)")
     print(f"Spending Trend: {stats['spending_trend']}")
     print()
 
-    # Budget Status
+    # Budget Status - BUYER FOCUS
     print("━" * 70)
     print("🔑 BUDGET STATUS")
     print("━" * 70)
@@ -186,10 +187,10 @@ if __name__ == "__main__":
     print(f"Active Mandates: {stats['active_mandates']}")
     print()
 
-    # Alerts
+    # Alerts - BUYER FOCUS
     if not args.no_alerts and alerts:
         print("━" * 70)
-        print(f"🚨 ALERTS ({len(alerts)})")
+        print(f"🚨 BUYER ALERTS ({len(alerts)})")
         print("━" * 70)
         alert_summary = dashboard.alert_engine.get_alert_summary()
         print(f"Critical: {alert_summary['critical']} | High: {alert_summary['high']} | " +
@@ -204,11 +205,12 @@ if __name__ == "__main__":
             print(f"\n... and {len(alerts) - 10} more alerts")
         print()
 
-    # Recent Payments
+    # Recent Payments - BUYER FOCUS (what you paid)
     if dashboard.payments:
         print("━" * 70)
-        print("💳 RECENT PAYMENTS (Last 10)")
+        print("💳 OUTGOING PAYMENTS (Last 10)")
         print("━" * 70)
+        print("(Payments YOU sent to merchants)\n")
         for i, payment in enumerate(dashboard.payments[:10], 1):
             timestamp = payment.get('timestamp', payment.get('created_at', 'N/A'))
             amount = float(payment.get('amount_usd', 0))
@@ -216,14 +218,15 @@ if __name__ == "__main__":
             tx_hash = payment.get('tx_hash', 'N/A')[:20]
             receiver = payment.get('receiver', payment.get('receiver_address', 'N/A'))[:12]
 
-            print(f"{i}. ${amount:.2f} → {receiver}... | {status} | {tx_hash}...")
+            print(f"{i}. YOU PAID ${amount:.2f} → Merchant {receiver}... | {status} | TX {tx_hash}...")
         print()
 
-    # Mandates
+    # Mandates - BUYER FOCUS
     if dashboard.mandates:
         print("━" * 70)
         print(f"🎫 ACTIVE MANDATES ({len(dashboard.mandates)})")
         print("━" * 70)
+        print("(Budget allocations for your payments)\n")
         for i, mandate in enumerate(dashboard.mandates[:5], 1):
             details = mandate.get('details', {})
             if isinstance(details, str):
@@ -232,42 +235,36 @@ if __name__ == "__main__":
 
             mandate_id = details.get('mandate_id', 'N/A')[:30]
             budget = details.get('budget_usd', 0)
+            remaining = details.get('budget_remaining', 0)
             status = details.get('status', 'N/A')
 
-            print(f"{i}. {mandate_id}... | ${budget:.2f} | {status}")
+            print(f"{i}. {mandate_id}... | Budget: ${budget:.2f} | Remaining: ${remaining:.2f} | {status}")
         if len(dashboard.mandates) > 5:
             print(f"... and {len(dashboard.mandates) - 5} more mandates")
         print()
 
-    # API Links
+    # API Links - BUYER FOCUS
     print("━" * 70)
-    print("🔗 EXPLORE YOUR DATA (CURL COMMANDS)")
+    print("🔗 EXPLORE YOUR BUYER DATA (CURL COMMANDS)")
     print("━" * 70)
     print("\nCopy-paste these commands to explore your payment data:\n")
 
     client_id = wallet if wallet else os.getenv('BUYER_EMAIL', 'YOUR_EMAIL')
 
-    print(f"# Last 24 hours of activity")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={client_id}&hours=24' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# Payment events only")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={client_id}&event_type=x402_payment_settled' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    # Show transaction-specific endpoint if we have recent payments
-    if dashboard.payments and dashboard.payments[0].get('tx_hash'):
-        latest_tx = dashboard.payments[0]['tx_hash']
-        print(f"# View specific transaction logs (fastest!)")
-        print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{latest_tx}' \\")
-        print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# User analytics")
+    print(f"# Buyer spending analytics")
     print(f"curl '{AGENTPAY_API_URL}/v1/analytics/me' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
-    print(f"# Payment history")
+    print(f"# Payment history (what you paid)")
     print(f"curl '{AGENTPAY_API_URL}/v1/payments/list' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    print(f"# Payment events from your wallet")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={client_id}&event_type=x402_payment_settled' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    print(f"# Your active mandates")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={client_id}&event_type=mandate_issued' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
     # Exports
@@ -278,26 +275,27 @@ if __name__ == "__main__":
     if args.export_csv or args.export_json:
         try:
             if args.export_csv:
-                csv_path = dashboard.export_csv()
-                print(f"✅ CSV Report: {csv_path}")
+                csv_path = dashboard.export_csv(filepath="buyer_monitoring_report.csv")
+                print(f"✅ Buyer CSV Report: {csv_path}")
 
             if args.export_json:
-                json_path = dashboard.export_json()
-                print(f"✅ JSON Report: {json_path}")
+                json_path = dashboard.export_json(filepath="buyer_monitoring_report.json")
+                print(f"✅ Buyer JSON Report: {json_path}")
         except Exception as e:
             print(f"⚠️  Export failed: {e}")
     else:
-        print("Run with --export-csv or --export-json to export reports")
+        print("Run with --export-csv or --export-json to export buyer reports")
         print(f"Example: python {os.path.basename(__file__)} --export-csv --export-json")
 
     print()
     print("=" * 70)
-    print("✅ MONITORING COMPLETE")
+    print("✅ BUYER MONITORING COMPLETE")
     print("=" * 70)
     print()
     print(f"💡 Next Steps:")
-    print(f"   - Check alerts above and take recommended actions")
-    print(f"   - Use curl commands to explore your data")
-    print(f"   - Export CSV/JSON for detailed analysis")
-    print(f"   - Run this script anytime to check payment status")
+    print(f"   - Check budget alerts and take action if needed")
+    print(f"   - Review mandate expiration warnings")
+    print(f"   - Use curl commands to explore detailed payment history")
+    print(f"   - Export CSV/JSON for accounting/analysis")
+    print(f"   - Run 6b_monitoring_seller.py to see revenue side")
     print()

@@ -8,14 +8,14 @@
 
 ## Overview
 
-This repository contains **7 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
 - **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP, with webhook support)
-- **Example 8:** External TX service (production-ready signing)
-- **Example 9:** Standalone Monitoring Dashboard (analytics & audit logs)
+- **Example 5:** External TX service (production-ready signing)
+- **Examples 6a/6b:** Buyer & Seller Monitoring Dashboards (analytics & audit logs)
 
-**Note:** Examples 1-4 demonstrate all core payment features. Examples 8-9 add production enhancements (external signing, monitoring).
+**Note:** Examples 1-4 demonstrate all core payment features. Examples 5-6 add production enhancements (external signing, monitoring).
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -173,7 +173,7 @@ python examples/1_api_basic_payment.py
 
 ---
 
-**Example 9: External Signing Service**
+**Example 5: External Signing Service**
 
 This example uses a separate signing service:
 
@@ -188,7 +188,7 @@ This example uses a separate signing service:
 
 3. Run example:
    ```bash
-   python examples/9_api_with_tx_service.py
+   python examples/5_api_with_tx_service.py
    ```
 
 ---
@@ -220,14 +220,17 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/4a_mcp_buyer_agent.py
 
-# Example 8: Production TX signing (external service) - PRODUCTION READY 🚀
-python examples/8_api_with_tx_service.py
+# Example 5: Production TX signing (external service) - PRODUCTION READY 🚀
+python examples/5_api_with_tx_service.py
 
-# Example 9: Monitoring dashboard (STANDALONE TOOL) - ANALYTICS & AUDIT LOGS
-python examples/9_monitoring_dashboard.py
+# Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
+python examples/6a_monitoring_buyer.py
+
+# Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
+python examples/6b_monitoring_seller.py
 
 # Run with exports
-python examples/9_monitoring_dashboard.py --export-csv --export-json
+python examples/6a_monitoring_buyer.py --export-csv --export-json
 ```
 
 ### Multi-Chain/Token Configuration
@@ -482,9 +485,9 @@ curl 'https://api.agentgatepay.com/audit/logs?...' | python3 -m json.tool
 
 ---
 
-### Example 8: Production TX Signing (External Service) ⭐ **PRODUCTION READY**
+### Example 5: Production TX Signing (External Service) ⭐ **PRODUCTION READY**
 
-**File:** `examples/8_api_with_tx_service.py`
+**File:** `examples/5_api_with_tx_service.py`
 
 **PRODUCTION-READY payment flow using external transaction signing service:**
 - ✅ NO private key in application code
@@ -524,7 +527,7 @@ response = requests.post(
 **Setup:**
 1. Deploy TX signing service ([Render one-click](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX) or Docker)
 2. Add `TX_SIGNING_SERVICE=https://your-service.onrender.com` to `.env`
-3. Run `python examples/8_api_with_tx_service.py`
+3. Run `python examples/5_api_with_tx_service.py`
 
 **Output:**
 ```
@@ -558,55 +561,57 @@ response = requests.post(
 
 ---
 
-### Example 9: Monitoring Dashboard
+### Examples 6a/6b: Buyer & Seller Monitoring Dashboards ⭐ **SEPARATE DASHBOARDS**
 
-**File:** `examples/9_monitoring_dashboard.py`
+**Files:**
+- `examples/6a_monitoring_buyer.py` - Buyer monitoring (spending, budgets, mandates)
+- `examples/6b_monitoring_seller.py` - Seller monitoring (revenue, webhooks, top buyers)
 
-Standalone monitoring tool for tracking AgentGatePay payments - similar to n8n monitoring workflows but as a Python CLI tool.
+Standalone monitoring tools for tracking AgentGatePay payments - similar to n8n monitoring workflows but as Python CLI tools. Split into **buyer** and **seller** dashboards to match real-world usage patterns.
 
-**Features:**
-- **Multi-chain/token support**: Ethereum, Base, Polygon, Arbitrum with USDC/USDT/DAI
+**Why Separate Dashboards:**
+- ✅ **Buyer Focus** - Track spending, budget utilization, mandate expiration
+- ✅ **Seller Focus** - Track revenue, webhook delivery, top buyers
+- ✅ **Realistic** - Buyers and sellers have different monitoring needs
+- ✅ **Matches n8n** - Same pattern as n8n buyer/seller monitoring workflows
+
+---
+
+#### Example 6a: Buyer Monitoring Dashboard
+
+**File:** `examples/6a_monitoring_buyer.py`
+
+Monitor your SPENDING as a buyer (outgoing payments):
+
+**Buyer-Specific Features:**
 - **Spending analytics**: Total spent, payment count, average payment, 24h activity
 - **Budget tracking**: Mandate budgets, utilization percentage, remaining budget
-- **Smart alerts**: Budget warnings (critical/high/medium), mandate expiration, failed payments, spending anomalies
-- **Payment history**: Last 100 payments with merchant vs commission breakdown
-- **CSV/JSON exports**: Export reports for offline analysis
-- **curl commands**: Ready-to-use API exploration commands
+- **Smart alerts**: Budget warnings (critical/high/medium), mandate expiration, failed payments
+- **Outgoing payments**: Track what you paid to merchants
+- **CSV/JSON exports**: Export spending reports for accounting
 
 **Usage:**
 ```bash
 # Standalone mode (prompts for credentials)
-python examples/9_monitoring_dashboard.py
+python examples/6a_monitoring_buyer.py
 
 # With arguments
-python examples/9_monitoring_dashboard.py --api-key pk_live_... --wallet 0xABC...
+python examples/6a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
 
 # Export reports
-python examples/9_monitoring_dashboard.py --export-csv --export-json
-
-# Disable alerts
-python examples/9_monitoring_dashboard.py --no-alerts
+python examples/6a_monitoring_buyer.py --export-csv --export-json
 ```
-
-**Interactive Chain/Token Selection:**
-On first run, you'll be prompted to select:
-1. **Chain**: Base (recommended), Ethereum, Polygon, or Arbitrum
-2. **Token**: USDC (recommended), USDT, or DAI
-
-Your choice is saved to `~/.agentgatepay_config.json` and reused in future runs.
 
 **Output:**
 ```
-AGENTGATEPAY MONITORING DASHBOARD
+BUYER MONITORING DASHBOARD (Outgoing Payments)
 ==============================================================
 Generated: 2025-11-28T12:00:00
-Chain: BASE (ID: 8453)
-Token: USDC (6 decimals)
-Wallet: 0x9752717...A3b844Bc
+Buyer Wallet: 0x9752717...A3b844Bc
 
 SPENDING SUMMARY
 Total Spent: $47.50 USD
-Payment Count: 12
+Payment Count: 12 (outgoing payments)
 Average Payment: $3.96 USD
 Last 24h: 5 payments ($18.75 USD)
 Spending Trend: increasing
@@ -617,39 +622,86 @@ Remaining: $52.50 USD
 Utilization: 47.5%
 Active Mandates: 2
 
-ALERTS (3)
-Critical: 0 | High: 1 | Medium: 2 | Low: 0
-
+BUYER ALERTS (3)
 1. [HIGH] BUDGET WARNING: Only $52.50 remaining (47.5% used)
    Action: Issue new mandate or reduce spending
 
-2. [MEDIUM] High Spending: $18.75 spent in 24h (10x average)
-   Action: Verify spending is intentional
+OUTGOING PAYMENTS (Last 10)
+(Payments YOU sent to merchants)
+1. YOU PAID $5.00 → Merchant 0x742d35Cc... | confirmed | TX 0xabc123...
 
-3. [MEDIUM] Budget Notice: $52.50 remaining (47.5% used)
-   Action: Monitor spending
+ACTIVE MANDATES (2)
+(Budget allocations for your payments)
+1. mandate_abc123... | Budget: $100.00 | Remaining: $52.50 | active
+```
 
-RECENT PAYMENTS (Last 10)
-1. $5.00 to 0x742d35Cc... | confirmed | 0xabc123def456...
-2. $3.50 to 0x742d35Cc... | confirmed | 0xdef456abc123...
+---
 
-EXPLORE YOUR DATA (CURL COMMANDS)
-# Last 24 hours of activity
-curl 'https://api.agentgatepay.com/audit/logs?client_id=0x...&hours=24' \
-  -H 'x-api-key: pk_live_...'
+#### Example 6b: Seller Monitoring Dashboard
 
-EXPORT OPTIONS
-Run with --export-csv or --export-json to export reports
+**File:** `examples/6b_monitoring_seller.py`
+
+Monitor your REVENUE as a seller (incoming payments):
+
+**Seller-Specific Features:**
+- **Revenue analytics**: Total revenue, payment count, average payment, monthly trends
+- **Webhook tracking**: Webhook delivery status and success rates
+- **Top buyers**: Identify your best customers
+- **Incoming payments**: Track what buyers paid you
+- **Payment success rate**: Monitor payment failures and issues
+
+**Usage:**
+```bash
+# Standalone mode (prompts for credentials)
+python examples/6b_monitoring_seller.py
+
+# With arguments
+python examples/6b_monitoring_seller.py --api-key pk_live_... --wallet 0xDEF...
+```
+
+**Output:**
+```
+SELLER MONITORING DASHBOARD (Incoming Payments)
+==============================================================
+Generated: 2025-11-28T12:00:00
+Seller Wallet: 0x742d35Cc...A1B2C3D4
+
+REVENUE SUMMARY
+Total Revenue: $247.50 USD
+Payment Count: 23 (incoming payments)
+Average Payment: $10.76 USD
+This Month: $89.25 USD
+Last 24h: 8 payments ($42.30 USD)
+
+WEBHOOK STATUS
+Total Webhooks: 2
+Active Webhooks: 2
+
+  1. https://seller.com/webhook... | ✅ Active
+  2. https://backup.com/webhook... | ✅ Active
+
+PAYMENT METRICS
+Success Rate: 95.7%
+Failed Payments: 1
+Total Events (24h): 45
+
+INCOMING PAYMENTS (Last 10)
+(Payments buyers sent to YOU)
+1. YOU RECEIVED $15.00 ← Buyer 0x9752717... | confirmed | TX 0xdef456...
+
+TOP BUYERS (5)
+(Buyers who paid you the most)
+1. 0x9752717... | $87.50 | 8 payments
+2. 0xABC1234... | $65.00 | 6 payments
 ```
 
 **Why This Matters:**
-- Equivalent to n8n monitoring workflow but as standalone Python tool
+- **Buyer Dashboard**: Track your spending and budget utilization
+- **Seller Dashboard**: Track your revenue and webhook delivery
+- Equivalent to n8n buyer/seller monitoring workflows
 - No n8n required - just Python + pip install
-- Can be run anytime to check payment status
-- Useful for debugging, auditing, and budget tracking
-- CSV/JSON exports for integration with other tools
-
-**See:** [CHAIN_TOKEN_GUIDE.md](CHAIN_TOKEN_GUIDE.md) for multi-chain configuration details
+- Can be run anytime to check payment/revenue status
+- CSV/JSON exports for accounting and analysis
 
 ---
 
@@ -816,7 +868,7 @@ PAYMENT_CHAIN=polygon python examples/1_api_basic_payment.py
 
 ## Next Steps
 
-1. **Try all 7 examples** - Understand both API and MCP approaches
+1. **Try all 8 examples** - Understand both API and MCP approaches, plus monitoring
 2. **Modify examples** - Adapt to your use case
 3. **Read comparison docs** - Choose API vs MCP for your stack
 4. **Build your agent** - Create custom payment workflows
