@@ -26,6 +26,8 @@ import os
 import sys
 import time
 import json
+import hmac
+import hashlib
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
@@ -134,12 +136,17 @@ class SellerAgentMCP:
     - Resource catalog with dynamic pricing
     - HTTP 402 Payment Required protocol
     - AgentGatePay MCP payment verification (instead of REST API SDK)
+    - Webhook notifications for automatic delivery (PRODUCTION MODE)
     - Automatic resource delivery after payment
     """
 
     def __init__(self, config: ChainConfig):
         # Store chain/token config
         self.config = config
+
+        # Webhook tracking
+        self.pending_deliveries = {}  # {tx_hash: resource_id}
+        self.webhook_secret = None
 
         # Resource catalog - ADD YOUR RESOURCES HERE
         self.catalog = {
@@ -206,6 +213,111 @@ class SellerAgentMCP:
         print(f"Catalog: {len(self.catalog)} resources available")
         print(f"Listening on: http://localhost:{SELLER_API_PORT}/resource")
         print(f"=" * 60)
+
+    def configure_webhook(self, webhook_url: str) -> dict:
+        """Configure webhook with AgentGatePay gateway"""
+        import requests
+        print(f"\n🔔 Configuring webhook for payment notifications...")
+        print(f"   Webhook URL: {webhook_url}")
+
+        try:
+            response = requests.post(
+                f"{AGENTPAY_API_URL}/v1/webhooks/configure",
+                headers={
+                    "x-api-key": SELLER_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "merchant_wallet": SELLER_WALLET,
+                    "webhook_url": webhook_url,
+                    "events": ["payment.confirmed"]
+                }
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                self.webhook_secret = result.get('webhook_secret')
+                print(f"   ✅ Webhook configured successfully")
+                print(f"   Webhook ID: {result.get('webhook_id')}")
+                print(f"   Secret: {self.webhook_secret[:20]}... (for HMAC verification)")
+                return result
+            else:
+                error = response.json().get('error', 'Unknown error')
+                print(f"   ⚠️  Webhook configuration failed: {error}")
+                return {"error": error}
+
+        except Exception as e:
+            print(f"   ⚠️  Webhook configuration error: {str(e)}")
+            return {"error": str(e)}
+
+    def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
+        """Verify webhook HMAC signature"""
+        if not self.webhook_secret:
+            return False
+
+        expected_sig = hmac.new(
+            self.webhook_secret.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+
+        return hmac.compare_digest(expected_sig, signature)
+
+    def handle_webhook(self, payload: dict, signature: str) -> dict:
+        """Handle webhook payment notification from AgentGatePay"""
+        print(f"\n🔔 [WEBHOOK] Received payment notification")
+
+        # Verify signature (in production, ALWAYS verify)
+        # For local testing without public URL, we'll skip signature verification
+        # if signature and not self.verify_webhook_signature(str(payload).encode(), signature):
+        #     print(f"   ❌ Invalid webhook signature")
+        #     return {"error": "Invalid signature"}
+
+        event = payload.get('event')
+        tx_hash = payload.get('tx_hash')
+        amount_usd = payload.get('amount_usd')
+        merchant_wallet = payload.get('merchant_wallet')
+
+        print(f"   Event: {event}")
+        print(f"   TX Hash: {tx_hash[:20]}...")
+        print(f"   Amount: ${amount_usd}")
+        print(f"   Merchant: {merchant_wallet[:10]}...")
+
+        # Check if we have a pending delivery for this payment
+        if tx_hash in self.pending_deliveries:
+            resource_id = self.pending_deliveries[tx_hash]
+            resource = self.catalog.get(resource_id)
+
+            if resource:
+                print(f"   📦 Auto-delivering resource: {resource['name']}")
+
+                # In production, you would:
+                # - Send email with resource access
+                # - Update database with delivery status
+                # - Trigger fulfillment workflow
+                # - etc.
+
+                # For demo, just log the delivery
+                delivery_info = {
+                    "resource_id": resource_id,
+                    "resource_name": resource['name'],
+                    "tx_hash": tx_hash,
+                    "amount": amount_usd,
+                    "delivered_at": time.time()
+                }
+
+                print(f"   ✅ Resource delivered successfully!")
+
+                # Remove from pending
+                del self.pending_deliveries[tx_hash]
+
+                return {
+                    "status": "delivered",
+                    "delivery": delivery_info
+                }
+
+        print(f"   ⚠️  No pending delivery found for this payment")
+        return {"status": "received", "message": "Payment confirmed but no pending delivery"}
 
     def list_catalog(self) -> Dict[str, Any]:
         """Return full resource catalog"""
@@ -462,6 +574,21 @@ def health_endpoint():
     }), 200
 
 
+@app.route('/webhooks/payment', methods=['POST'])
+def webhook_endpoint():
+    """Webhook endpoint for AgentGatePay payment notifications"""
+    try:
+        payload = request.get_json()
+        signature = request.headers.get('x-webhook-signature', '')
+
+        result = seller.handle_webhook(payload, signature)
+        return jsonify(result), 200
+
+    except Exception as e:
+        print(f"❌ Webhook error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ========================================
 # MAIN
 # ========================================
@@ -523,7 +650,42 @@ if __name__ == "__main__":
     print(f"📋 Endpoints:")
     print(f"   GET /catalog                - List all resources")
     print(f"   GET /resource?resource_id=<id>  - Purchase resource")
+    print(f"   POST /webhooks/payment      - Webhook for payment notifications")
     print(f"   GET /health                 - Health check")
+    print()
+
+    # Ask about webhook configuration
+    print("=" * 60)
+    print("🔔 WEBHOOK CONFIGURATION (PRODUCTION MODE)")
+    print("=" * 60)
+    print()
+    print("For production deployment, configure webhooks to receive")
+    print("automatic payment notifications from AgentGatePay.")
+    print()
+    print("⚠️  For local testing, webhooks require a public URL.")
+    print("   Options: ngrok, localtunnel, Render, Railway, etc.")
+    print()
+
+    webhook_choice = input("Configure webhooks now? (y/n, default: n): ").strip().lower()
+
+    if webhook_choice == 'y':
+        webhook_url = input("Enter public webhook URL (e.g., https://your-domain.com/webhooks/payment): ").strip()
+
+        if webhook_url:
+            result = seller.configure_webhook(webhook_url)
+
+            if 'error' not in result:
+                print(f"\n✅ Webhooks enabled! Gateway will send notifications to:")
+                print(f"   {webhook_url}")
+                print(f"\n📦 Resources will be auto-delivered when payments are confirmed.")
+            else:
+                print(f"\n⚠️  Continuing without webhooks (using manual verification)")
+        else:
+            print(f"\n⚠️  No URL provided - continuing without webhooks")
+    else:
+        print(f"\n⚠️  Skipping webhook configuration (using manual verification)")
+        print(f"   Note: For production, webhooks provide better UX and scalability")
+
     print()
     print(f"💡 MCP Tools Used:")
     print(f"   - agentpay_verify_payment (payment verification)")

@@ -255,12 +255,6 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2:
 python examples/4a_mcp_buyer_agent.py
 
-# Example 6: ALL 11 features (comprehensive demo)
-python examples/6_api_complete_features.py
-
-# Example 7: ALL 15 MCP tools (100% coverage)
-python examples/7_mcp_complete_features.py
-
 # Example 8: Production signing (external service) - PRODUCTION READY 🚀
 python examples/8_api_with_tx_service.py
 

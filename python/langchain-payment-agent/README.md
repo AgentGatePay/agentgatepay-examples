@@ -8,14 +8,14 @@
 
 ## Overview
 
-This repository contains **9 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **7 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
-- **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP)
-- **Example 6:** REST API complete (ALL 11 AgentGatePay features with optimizations)
-- **Example 7:** MCP complete (ALL 15 MCP tools - 100% coverage)
+- **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP, with webhook support)
 - **Example 8:** External TX service (production-ready signing)
 - **Example 9:** Standalone Monitoring Dashboard (analytics & audit logs)
+
+**Note:** Examples 1-4 demonstrate all core payment features. Examples 8-9 add production enhancements (external signing, monitoring).
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -219,12 +219,6 @@ python examples/4b_mcp_seller_agent.py
 
 # Terminal 2: Then run buyer
 python examples/4a_mcp_buyer_agent.py
-
-# Example 6: Complete features demo (REST API) - ALL 11 FEATURES + OPTIMIZATIONS
-python examples/6_api_complete_features.py
-
-# Example 7: Complete features demo (MCP tools) - ALL 15 MCP TOOLS
-python examples/7_mcp_complete_features.py
 
 # Example 8: Production TX signing (external service) - PRODUCTION READY 🚀
 python examples/8_api_with_tx_service.py
@@ -484,101 +478,7 @@ curl 'https://api.agentgatepay.com/audit/logs?...' | python3 -m json.tool
 - Adaptive retry logic for payment verification
 - Comprehensive error handling
 - Audit log commands at end
-
----
-
-### Example 6: Complete Features Demo (REST API)
-
-**File:** `examples/6_api_complete_features.py`
-
-Comprehensive demonstration of all 11 AgentGatePay features matching n8n workflow capabilities with production optimizations.
-
-**Features Demonstrated:**
-1. User Authentication & Signup
-2. Wallet Management
-3. API Key Management (create, list, revoke)
-4. Mandate Management (issue, verify, budget tracking)
-5. Payment Execution (2-TX model with nonce optimization)
-6. Payment History Retrieval
-7. Merchant Revenue Analytics
-8. Comprehensive Audit Logging
-9. Webhook Configuration & Testing
-10. System Health Monitoring
-11. Monitoring Dashboard (analytics with smart alerts)
-
-**Key Capabilities:**
-- **Multi-chain support**: Interactive chain selection (Base/Ethereum/Polygon/Arbitrum)
-- **Multi-token support**: USDC, USDT, or DAI selection
-- **Nonce optimization**: Single nonce fetch for parallel TX submission
-- **Monitoring dashboard**: Real-time analytics with alert system
-
-**Why This Example Matters:**
-- Shows complete platform capabilities
-- Matches n8n buyer + seller + monitoring workflows combined
-- Production-ready feature coverage with optimizations
-- Demonstrates full agent economy ecosystem
-
-**Output:**
-```
-Features Demonstrated: 11/11
-   User authentication & signup
-   Wallet management
-   API key management
-   Mandates (AP2)
-   Payments (2-TX model with nonce optimization)
-   Payment history
-   Revenue analytics
-   Audit logging
-   Webhooks
-   System health
-   Monitoring dashboard (analytics + alerts)
-ALL 11 AGENTGATEPAY FEATURES DEMONSTRATED
-```
-
----
-
-### Example 7: Complete Features Demo (MCP Tools) ⭐ **ALL 15 MCP TOOLS**
-
-**File:** `examples/7_mcp_complete_features.py`
-
-**Comprehensive demonstration of ALL 15 AgentGatePay MCP tools** - 100% coverage.
-
-**MCP Tools Demonstrated:**
-1. ✅ `agentpay_signup` - User signup
-2. ✅ `agentpay_get_user_info` - Get user info
-3. ✅ `agentpay_add_wallet` - Add wallet
-4. ✅ `agentpay_create_api_key` - Create API key
-5. ✅ `agentpay_list_api_keys` - List API keys
-6. ✅ `agentpay_revoke_api_key` - Revoke API key
-7. ✅ `agentpay_issue_mandate` - Issue mandate
-8. ✅ `agentpay_verify_mandate` - Verify mandate
-9. ✅ `agentpay_create_payment` - Create payment
-10. ✅ `agentpay_submit_payment` - Submit payment
-11. ✅ `agentpay_verify_payment` - Verify payment
-12. ✅ `agentpay_get_payment_history` - Payment history
-13. ✅ `agentpay_get_analytics` - Analytics
-14. ✅ `agentpay_list_audit_logs` - Audit logs
-15. ✅ `agentpay_get_system_health` - System health
-
-**Why This Example Matters:**
-- 100% MCP tool coverage (15/15)
-- Proves MCP = REST API feature parity
-- Shows standardized JSON-RPC 2.0 protocol
-- Matches complete n8n workflow feature set
-- Future-proof integration approach
-
-**Output:**
-```
-📊 MCP TOOLS USED: 15/15
-   1. agentpay_signup
-   2. agentpay_get_user_info
-   ... (all 15 tools listed)
-   15. agentpay_get_system_health
-
-🎉 ALL 15 MCP TOOLS DEMONSTRATED!
-   100% feature parity with REST API
-   Matches n8n workflow capabilities
-```
+- **Production webhooks** for automatic resource delivery (optional)
 
 ---
 
@@ -916,7 +816,7 @@ PAYMENT_CHAIN=polygon python examples/1_api_basic_payment.py
 
 ## Next Steps
 
-1. **Try all 6 examples** - Understand both API and MCP approaches
+1. **Try all 7 examples** - Understand both API and MCP approaches
 2. **Modify examples** - Adapt to your use case
 3. **Read comparison docs** - Choose API vs MCP for your stack
 4. **Build your agent** - Create custom payment workflows
