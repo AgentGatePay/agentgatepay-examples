@@ -1099,6 +1099,29 @@ All other tools require valid API key.
 
 ## Error Handling
 
+### MCP Tool Response Format
+
+⚠️ **CRITICAL:** All MCP tools return `{"success": true/false, ...}`. Always check `success` before proceeding.
+
+```python
+result = call_mcp_tool("agentpay_submit_payment", {...})
+
+# ✅ ALWAYS CHECK SUCCESS
+if not result.get('success', False):
+    error = result.get('error', 'Unknown error')
+    print(f"❌ Payment failed: {error}")
+    return  # Stop workflow
+
+print(f"✅ Payment succeeded")
+# Continue with successful result
+```
+
+**Common Gateway Errors:**
+- `"Nonce already used (replay attack blocked)"` - Transaction already submitted
+- `"Invalid mandate token"` - Mandate expired or not found
+- `"Insufficient budget"` - Not enough budget remaining
+- `"Payment verification failed"` - Transaction not found on blockchain
+
 ### JSON-RPC Error Format
 
 ```json
