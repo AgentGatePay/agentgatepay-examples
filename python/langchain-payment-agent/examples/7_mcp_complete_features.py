@@ -592,11 +592,20 @@ class MCPCompleteDemo:
 
             self.track_tool("agentpay_submit_payment")
 
-            print(f"✅ Payment submitted via MCP!")
-            print(f"   Charge ID: {result.get('chargeId', 'N/A')}")
-            print(f"   Status: {result.get('status', 'N/A')}")
+            # ✅ FIX: Check if payment was actually successful
+            if not result.get('success', False):
+                error = result.get('error', 'Unknown error')
+                details = result.get('details')
+                print(f"❌ Payment submission failed: {error}")
+                if details:
+                    print(f"   Details: {details}")
+                return f"Failed: {error}"
 
-            return f"Payment submitted via MCP. Charge: {result.get('chargeId')}"
+            print(f"✅ Payment submitted via MCP!")
+            print(f"   Charge ID: {result.get('charge_id', 'N/A')}")
+            print(f"   Status: {result.get('status', 'confirmed')}")
+
+            return f"Payment submitted via MCP. Charge: {result.get('charge_id')}"
 
         except Exception as e:
             error_msg = f"MCP submit payment failed: {str(e)}"

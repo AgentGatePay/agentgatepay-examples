@@ -362,8 +362,17 @@ def mcp_submit_and_verify_payment() -> str:
             "token": config.token
         })
 
+        # ✅ FIX: Check if payment was actually successful
+        if not result.get('success', False):
+            error = result.get('error', 'Unknown error')
+            details = result.get('details')
+            print(f"❌ Payment submission failed: {error}")
+            if details:
+                print(f"   Details: {details}")
+            return f"Failed: {error}"
+
         print(f"✅ Payment submitted via MCP")
-        print(f"   Status: {result.get('status', 'N/A')}")
+        print(f"   Status: {result.get('status', 'confirmed')}")
 
         # Verify mandate to get updated budget
         print(f"   🔍 Fetching updated budget...")

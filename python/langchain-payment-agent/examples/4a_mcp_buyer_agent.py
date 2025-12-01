@@ -429,13 +429,22 @@ class BuyerAgentMCP:
                 "token": self.config.token
             })
 
+            # ✅ FIX: Check if payment was actually successful
+            if not result.get('success', False):
+                error = result.get('error', 'Unknown error')
+                details = result.get('details')
+                print(f"❌ Payment submission failed: {error}")
+                if details:
+                    print(f"   Details: {details}")
+                return f"Failed: {error}"
+
             print(f"✅ Payment submitted via MCP")
-            print(f"   Charge ID: {result.get('chargeId', 'N/A')}")
-            print(f"   Status: {result.get('status', 'N/A')}")
+            print(f"   Charge ID: {result.get('charge_id', 'N/A')}")
+            print(f"   Status: {result.get('status', 'confirmed')}")
 
-            self.last_payment['charge_id'] = result.get('chargeId')
+            self.last_payment['charge_id'] = result.get('charge_id')
 
-            return f"Payment proof submitted via MCP. Charge ID: {result.get('chargeId')}. IMPORTANT: Now call claim_resource to get the resource."
+            return f"Payment proof submitted via MCP. Charge ID: {result.get('charge_id')}. IMPORTANT: Now call claim_resource to get the resource."
 
         except Exception as e:
             error_msg = f"MCP payment submission failed: {str(e)}"
