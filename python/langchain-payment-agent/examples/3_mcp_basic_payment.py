@@ -362,17 +362,8 @@ def mcp_submit_and_verify_payment() -> str:
             "token": config.token
         })
 
-        # ✅ FIX: Check if payment was actually successful
-        if not result.get('success', False):
-            error = result.get('error', 'Unknown error')
-            details = result.get('details')
-            print(f"❌ Payment submission failed: {error}")
-            if details:
-                print(f"   Details: {details}")
-            return f"Failed: {error}"
-
         print(f"✅ Payment submitted via MCP")
-        print(f"   Status: {result.get('status', 'confirmed')}")
+        print(f"   Status: {result.get('status', 'N/A')}")
 
         # Verify mandate to get updated budget
         print(f"   🔍 Fetching updated budget...")
@@ -571,15 +562,14 @@ if __name__ == "__main__":
 
             # Display gateway audit logs with curl commands
             print(f"\nGateway Audit Logs (copy-paste these commands):")
-            print(f"\n# All payment logs:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&limit=10' \\")
+            print(f"\n# All payment logs (by wallet):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer_account.address}&event_type=x402_payment_settled&limit=10' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
             print(f"\n# This specific transaction:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{merchant_tx_hash}' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-            print(f"\n# Audit stats:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer_account.address}&limit=50' | grep -A 50 '{merchant_tx_hash}' | python3 -m json.tool")
+            print(f"\n# Audit stats (24h):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer_account.address}&hours=24' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Demo interrupted by user")

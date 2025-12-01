@@ -704,15 +704,14 @@ Think step by step:
         # Display gateway audit logs with curl commands
         if buyer.last_payment and 'merchant_tx' in buyer.last_payment:
             print(f"\n📋 Gateway Audit Logs (copy-paste these commands):")
-            print(f"\n# All payment logs:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&limit=10' \\")
+            print(f"\n# All payment logs (by wallet):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&event_type=x402_payment_settled&limit=10' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
             print(f"\n# This specific transaction:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{buyer.last_payment['merchant_tx']}' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-            print(f"\n# Audit stats:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/stats' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&limit=50' | grep -A 50 '{buyer.last_payment['merchant_tx']}' | python3 -m json.tool")
+            print(f"\n# Audit stats (24h):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&hours=24' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Buyer agent interrupted by user")
