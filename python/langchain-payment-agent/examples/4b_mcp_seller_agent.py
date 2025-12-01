@@ -104,8 +104,7 @@ def call_mcp_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         "x-api-key": SELLER_API_KEY
     }
 
-    mcp_endpoint = f"{MCP_API_URL}/mcp/tools/call"
-    response = requests.post(mcp_endpoint, json=payload, headers=headers, timeout=30)
+    response = requests.post(MCP_API_URL, json=payload, headers=headers, timeout=30)
 
     if response.status_code != 200:
         raise Exception(f"MCP call failed: HTTP {response.status_code} - {response.text}")
@@ -496,10 +495,9 @@ if __name__ == "__main__":
     seller = SellerAgentMCP(config)
 
     # Ask user to set resource prices
-    print(f"\n💵 Set resource prices (press Enter for defaults):")
+    print(f"\n💵 Set resource prices (press Enter for default $0.01):")
     for res_id, res in seller.catalog.items():
-        default_price = res['price_usd']
-        price_input = input(f"   {res['name']} (default: ${default_price}): $").strip()
+        price_input = input(f"   {res['name']}: $").strip()
         if price_input:
             try:
                 new_price = float(price_input)
@@ -507,11 +505,15 @@ if __name__ == "__main__":
                     seller.catalog[res_id]['price_usd'] = new_price
                     print(f"      ✅ Set to ${new_price}")
                 else:
-                    print(f"      ⚠️  Invalid price, using default ${default_price}")
+                    print(f"      ⚠️  Invalid price, using default $0.01")
+                    seller.catalog[res_id]['price_usd'] = 0.01
             except ValueError:
-                print(f"      ⚠️  Invalid input, using default ${default_price}")
+                print(f"      ⚠️  Invalid input, using default $0.01")
+                seller.catalog[res_id]['price_usd'] = 0.01
         else:
-            print(f"      ✅ Using default: ${default_price}")
+            # User pressed Enter without typing - default to $0.01
+            seller.catalog[res_id]['price_usd'] = 0.01
+            print(f"      ✅ Set to default: $0.01")
 
     print(f"\n✅ Final prices:")
     for res_id, res in seller.catalog.items():
