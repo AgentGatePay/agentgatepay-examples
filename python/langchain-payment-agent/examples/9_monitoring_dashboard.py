@@ -255,6 +255,13 @@ if __name__ == "__main__":
     print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={client_id}&event_type=x402_payment_settled' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
+    # Show transaction-specific endpoint if we have recent payments
+    if dashboard.payments and dashboard.payments[0].get('tx_hash'):
+        latest_tx = dashboard.payments[0]['tx_hash']
+        print(f"# View specific transaction logs (fastest!)")
+        print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{latest_tx}' \\")
+        print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
     print(f"# User analytics")
     print(f"curl '{AGENTPAY_API_URL}/v1/analytics/me' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
