@@ -413,51 +413,67 @@ if __name__ == "__main__":
             # Extract merchant and commission info
             merchant_tx = details.get('merchant_tx_hash')
             commission_tx = details.get('commission_tx_hash')
-            amount_usd = details.get('amount_usd', 0)
-            commission_usd = details.get('commission_usd', 0)
-            timestamp = log.get('timestamp', 'N/A')
-            payer = details.get('payer', 'N/A')
+
+            # Get amounts - merchant gets amount_usd or merchant_amount_usd
+            merchant_amount = details.get('merchant_amount_usd') or details.get('amount_usd', 0)
+            commission_amount = details.get('commission_amount_usd') or details.get('commission_usd', 0)
+
+            # Convert Unix timestamp to human-readable (details.timestamp is in seconds)
+            timestamp_unix = details.get('timestamp', log.get('timestamp', 0))
+            try:
+                if isinstance(timestamp_unix, str):
+                    timestamp_readable = timestamp_unix
+                else:
+                    from datetime import datetime
+                    timestamp_readable = datetime.fromtimestamp(int(timestamp_unix)).isoformat()
+            except:
+                timestamp_readable = str(timestamp_unix)
+
+            # Extract payer address
+            payer = details.get('payer_address') or details.get('sender_address') or details.get('payer', 'N/A')
 
             if merchant_tx:
                 merchant_payments.append({
                     'tx_hash': merchant_tx,
-                    'amount_usd': amount_usd,
-                    'timestamp': timestamp,
+                    'amount_usd': float(merchant_amount),
+                    'timestamp': timestamp_readable,
                     'payer': payer
                 })
 
             if commission_tx:
                 commission_payments.append({
                     'tx_hash': commission_tx,
-                    'amount_usd': commission_usd,
-                    'timestamp': timestamp
+                    'amount_usd': float(commission_amount),
+                    'timestamp': timestamp_readable,
+                    'payer': payer
                 })
 
         # Display merchant payments received
         if merchant_payments:
             print("━" * 70)
-            print(f"💰 MERCHANT PAYMENTS RECEIVED (Last {min(20, len(merchant_payments))})")
+            print(f"💰 PAYMENTS RECEIVED FROM BUYERS (Last {min(20, len(merchant_payments))})")
             print("━" * 70)
             print("(Full payment amounts you received from buyers)\n")
             for i, payment in enumerate(merchant_payments[:20], 1):
                 tx_hash = payment['tx_hash'][:20]
-                amount = float(payment.get('amount_usd', 0))
-                payer = payment.get('payer', 'N/A')[:12]
+                amount = payment.get('amount_usd', 0)
+                payer = str(payment.get('payer', 'N/A'))[:12]
                 timestamp = payment.get('timestamp', 'N/A')
-                print(f"{i}. ${amount:.2f} ← {payer}... | {timestamp} | TX {tx_hash}...")
+                print(f"{i}. YOU RECEIVED ${amount:.4f} ← {payer}... | {timestamp} | TX {tx_hash}...")
             print()
 
         # Display commission payments deducted
         if commission_payments:
             print("━" * 70)
-            print(f"💸 COMMISSION PAYMENTS DEDUCTED (Last {min(20, len(commission_payments))})")
+            print(f"💸 COMMISSION DEDUCTED BY GATEWAY (Last {min(20, len(commission_payments))})")
             print("━" * 70)
             print("(0.5% gateway commission on each transaction)\n")
             for i, payment in enumerate(commission_payments[:20], 1):
                 tx_hash = payment['tx_hash'][:20]
-                commission = float(payment.get('amount_usd', 0))
+                commission = payment.get('amount_usd', 0)
+                payer = str(payment.get('payer', 'N/A'))[:12]
                 timestamp = payment.get('timestamp', 'N/A')
-                print(f"{i}. ${commission:.4f} → Gateway | {timestamp} | TX {tx_hash}...")
+                print(f"{i}. ${commission:.4f} → Gateway (Buyer: {payer}...) | {timestamp} | TX {tx_hash}...")
             print()
 
     # API Links - SELLER FOCUS
