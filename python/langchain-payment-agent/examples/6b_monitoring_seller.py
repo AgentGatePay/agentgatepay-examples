@@ -188,8 +188,8 @@ def generate_seller_alerts(stats, payments, webhooks):
             'action': 'Check webhook configuration and test delivery'
         })
 
-    # No payments in 24h
-    if stats['payments_24h'] == 0 and stats['payment_count'] > 0:
+    # No payments in 24h - check both payments list AND audit logs
+    if stats['payments_24h'] == 0 and stats['total_events'] == 0 and stats['payment_count'] > 0:
         alerts.append({
             'severity': 'medium',
             'message': '⏰ No payments received in last 24 hours',
@@ -396,6 +396,70 @@ if __name__ == "__main__":
             print(f"{i}. {buyer_id}... | ${total_spent:.2f} | {count} payments")
         print()
 
+    # Audit Logs - SELLER FOCUS (merchant + commission breakdown)
+    if logs:
+        # Separate merchant and commission payments from audit logs
+        merchant_payments = []
+        commission_payments = []
+
+        for log in logs:
+            details = log.get('details', {})
+            if isinstance(details, str):
+                try:
+                    details = json.loads(details)
+                except:
+                    continue
+
+            # Extract merchant and commission info
+            merchant_tx = details.get('merchant_tx_hash')
+            commission_tx = details.get('commission_tx_hash')
+            amount_usd = details.get('amount_usd', 0)
+            commission_usd = details.get('commission_usd', 0)
+            timestamp = log.get('timestamp', 'N/A')
+            payer = details.get('payer', 'N/A')
+
+            if merchant_tx:
+                merchant_payments.append({
+                    'tx_hash': merchant_tx,
+                    'amount_usd': amount_usd,
+                    'timestamp': timestamp,
+                    'payer': payer
+                })
+
+            if commission_tx:
+                commission_payments.append({
+                    'tx_hash': commission_tx,
+                    'amount_usd': commission_usd,
+                    'timestamp': timestamp
+                })
+
+        # Display merchant payments received
+        if merchant_payments:
+            print("━" * 70)
+            print(f"💰 MERCHANT PAYMENTS RECEIVED (Last {min(20, len(merchant_payments))})")
+            print("━" * 70)
+            print("(Full payment amounts you received from buyers)\n")
+            for i, payment in enumerate(merchant_payments[:20], 1):
+                tx_hash = payment['tx_hash'][:20]
+                amount = float(payment.get('amount_usd', 0))
+                payer = payment.get('payer', 'N/A')[:12]
+                timestamp = payment.get('timestamp', 'N/A')
+                print(f"{i}. ${amount:.2f} ← {payer}... | {timestamp} | TX {tx_hash}...")
+            print()
+
+        # Display commission payments deducted
+        if commission_payments:
+            print("━" * 70)
+            print(f"💸 COMMISSION PAYMENTS DEDUCTED (Last {min(20, len(commission_payments))})")
+            print("━" * 70)
+            print("(0.5% gateway commission on each transaction)\n")
+            for i, payment in enumerate(commission_payments[:20], 1):
+                tx_hash = payment['tx_hash'][:20]
+                commission = float(payment.get('amount_usd', 0))
+                timestamp = payment.get('timestamp', 'N/A')
+                print(f"{i}. ${commission:.4f} → Gateway | {timestamp} | TX {tx_hash}...")
+            print()
+
     # API Links - SELLER FOCUS
     print("━" * 70)
     print("🔗 EXPLORE YOUR SELLER DATA (CURL COMMANDS)")
@@ -421,11 +485,4 @@ if __name__ == "__main__":
     print("=" * 70)
     print("✅ SELLER MONITORING COMPLETE")
     print("=" * 70)
-    print()
-    print(f"💡 Next Steps:")
-    print(f"   - Check payment alerts and webhook delivery")
-    print(f"   - Configure webhooks for real-time notifications")
-    print(f"   - Review top buyers and payment success rate")
-    print(f"   - Use curl commands to explore detailed revenue data")
-    print(f"   - Run 6a_monitoring_buyer.py to see spending side")
     print()
