@@ -132,8 +132,10 @@ agentpay = AgentGatePay(
 )
 
 # Test connection
-health = agentpay.system.health()
-print(f"✅ Connected to AgentGatePay v{health['version']}")
+health = agentpay.health()
+if health['status'] == 'healthy':
+    print(f"✅ Connected to AgentGatePay ({health['endpoint']} endpoint)")
+    print(f"   All {len(health['components'])} components healthy")
 ```
 
 ### 3. First Payment Flow (3-Step Process)
@@ -261,7 +263,7 @@ print(f"   Budget remaining: ${updated_verification['budget_remaining']}")
 
 ## SDK Modules
 
-The SDK is organized into 7 modules, each handling a specific domain.
+The SDK is organized into 6 modules, each handling a specific domain. The `health()` method is available directly on the main client object.
 
 ### Module 1: Authentication (`auth`)
 
@@ -669,28 +671,63 @@ def by_transaction(tx_hash: str) -> Dict[str, Any]
 
 ---
 
-### Module 7: System (`system`)
+### Health Check
 
-**System health and status checks.**
+**System health monitoring with 7-component validation.**
+
+The SDK provides a `health()` method (on the main client, not a module) that validates all gateway components.
 
 ```python
 # Check system health
-health = agentpay.system.health()
+health = agentpay.health()
 
-if health['status'] == 'ok':
-    print(f"✅ System healthy")
-    print(f"Version: {health['version']}")
-    print(f"Uptime: {health['uptime_hours']} hours")
-    print(f"Chains: {', '.join(health['chains'])}")
-    print(f"Tokens: {', '.join(health['tokens'])}")
+if health['status'] == 'healthy':
+    print(f"✅ System healthy ({health['endpoint']} endpoint)")
+    print(f"   Timestamp: {health['timestamp']}")
+    print(f"\n   Components:")
+    for component, status in health['components'].items():
+        icon = "✅" if status == "ok" else "❌"
+        print(f"   {icon} {component}: {status}")
 else:
-    print(f"⚠️ System degraded: {health['message']}")
+    print(f"⚠️ System degraded")
+    # Check which components failed
+    failed = [c for c, s in health['components'].items() if s != 'ok']
+    print(f"   Failed components: {', '.join(failed)}")
 ```
+
+**Response Format:**
+```json
+{
+  "status": "healthy",
+  "endpoint": "api",
+  "timestamp": 1764703713,
+  "components": {
+    "gateway": "ok",
+    "payments": "ok",
+    "aif": "ok",
+    "mandates": "ok",
+    "mcp": "ok",
+    "api": "ok",
+    "audit_logs": "ok"
+  }
+}
+```
+
+**Component Descriptions:**
+- `gateway`: Core gateway services
+- `payments`: Payment processing system
+- `aif`: Security and rate limiting
+- `mandates`: Authorization system
+- `mcp`: Tool integration layer
+- `api`: REST API availability
+- `audit_logs`: Logging and compliance
 
 **Type Signature:**
 ```python
 def health() -> Dict[str, Any]
 ```
+
+**Note:** The `health()` method is on the main `AgentGatePay` client object, NOT a separate module. There is no `system` module in the SDK.
 
 ---
 
