@@ -482,7 +482,7 @@ if __name__ == "__main__":
                 print(f"{i}. ${commission:.4f} → Gateway (Buyer: {payer}) | {timestamp} | TX {tx_hash}")
             print()
 
-    # Calculate additional metrics (from n8n workflow)
+    # Calculate additional metrics
     print("━" * 70)
     print("💡 ADDITIONAL METRICS")
     print("━" * 70)
