@@ -620,28 +620,52 @@ if __name__ == "__main__":
             print(f"❌ Error: {e}")
         print("\n" + "━" * 70 + "\n")
 
-    # 6. Commission events
+    # 6. Commission events (extracted from payment_settled events)
     print("6️⃣  COMMISSION EVENTS (Last 30 days) - Showing Last 10\n")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_commission_collected&hours=720' \\")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=720' \\")
     print(f"  -H 'x-api-key: {api_key}'\n")
+    print("💡 Note: Filtering for events with commission data embedded\n")
     print("🔄 Executing...\n")
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/audit/logs",
             headers={"x-api-key": api_key},
-            params={"event_type": "x402_commission_collected", "hours": 720},
+            params={"event_type": "x402_payment_settled", "hours": 720},
             timeout=10
         )
         if response.status_code == 200:
             data = response.json()
             all_logs = data.get('logs', [])
-            comm_logs = all_logs[:10]
-            result = {'logs': comm_logs, 'count': len(all_logs), 'showing': len(comm_logs)}
+
+            # Filter for logs with commission data
+            commission_logs = []
+            for log in all_logs:
+                details = log.get('details', {})
+                if isinstance(details, str):
+                    try:
+                        details = json.loads(details)
+                    except:
+                        continue
+
+                # Only include if has commission data
+                if details.get('commission_tx_hash'):
+                    # Create clean commission-focused log entry
+                    commission_logs.append({
+                        'id': log.get('id'),
+                        'timestamp': log.get('timestamp'),
+                        'commission_tx_hash': details.get('commission_tx_hash'),
+                        'commission_amount_usd': details.get('commission_amount_usd'),
+                        'related_buyer': details.get('payer_address') or details.get('sender_address'),
+                        'status': details.get('status', 'completed')
+                    })
+
+            comm_logs = commission_logs[:10]
+            result = {'commission_events': comm_logs, 'count': len(commission_logs), 'showing': len(comm_logs)}
             clean_data = hide_gateway_info(result)
-            print(f"✅ Response (showing last 10 of {len(all_logs)} total):")
+            print(f"✅ Response (showing last 10 of {len(commission_logs)} commission events):")
             print(json.dumps(clean_data, indent=2))
         else:
-            print(f"❌ No commission events (HTTP {response.status_code})")
+            print(f"❌ No payment events (HTTP {response.status_code})")
     except Exception as e:
         print(f"❌ Error: {e}")
     print("\n" + "━" * 70 + "\n")
