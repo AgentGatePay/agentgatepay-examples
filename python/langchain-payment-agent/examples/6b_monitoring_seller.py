@@ -402,9 +402,8 @@ if __name__ == "__main__":
             print(f"{i}. {buyer_id}... | ${total_spent:.2f} | {count} payments")
         print()
 
-    # Audit Logs - SELLER FOCUS (merchant + commission breakdown)
+    # Payment breakdown with commission
     if logs:
-        # Separate merchant and commission payments from audit logs
         merchant_payments = []
         commission_payments = []
 
@@ -533,11 +532,10 @@ if __name__ == "__main__":
     print("━" * 70)
     print()
 
-    # Helper function to hide gateway addresses
     def hide_gateway_info(data):
-        """Recursively hide gateway commission addresses from output"""
+        """Hide sensitive gateway information"""
         if isinstance(data, dict):
-            return {k: hide_gateway_info(v) if k not in ['commission_address', 'commission_tx_hash', 'commission_explorer_url']
+            return {k: hide_gateway_info(v) if k not in ['commission_address']
                     else '[HIDDEN]' for k, v in data.items()}
         elif isinstance(data, list):
             return [hide_gateway_info(item) for item in data]

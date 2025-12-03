@@ -86,18 +86,18 @@
   - Customizable resource catalog
 
   **Buyer Monitoring Dashboard**
-  - Real-time spending analytics
+  - Real-time spending analytics (track outgoing payments)
   - Mandate budget tracking (remaining balance, spent amount, utilization percentage)
-  - Transaction history with blockchain verification
+  - Transaction history (payments YOU sent to merchants)
   - Multi-wallet support
-  - Budget depletion alerts
+  - Budget depletion and spending alerts
 
   **Seller Monitoring Dashboard**
   - Revenue analytics (total, daily, weekly, monthly breakdowns)
-  - Payment tracking by payer address
+  - Payment tracking (payments YOU received from buyers)
   - Multi-chain revenue breakdown
-  - Top customers analytics
-  - Gateway commission tracking
+  - Top buyers analytics
+  - Webhook delivery status tracking
 
   [Browse n8n workflows](n8n/)
 

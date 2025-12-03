@@ -8,14 +8,14 @@
 
 ## Overview
 
-This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **7 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
 - **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP, with webhook support)
 - **Example 5:** External TX service (production-ready signing)
 - **Examples 6a/6b:** Buyer & Seller Monitoring Dashboards (analytics & audit logs)
 
-**Note:** Examples 1-4 demonstrate all core payment features. Examples 5-6 add production enhancements (external signing, monitoring).
+**Note:** Examples 1-4 demonstrate all core payment features. Examples 5-6a/6b add production enhancements (external signing, buyer/seller monitoring).
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -868,7 +868,7 @@ PAYMENT_CHAIN=polygon python examples/1_api_basic_payment.py
 
 ## Next Steps
 
-1. **Try all 8 examples** - Understand both API and MCP approaches, plus monitoring
+1. **Try all 7 examples** - Understand both API and MCP approaches, plus buyer/seller monitoring
 2. **Modify examples** - Adapt to your use case
 3. **Read comparison docs** - Choose API vs MCP for your stack
 4. **Build your agent** - Create custom payment workflows
