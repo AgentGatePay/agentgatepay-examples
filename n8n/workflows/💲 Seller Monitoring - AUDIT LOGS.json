@@ -179,6 +179,15 @@
       "parameters": {
         "method": "GET",
         "url": "={{ $('2️⃣ Load Config').first().json.config.api_url }}/v1/payments/verify/{{ $json.tx_hash }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $('2️⃣ Load Config').first().json.config.api_key }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "verify-payment-009",
