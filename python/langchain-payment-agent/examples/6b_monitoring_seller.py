@@ -377,7 +377,7 @@ if __name__ == "__main__":
             timestamp = payment.get('timestamp', payment.get('created_at', 'N/A'))
             amount = float(payment.get('amount_usd', 0))
             status = payment.get('status', 'unknown')
-            tx_hash = payment.get('tx_hash', 'N/A')[:20]
+            tx_hash = payment.get('tx_hash', 'N/A')
 
             # Try multiple field names for payer address
             payer = (payment.get('payer_address') or
@@ -385,10 +385,8 @@ if __name__ == "__main__":
                     payment.get('sender_address') or
                     payment.get('from_address') or
                     'N/A')
-            if payer != 'N/A':
-                payer = payer[:14]  # Show more chars for readability
 
-            print(f"{i}. YOU RECEIVED ${amount:.2f} ← Buyer {payer}... | {status} | TX {tx_hash}...")
+            print(f"{i}. YOU RECEIVED ${amount:.2f} ← Buyer {payer} | {status} | TX {tx_hash}")
         print()
 
     # Top Buyers - SELLER FOCUS
@@ -463,11 +461,11 @@ if __name__ == "__main__":
             print("━" * 70)
             print("(Full payment amounts you received from buyers)\n")
             for i, payment in enumerate(merchant_payments[:20], 1):
-                tx_hash = payment['tx_hash'][:20]
+                tx_hash = payment['tx_hash']
                 amount = payment.get('amount_usd', 0)
-                payer = str(payment.get('payer', 'N/A'))[:12]
+                payer = str(payment.get('payer', 'N/A'))
                 timestamp = payment.get('timestamp', 'N/A')
-                print(f"{i}. YOU RECEIVED ${amount:.4f} ← {payer}... | {timestamp} | TX {tx_hash}...")
+                print(f"{i}. YOU RECEIVED ${amount:.4f} ← {payer} | {timestamp} | TX {tx_hash}")
             print()
 
         # Display commission payments deducted
@@ -477,11 +475,11 @@ if __name__ == "__main__":
             print("━" * 70)
             print("(0.5% gateway commission on each transaction)\n")
             for i, payment in enumerate(commission_payments[:20], 1):
-                tx_hash = payment['tx_hash'][:20]
+                tx_hash = payment['tx_hash']
                 commission = payment.get('amount_usd', 0)
-                payer = str(payment.get('payer', 'N/A'))[:12]
+                payer = str(payment.get('payer', 'N/A'))
                 timestamp = payment.get('timestamp', 'N/A')
-                print(f"{i}. ${commission:.4f} → Gateway (Buyer: {payer}...) | {timestamp} | TX {tx_hash}...")
+                print(f"{i}. ${commission:.4f} → Gateway (Buyer: {payer}) | {timestamp} | TX {tx_hash}")
             print()
 
     # Calculate additional metrics (from n8n workflow)
@@ -547,10 +545,10 @@ if __name__ == "__main__":
                             details = json.loads(details)
                         except:
                             continue
-                    tx_hash = details.get('merchant_tx_hash', details.get('tx_hash', 'N/A'))[:20]
+                    tx_hash = details.get('merchant_tx_hash', details.get('tx_hash', 'N/A'))
                     amount = details.get('merchant_amount_usd', details.get('amount_usd', 0))
-                    payer = (details.get('payer_address') or details.get('sender_address', 'N/A'))[:14]
-                    print(f"    {i}. ${amount:.4f} ← {payer}... | TX {tx_hash}...")
+                    payer = details.get('payer_address') or details.get('sender_address', 'N/A')
+                    print(f"    {i}. ${amount:.4f} ← {payer} | TX {tx_hash}")
                 print()
         except Exception as e:
             print(f"  {time_label}: ⚠️  Failed to fetch ({e})\n")
@@ -596,7 +594,7 @@ if __name__ == "__main__":
                 )
                 if response.status_code == 200:
                     verify_data = response.json()
-                    print(f"  TX: {latest_tx[:20]}...")
+                    print(f"  TX: {latest_tx}")
                     print(f"  Status: {verify_data.get('verified', False) and '✅ Verified' or '⏳ Pending'}")
                     print(f"  Amount: ${verify_data.get('amount_usd', 0):.4f} USD")
                     if verify_data.get('explorer_url'):
@@ -607,28 +605,55 @@ if __name__ == "__main__":
 
     # 4. CURL Commands for manual exploration
     print("━" * 70)
-    print("📋 MANUAL CURL COMMANDS (Copy & Paste)")
+    print("📋 MANUAL CURL COMMANDS (Copy & Paste - Get ALL Data)")
     print("━" * 70)
-    print("\nUse these commands to explore your data further:\n")
+    print("\nUse these commands to get ALL your data (no limits):\n")
 
-    print(f"# Seller revenue analytics")
+    print(f"# Seller revenue analytics (all time)")
     print(f"curl '{AGENTPAY_API_URL}/v1/merchant/revenue?wallet={wallet}' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
-    print(f"# Payment list (last 50)")
-    print(f"curl '{AGENTPAY_API_URL}/v1/payments/list?wallet={wallet}&limit=50' \\")
+    print(f"# ALL payments received (unlimited)")
+    print(f"curl '{AGENTPAY_API_URL}/v1/payments/list?wallet={wallet}' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
-    print(f"# All payment events (24h)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=24&limit=100' \\")
+    print(f"# ALL payment events (last 24h)")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=24' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    print(f"# ALL payment events (last 7 days)")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=168' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    print(f"# ALL payment events (last 30 days)")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=720' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    print(f"# ALL commission events (last 30 days)")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_commission_collected&hours=720' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    # Add buyer-specific search if we have unique buyers
+    if len(unique_buyers) > 0:
+        example_buyer = list(unique_buyers)[0]
+        print(f"# Payments from specific buyer")
+        print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&client_id={example_buyer}' \\")
+        print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
     print(f"# Webhook configuration")
     print(f"curl '{AGENTPAY_API_URL}/v1/webhooks/list' \\")
     print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
-    print(f"# Verify specific payment")
+    print(f"# ALL webhook delivery events (last 30 days)")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=webhook_delivered&hours=720' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+
+    print(f"# Verify specific payment (by TX hash)")
     print(f"curl '{AGENTPAY_API_URL}/v1/payments/verify/YOUR_TX_HASH'\n")
+
+    print(f"# Payment by TX hash (from audit logs)")
+    print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/YOUR_TX_HASH' \\")
+    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
 
     print("=" * 70)
     print("✅ SELLER MONITORING COMPLETE")
