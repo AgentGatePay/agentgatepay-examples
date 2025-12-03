@@ -590,9 +590,10 @@ if __name__ == "__main__":
                     tx_hash = details.get('merchant_tx_hash', details.get('tx_hash', 'N/A'))
                     amount = details.get('merchant_amount_usd', details.get('amount_usd', 0))
                     payer = details.get('payer_address') or details.get('sender_address', 'N/A')
+                    agent_id = log.get('client_id', 'N/A')  # Agent/buyer identifier
                     ts_unix = details.get('timestamp', 0)
                     ts_readable = datetime.fromtimestamp(int(ts_unix)).isoformat() if ts_unix else 'N/A'
-                    print(f"    {i}. ${amount:.4f} ← {payer} | {ts_readable} | TX {tx_hash}")
+                    print(f"    {i}. ${amount:.4f} ← {payer} | Agent: {agent_id} | {ts_readable} | TX {tx_hash}")
                 print()
             else:
                 print(f"  ⚠️  No events found\n")
@@ -621,9 +622,11 @@ if __name__ == "__main__":
                         continue
                 tx_hash = details.get('commission_tx_hash', 'N/A')
                 amount = details.get('commission_amount_usd', 0)
+                payer = details.get('payer_address') or details.get('sender_address', 'N/A')
+                agent_id = log.get('client_id', 'N/A')
                 ts_unix = details.get('timestamp', 0)
                 ts_readable = datetime.fromtimestamp(int(ts_unix)).isoformat() if ts_unix else 'N/A'
-                print(f"    {i}. ${amount:.4f} → Gateway | {ts_readable} | TX {tx_hash}")
+                print(f"    {i}. ${amount:.4f} → Gateway | From: {payer} | Agent: {agent_id} | {ts_readable} | TX {tx_hash}")
             print()
         else:
             print(f"  ⚠️  No commission events found\n")
