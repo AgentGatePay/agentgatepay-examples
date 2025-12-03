@@ -523,16 +523,32 @@ if __name__ == "__main__":
     print(f"Commission Deducted (0.5%): ${total_commission:.4f} USD")
     print()
 
-    # CURL EXECUTION - Print command, execute it, show last 10 results
+    # MANUAL CURL COMMANDS WITH LIVE OUTPUT
     print("━" * 70)
-    print("🔍 CURL COMMAND EXECUTION (Showing Last 10 Each)")
+    print("📋 CURL COMMANDS & LIVE OUTPUT (Last 10 Results)")
     print("━" * 70)
-    print("(Each section shows: CURL command → Execution → Last 10 results)\n")
+    print("\n💡 Each section shows:")
+    print("   1. Full CURL command (copy/paste to get ALL data)")
+    print("   2. Live execution results (limited to last 10 for readability)\n")
+    print("━" * 70)
+    print()
+
+    # Helper function to hide gateway addresses
+    def hide_gateway_info(data):
+        """Recursively hide gateway commission addresses from output"""
+        if isinstance(data, dict):
+            return {k: hide_gateway_info(v) if k not in ['commission_address', 'commission_tx_hash', 'commission_explorer_url']
+                    else '[HIDDEN]' for k, v in data.items()}
+        elif isinstance(data, list):
+            return [hide_gateway_info(item) for item in data]
+        else:
+            return data
 
     # 1. Seller revenue analytics
-    print("💰 SELLER REVENUE ANALYTICS (All Time):\n")
+    print("1️⃣  SELLER REVENUE ANALYTICS (All Time)\n")
     print(f"curl '{AGENTPAY_API_URL}/v1/merchant/revenue?wallet={wallet}' \\")
     print(f"  -H 'x-api-key: {api_key}'\n")
+    print("🔄 Executing...\n")
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/v1/merchant/revenue",
@@ -542,18 +558,21 @@ if __name__ == "__main__":
         )
         if response.status_code == 200:
             rev_data = response.json()
-            print(f"  Total Revenue: ${rev_data.get('total_usd', 0):.2f} USD")
-            print(f"  Payment Count: {rev_data.get('count', 0)}")
-            print(f"  Average: ${rev_data.get('average_usd', 0):.2f} USD\n")
+            # Hide gateway info
+            clean_data = hide_gateway_info(rev_data)
+            print(f"✅ Response (JSON):")
+            print(json.dumps(clean_data, indent=2))
         else:
-            print(f"  ⚠️  Failed to fetch revenue (HTTP {response.status_code})\n")
+            print(f"❌ Failed (HTTP {response.status_code})")
     except Exception as e:
-        print(f"  ⚠️  Error: {e}\n")
+        print(f"❌ Error: {e}")
+    print("\n" + "━" * 70 + "\n")
 
-    # 2. ALL payments received (showing last 10)
-    print("💳 ALL PAYMENTS RECEIVED (Last 10):\n")
+    # 2. ALL payments received
+    print("2️⃣  ALL PAYMENTS RECEIVED (Showing Last 10)\n")
     print(f"curl '{AGENTPAY_API_URL}/v1/payments/list?wallet={wallet}' \\")
     print(f"  -H 'x-api-key: {api_key}'\n")
+    print("🔄 Executing...\n")
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/v1/payments/list",
@@ -563,28 +582,23 @@ if __name__ == "__main__":
         )
         if response.status_code == 200:
             pay_data = response.json()
-            pay_list = pay_data.get('payments', [])[:10]  # Show last 10
-            print(f"  Found {len(pay_list)} payment(s) (showing last 10)")
-            for i, p in enumerate(pay_list, 1):
-                amt = p.get('amount_usd', 0)
-                ts = p.get('timestamp', p.get('created_at', 'N/A'))
-                tx = p.get('tx_hash', 'N/A')
-                # Try multiple field names for buyer/payer
-                buyer = (p.get('payer_address') or p.get('payer') or
-                        p.get('sender_address') or p.get('client_id') or
-                        p.get('from_address', 'Unknown'))
-                print(f"    {i}. ${amt:.4f} ← {buyer} | {ts} | TX {tx}")
-            print()
+            pay_list = pay_data.get('payments', [])[:10]
+            result = {'payments': pay_list, 'count': len(pay_data.get('payments', [])), 'showing': len(pay_list)}
+            clean_data = hide_gateway_info(result)
+            print(f"✅ Response (showing last 10 of {len(pay_data.get('payments', []))} total):")
+            print(json.dumps(clean_data, indent=2))
         else:
-            print(f"  ⚠️  Failed to fetch payments (HTTP {response.status_code})\n")
+            print(f"❌ Failed (HTTP {response.status_code})")
     except Exception as e:
-        print(f"  ⚠️  Error: {e}\n")
+        print(f"❌ Error: {e}")
+    print("\n" + "━" * 70 + "\n")
 
     # 3-5. Payment events (24h, 7d, 30d)
-    for time_label, hours in [("24h", 24), ("7 days", 168), ("30 days", 720)]:
-        print(f"📋 PAYMENT EVENTS (Last {time_label}) - Last 10:\n")
+    for idx, (time_label, hours) in enumerate([("24h", 24), ("7 days", 168), ("30 days", 720)], start=3):
+        print(f"{idx}️⃣  PAYMENT EVENTS (Last {time_label}) - Showing Last 10\n")
         print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours={hours}' \\")
         print(f"  -H 'x-api-key: {api_key}'\n")
+        print("🔄 Executing...\n")
         try:
             response = requests.get(
                 f"{AGENTPAY_API_URL}/audit/logs",
@@ -594,33 +608,23 @@ if __name__ == "__main__":
             )
             if response.status_code == 200:
                 data = response.json()
-                event_logs = data.get('logs', [])[:10]  # Show last 10
-                print(f"  Found {len(event_logs)} event(s) (showing last 10)")
-                for i, log in enumerate(event_logs, 1):
-                    details = log.get('details', {})
-                    if isinstance(details, str):
-                        try:
-                            details = json.loads(details)
-                        except:
-                            continue
-                    tx_hash = details.get('merchant_tx_hash', details.get('tx_hash', 'N/A'))
-                    amount = details.get('merchant_amount_usd', details.get('amount_usd', 0))
-                    # Try multiple fields for buyer/payer (remove duplicate agent_id)
-                    buyer = (details.get('payer_address') or details.get('sender_address') or
-                            details.get('payer') or log.get('client_id', 'Unknown'))
-                    ts_unix = details.get('timestamp', 0)
-                    ts_readable = datetime.fromtimestamp(int(ts_unix)).isoformat() if ts_unix else 'N/A'
-                    print(f"    {i}. ${amount:.4f} ← {buyer} | {ts_readable} | TX {tx_hash}")
-                print()
+                all_logs = data.get('logs', [])
+                event_logs = all_logs[:10]
+                result = {'logs': event_logs, 'count': len(all_logs), 'showing': len(event_logs)}
+                clean_data = hide_gateway_info(result)
+                print(f"✅ Response (showing last 10 of {len(all_logs)} total):")
+                print(json.dumps(clean_data, indent=2))
             else:
-                print(f"  ⚠️  No events found (HTTP {response.status_code})\n")
+                print(f"❌ No events found (HTTP {response.status_code})")
         except Exception as e:
-            print(f"  ⚠️  Error: {e}\n")
+            print(f"❌ Error: {e}")
+        print("\n" + "━" * 70 + "\n")
 
-    # 6. Commission events (30d)
-    print(f"💸 COMMISSION EVENTS (Last 30 days) - Last 10:\n")
+    # 6. Commission events
+    print("6️⃣  COMMISSION EVENTS (Last 30 days) - Showing Last 10\n")
     print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_commission_collected&hours=720' \\")
     print(f"  -H 'x-api-key: {api_key}'\n")
+    print("🔄 Executing...\n")
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/audit/logs",
@@ -630,35 +634,25 @@ if __name__ == "__main__":
         )
         if response.status_code == 200:
             data = response.json()
-            comm_logs = data.get('logs', [])[:10]  # Show last 10
-            print(f"  Found {len(comm_logs)} commission event(s) (showing last 10)")
-            for i, log in enumerate(comm_logs, 1):
-                details = log.get('details', {})
-                if isinstance(details, str):
-                    try:
-                        details = json.loads(details)
-                    except:
-                        continue
-                tx_hash = details.get('commission_tx_hash', 'N/A')
-                amount = details.get('commission_amount_usd', 0)
-                # Try multiple fields for buyer/payer (remove duplicate agent_id)
-                buyer = (details.get('payer_address') or details.get('sender_address') or
-                        details.get('payer') or log.get('client_id', 'Unknown'))
-                ts_unix = details.get('timestamp', 0)
-                ts_readable = datetime.fromtimestamp(int(ts_unix)).isoformat() if ts_unix else 'N/A'
-                print(f"    {i}. ${amount:.4f} → Gateway (from {buyer}) | {ts_readable} | TX {tx_hash}")
-            print()
+            all_logs = data.get('logs', [])
+            comm_logs = all_logs[:10]
+            result = {'logs': comm_logs, 'count': len(all_logs), 'showing': len(comm_logs)}
+            clean_data = hide_gateway_info(result)
+            print(f"✅ Response (showing last 10 of {len(all_logs)} total):")
+            print(json.dumps(clean_data, indent=2))
         else:
-            print(f"  ⚠️  No commission events found (HTTP {response.status_code})\n")
+            print(f"❌ No commission events (HTTP {response.status_code})")
     except Exception as e:
-        print(f"  ⚠️  Error: {e}\n")
+        print(f"❌ Error: {e}")
+    print("\n" + "━" * 70 + "\n")
 
-    # 7. Payments from specific buyer (if available)
+    # 7. Payments from specific buyer
     if len(unique_buyers) > 0:
         example_buyer = list(unique_buyers)[0]
-        print(f"👤 PAYMENTS FROM SPECIFIC BUYER - Last 10:\n")
+        print("7️⃣  PAYMENTS FROM SPECIFIC BUYER - Showing Last 10\n")
         print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&client_id={example_buyer}' \\")
         print(f"  -H 'x-api-key: {api_key}'\n")
+        print("🔄 Executing...\n")
         try:
             response = requests.get(
                 f"{AGENTPAY_API_URL}/audit/logs",
@@ -668,41 +662,34 @@ if __name__ == "__main__":
             )
             if response.status_code == 200:
                 data = response.json()
-                buyer_logs = data.get('logs', [])[:10]  # Show last 10
-                print(f"  Buyer: {example_buyer}")
-                print(f"  Found {len(buyer_logs)} payment(s) from this buyer (showing last 10)")
-                for i, log in enumerate(buyer_logs, 1):
-                    details = log.get('details', {})
-                    if isinstance(details, str):
-                        try:
-                            details = json.loads(details)
-                        except:
-                            continue
-                    tx_hash = details.get('merchant_tx_hash', details.get('tx_hash', 'N/A'))
-                    amount = details.get('merchant_amount_usd', details.get('amount_usd', 0))
-                    ts_unix = details.get('timestamp', 0)
-                    ts_readable = datetime.fromtimestamp(int(ts_unix)).isoformat() if ts_unix else 'N/A'
-                    print(f"    {i}. ${amount:.4f} | {ts_readable} | TX {tx_hash}")
-                print()
+                all_logs = data.get('logs', [])
+                buyer_logs = all_logs[:10]
+                result = {'buyer': example_buyer, 'logs': buyer_logs, 'count': len(all_logs), 'showing': len(buyer_logs)}
+                clean_data = hide_gateway_info(result)
+                print(f"✅ Response (showing last 10 of {len(all_logs)} total from buyer):")
+                print(json.dumps(clean_data, indent=2))
             else:
-                print(f"  ⚠️  No payments found from this buyer (HTTP {response.status_code})\n")
+                print(f"❌ No payments from this buyer (HTTP {response.status_code})")
         except Exception as e:
-            print(f"  ⚠️  Error: {e}\n")
+            print(f"❌ Error: {e}")
+        print("\n" + "━" * 70 + "\n")
 
     # 8. Webhook configuration
-    print("🔗 WEBHOOK CONFIGURATION:\n")
+    print("8️⃣  WEBHOOK CONFIGURATION\n")
     print(f"curl '{AGENTPAY_API_URL}/v1/webhooks/list' \\")
     print(f"  -H 'x-api-key: {api_key}'\n")
-    print(f"  Total: {stats['total_webhooks']}, Active: {stats['active_webhooks']}")
-    if webhooks:
-        for i, wh in enumerate(webhooks[:10], 1):
-            print(f"    {i}. {wh.get('url', 'N/A')} | {'✅ Active' if wh.get('active') else '❌ Inactive'}")
-    print()
+    print("🔄 Executing...\n")
+    result = {'webhooks': webhooks[:10], 'total': stats['total_webhooks'], 'active': stats['active_webhooks']}
+    clean_data = hide_gateway_info(result)
+    print(f"✅ Response (showing first 10):")
+    print(json.dumps(clean_data, indent=2))
+    print("\n" + "━" * 70 + "\n")
 
-    # 9. Webhook delivery events (30d)
-    print("📨 WEBHOOK DELIVERY EVENTS (Last 30 days) - Last 10:\n")
+    # 9. Webhook delivery events
+    print("9️⃣  WEBHOOK DELIVERY EVENTS (Last 30 days) - Showing Last 10\n")
     print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=webhook_delivered&hours=720' \\")
     print(f"  -H 'x-api-key: {api_key}'\n")
+    print("🔄 Executing...\n")
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/audit/logs",
@@ -712,99 +699,51 @@ if __name__ == "__main__":
         )
         if response.status_code == 200:
             data = response.json()
-            wh_logs = data.get('logs', [])[:10]  # Show last 10
-            print(f"  Found {len(wh_logs)} webhook delivery event(s) (showing last 10)")
-            for i, log in enumerate(wh_logs, 1):
-                details = log.get('details', {})
-                if isinstance(details, str):
-                    try:
-                        details = json.loads(details)
-                    except:
-                        continue
-                url = details.get('webhook_url', 'N/A')[:40]
-                status = details.get('status', 'unknown')
-                print(f"    {i}. {url}... | Status: {status}")
-            print()
+            all_logs = data.get('logs', [])
+            wh_logs = all_logs[:10]
+            result = {'logs': wh_logs, 'count': len(all_logs), 'showing': len(wh_logs)}
+            clean_data = hide_gateway_info(result)
+            print(f"✅ Response (showing last 10 of {len(all_logs)} total):")
+            print(json.dumps(clean_data, indent=2))
         else:
-            print(f"  ⚠️  No webhook events found (HTTP {response.status_code})\n")
+            print(f"❌ No webhook events (HTTP {response.status_code})")
     except Exception as e:
-        print(f"  ⚠️  Error: {e}\n")
+        print(f"❌ Error: {e}")
+    print("\n" + "━" * 70 + "\n")
 
-    # 10. Payment verification (latest payment)
+    # 10. Payment verification
     if payments and len(payments) > 0:
         latest_tx = payments[0].get('tx_hash')
         if latest_tx:
-            print("✅ PAYMENT VERIFICATION (Latest Payment):\n")
-            print(f"curl '{AGENTPAY_API_URL}/v1/payments/verify/{latest_tx}'\n")
+            print("🔟 PAYMENT VERIFICATION (Latest Payment)\n")
+            print(f"curl '{AGENTPAY_API_URL}/v1/payments/verify/{latest_tx}' \\")
+            print(f"  -H 'x-api-key: {api_key}'\n")
+            print("🔄 Executing...\n")
             try:
                 response = requests.get(
                     f"{AGENTPAY_API_URL}/v1/payments/verify/{latest_tx}",
+                    headers={"x-api-key": api_key},
                     timeout=10
                 )
                 if response.status_code == 200:
                     verify_data = response.json()
-                    print(f"  TX: {latest_tx}")
-                    print(f"  Status: {verify_data.get('verified', False) and '✅ Verified' or '⏳ Pending'}")
-                    print(f"  Amount: ${verify_data.get('amount_usd', 0):.4f} USD")
-                    if verify_data.get('explorer_url'):
-                        print(f"  Explorer: {verify_data['explorer_url']}")
-                    print()
+                    clean_data = hide_gateway_info(verify_data)
+                    print(f"✅ Response:")
+                    print(json.dumps(clean_data, indent=2))
                 else:
-                    print(f"  ⚠️  Verification failed (HTTP {response.status_code})\n")
+                    print(f"❌ Verification failed (HTTP {response.status_code})")
             except Exception as e:
-                print(f"  ⚠️  Verification failed: {e}\n")
+                print(f"❌ Error: {e}")
+            print("\n" + "━" * 70 + "\n")
 
-    # MANUAL CURL COMMANDS (unlimited - for manual copy/paste)
-    print("━" * 70)
-    print("📋 MANUAL CURL COMMANDS (Copy & Paste - Get ALL Data)")
-    print("━" * 70)
-    print("\nUse these commands to get ALL your data (no limits):\n")
-
-    print(f"# Seller revenue analytics (all time)")
-    print(f"curl '{AGENTPAY_API_URL}/v1/merchant/revenue?wallet={wallet}' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# ALL payments received (unlimited)")
-    print(f"curl '{AGENTPAY_API_URL}/v1/payments/list?wallet={wallet}' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# ALL payment events (last 24h)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=24' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# ALL payment events (last 7 days)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=168' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# ALL payment events (last 30 days)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&hours=720' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# ALL commission events (last 30 days)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_commission_collected&hours=720' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    # Add buyer-specific search if we have unique buyers
-    if len(unique_buyers) > 0:
-        example_buyer = list(unique_buyers)[0]
-        print(f"# Payments from specific buyer")
-        print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=x402_payment_settled&client_id={example_buyer}' \\")
-        print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# Webhook configuration")
-    print(f"curl '{AGENTPAY_API_URL}/v1/webhooks/list' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# ALL webhook delivery events (last 30 days)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs?event_type=webhook_delivered&hours=720' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
-
-    print(f"# Verify specific payment (by TX hash)")
-    print(f"curl '{AGENTPAY_API_URL}/v1/payments/verify/YOUR_TX_HASH'\n")
-
-    print(f"# Payment by TX hash (from audit logs)")
-    print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/YOUR_TX_HASH' \\")
-    print(f"  -H 'x-api-key: {api_key[:15]}...'\n")
+    # Additional manual commands (templates for user)
+    print("➕ ADDITIONAL COMMANDS (Templates)\n")
+    print("   Verify specific payment (replace YOUR_TX_HASH):")
+    print(f"   curl '{AGENTPAY_API_URL}/v1/payments/verify/YOUR_TX_HASH' \\")
+    print(f"     -H 'x-api-key: {api_key}'\n")
+    print("   Get audit logs by transaction (replace YOUR_TX_HASH):")
+    print(f"   curl '{AGENTPAY_API_URL}/audit/logs/transaction/YOUR_TX_HASH' \\")
+    print(f"     -H 'x-api-key: {api_key}'\n")
 
     print("=" * 70)
     print("✅ SELLER MONITORING COMPLETE")
