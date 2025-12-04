@@ -1,41 +1,57 @@
 #!/usr/bin/env python3
 """
-AgentGatePay + LangChain Integration - External TX Signing Service (PRODUCTION)
+AgentGatePay + LangChain Integration - External TX Signing Service
 
-This example demonstrates PRODUCTION-READY payment flow using:
-- AgentGatePay REST API (via published SDK v1.1.3+)
-- External transaction signing service (NO private key in code)
-- Base network blockchain payments
-- LangChain agent framework
+This example demonstrates the SAME payment flow as 1_api_basic_payment.py,
+but using an external transaction signing service for production security.
 
 Flow:
 1. Issue AP2 mandate ($100 budget)
-2. Request payment signing from external service (TX repo)
+2. Request payment signing from external service (Docker/Render/Railway/self-hosted)
 3. Submit payment proof to AgentGatePay
 4. Verify payment completion
 
-✅ PRODUCTION READY - Private key stored securely in signing service
-⚠️ Requires TX signing service deployed (see docs/TX_SIGNING_OPTIONS.md)
+Security Benefits:
+- Private key stored in signing service, NOT in application code
+- Application cannot access private keys
+- Signing service can be audited independently
+- Scalable deployment options
+
+Setup Options:
+- Docker local: See docs/DOCKER_LOCAL_SETUP.md
+- Render cloud: See docs/RENDER_DEPLOYMENT_GUIDE.md
+- Other options: See docs/TX_SIGNING_OPTIONS.md
 
 Requirements:
 - pip install agentgatepay-sdk langchain langchain-openai python-dotenv requests
 - .env file with TX_SIGNING_SERVICE configured
-- External signing service running (Render/Docker/Railway/self-hosted)
 """
 
 import os
+import sys
+import json
+import base64
 import requests
 from typing import Dict, Any
 from dotenv import load_dotenv
 from agentgatepay_sdk import AgentGatePay
 
-# LangChain imports
-from langchain.agents import Tool, AgentExecutor, create_react_agent
+# LangChain imports (updated for LangChain 1.x)
+from langchain_core.tools import Tool
+from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
+
+# Add parent directory to path for utils import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+# Utils for mandate storage
+from utils import save_mandate, get_mandate, clear_mandate
 
 # Load environment variables
 load_dotenv()
+
+# Import chain configuration
+from chain_config import get_chain_config
 
 # ========================================
 # TRANSACTION SIGNING
@@ -48,12 +64,9 @@ load_dotenv()
 # ✅ SCALABLE: Signing service can be scaled independently
 #
 # Setup options:
-# - Option 1: Render one-click deploy (https://github.com/AgentGatePay/TX)
-# - Option 2: Docker container (docker pull agentgatepay/tx-signing-service)
-# - Option 3: Railway deployment (see docs/TX_SIGNING_OPTIONS.md)
-# - Option 4: Self-hosted service (clone TX repo, npm start)
-#
-# See docs/TX_SIGNING_OPTIONS.md for complete setup guide.
+# - Option 1: Docker container (see docs/DOCKER_LOCAL_SETUP.md)
+# - Option 2: Render one-click deploy (see docs/RENDER_DEPLOYMENT_GUIDE.md)
+# - Option 3: Railway/AWS/GCP/custom (see docs/TX_SIGNING_OPTIONS.md)
 #
 # ========================================
 
@@ -63,18 +76,22 @@ load_dotenv()
 
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
+BUYER_EMAIL = os.getenv('BUYER_EMAIL')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
-TX_SIGNING_SERVICE = os.getenv('TX_SIGNING_SERVICE')  # e.g., https://your-service.onrender.com
+TX_SIGNING_SERVICE = os.getenv('TX_SIGNING_SERVICE')
 
 # Payment configuration
-RESOURCE_PRICE_USD = 10.0
+RESOURCE_PRICE_USD = 0.01
 MANDATE_BUDGET_USD = 100.0
-COMMISSION_RATE = 0.005  # 0.5%
+
+# Multi-chain/token configuration (set after interactive selection)
+config = None  # Will be set via get_chain_config() in main()
 
 # Validate configuration
 if not TX_SIGNING_SERVICE:
     print("❌ ERROR: TX_SIGNING_SERVICE not configured in .env")
-    print("   Please set TX_SIGNING_SERVICE=https://your-service.onrender.com")
+    print("   Please set TX_SIGNING_SERVICE=http://localhost:3000 (Docker)")
+    print("   Or: TX_SIGNING_SERVICE=https://your-service.onrender.com (Render)")
     print("   See docs/TX_SIGNING_OPTIONS.md for setup instructions")
     exit(1)
 
@@ -82,7 +99,6 @@ if not TX_SIGNING_SERVICE:
 # INITIALIZE CLIENTS
 # ========================================
 
-# AgentGatePay SDK client
 agentpay = AgentGatePay(
     api_url=AGENTPAY_API_URL,
     api_key=BUYER_API_KEY
@@ -93,51 +109,94 @@ print(f"✅ Configured TX signing service: {TX_SIGNING_SERVICE}")
 print(f"✅ PRODUCTION MODE: Private key NOT in application code\n")
 
 # ========================================
+# HELPER FUNCTIONS
+# ========================================
+
+def decode_mandate_token(token: str) -> dict:
+    """Decode AP2 mandate token to extract payload"""
+    try:
+        parts = token.split('.')
+        if len(parts) != 3:
+            return {}
+        payload_b64 = parts[1]
+        padding = 4 - (len(payload_b64) % 4)
+        if padding != 4:
+            payload_b64 += '=' * padding
+        payload_json = base64.urlsafe_b64decode(payload_b64)
+        return json.loads(payload_json)
+    except:
+        return {}
+
+# ========================================
 # AGENT TOOLS
 # ========================================
 
-# Global mandate storage
+# Global state
 current_mandate = None
 merchant_tx_hash = None
 commission_tx_hash = None
 
 def issue_payment_mandate(budget_usd: float) -> str:
-    """
-    Issue AP2 payment mandate with specified budget.
-
-    Args:
-        budget_usd: Budget amount in USD
-
-    Returns:
-        Mandate token string
-    """
+    """Issue mandate with reuse logic (matches Script 1)"""
     global current_mandate
 
     try:
-        print(f"\n🔐 Issuing mandate with ${budget_usd} budget...")
+        agent_id = f"research-assistant-tx-service"
+        existing_mandate = get_mandate(agent_id)
+
+        if existing_mandate:
+            token = existing_mandate.get('mandate_token')
+
+            # Get LIVE budget from gateway
+            verify_response = requests.post(
+                f"{AGENTPAY_API_URL}/mandates/verify",
+                headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                json={"mandate_token": token}
+            )
+
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                budget_remaining = verify_data.get('budget_remaining', 'Unknown')
+            else:
+                # Fallback to JWT if verify fails
+                token_data = decode_mandate_token(token)
+                budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
+
+            print(f"\n♻️  Reusing mandate (Budget: ${budget_remaining})")
+            current_mandate = existing_mandate
+            current_mandate['budget_remaining'] = budget_remaining
+            return f"MANDATE_TOKEN:{token}"
+
+        print(f"\n🔐 Creating mandate (${budget_usd})...")
 
         mandate = agentpay.mandates.issue(
-            subject=f"research-assistant-production",
-            budget_usd=budget_usd,
+            subject=agent_id,
+            budget=budget_usd,
             scope="resource.read,payment.execute",
-            ttl_hours=168  # 7 days
+            ttl_minutes=168 * 60
         )
 
-        current_mandate = mandate
-        print(f"✅ Mandate issued successfully")
-        print(f"   Token: {mandate['mandateToken'][:50]}...")
-        print(f"   Budget: ${mandate['budgetUsd']}")
-        print(f"   Expires: {mandate['expiresAt']}")
+        # Store mandate with budget info
+        token = mandate['mandate_token']
+        mandate_with_budget = {
+            **mandate,
+            'budget_usd': budget_usd,
+            'budget_remaining': budget_usd
+        }
 
-        return f"Mandate issued successfully. Token: {mandate['mandateToken'][:50]}... Budget: ${budget_usd}"
+        current_mandate = mandate_with_budget
+        save_mandate(agent_id, mandate_with_budget)
+
+        print(f"✅ Mandate created (Budget: ${budget_usd})")
+
+        return f"MANDATE_TOKEN:{token}"
 
     except Exception as e:
-        error_msg = f"Failed to issue mandate: {str(e)}"
-        print(f"❌ {error_msg}")
-        return error_msg
+        print(f"❌ Mandate failed: {str(e)}")
+        return f"Failed: {str(e)}"
 
 
-def sign_payment_via_service(amount_usd: float, recipient: str) -> str:
+def sign_payment_via_service(payment_input: str) -> str:
     """
     Sign blockchain payment via external signing service (PRODUCTION).
 
@@ -148,17 +207,24 @@ def sign_payment_via_service(amount_usd: float, recipient: str) -> str:
     - Nonce management
 
     Args:
-        amount_usd: Payment amount in USD
-        recipient: Recipient wallet address
+        payment_input: "amount_usd,recipient_address"
 
     Returns:
-        Transaction hashes (merchant, commission)
+        "TX_HASHES:merchant_tx,commission_tx"
     """
     global merchant_tx_hash, commission_tx_hash
 
     try:
+        parts = payment_input.split(',')
+        if len(parts) != 2:
+            return f"Error: Invalid format"
+
+        amount_usd = float(parts[0].strip())
+        recipient = parts[1].strip()
+
         print(f"\n💳 Requesting payment signature from external service...")
-        print(f"   Amount: ${amount_usd}")
+        print(f"   Amount: ${amount_usd} {config.token}")
+        print(f"   Chain: {config.chain.title()}")
         print(f"   Recipient: {recipient[:10]}...")
         print(f"   Service: {TX_SIGNING_SERVICE}")
 
@@ -167,15 +233,15 @@ def sign_payment_via_service(amount_usd: float, recipient: str) -> str:
             f"{TX_SIGNING_SERVICE}/sign-payment",
             headers={
                 "Content-Type": "application/json",
-                "x-api-key": BUYER_API_KEY  # Service authenticates with this
+                "x-api-key": BUYER_API_KEY
             },
             json={
                 "merchant_address": recipient,
                 "amount_usd": str(amount_usd),
-                "chain": "base",
-                "token": "USDC"
+                "chain": config.chain,
+                "token": config.token
             },
-            timeout=120  # Allow time for blockchain confirmation
+            timeout=120
         )
 
         if response.status_code != 200:
@@ -195,19 +261,19 @@ def sign_payment_via_service(amount_usd: float, recipient: str) -> str:
             return error_msg
 
         print(f"✅ Payment signed and submitted by external service")
-        print(f"   Merchant TX: {merchant_tx_hash}")
-        print(f"   Commission TX: {commission_tx_hash}")
+        print(f"   Merchant TX: {merchant_tx_hash[:20]}...")
+        print(f"   Commission TX: {commission_tx_hash[:20]}...")
         print(f"   Status: {result.get('status', 'N/A')}")
 
-        return f"Payment successful! Merchant TX: {merchant_tx_hash}, Commission TX: {commission_tx_hash}"
+        return f"TX_HASHES:{merchant_tx_hash},{commission_tx_hash}"
 
     except requests.exceptions.Timeout:
-        error_msg = f"Signing service timeout (exceeded 120s). Service may be down or slow."
+        error_msg = f"Signing service timeout (exceeded 120s)"
         print(f"❌ {error_msg}")
         return error_msg
 
     except requests.exceptions.ConnectionError:
-        error_msg = f"Cannot connect to signing service at {TX_SIGNING_SERVICE}. Is it running?"
+        error_msg = f"Cannot connect to signing service at {TX_SIGNING_SERVICE}"
         print(f"❌ {error_msg}")
         print(f"   Check: curl {TX_SIGNING_SERVICE}/health")
         return error_msg
@@ -218,36 +284,82 @@ def sign_payment_via_service(amount_usd: float, recipient: str) -> str:
         return error_msg
 
 
-def verify_payment_completion(tx_hash: str) -> str:
-    """
-    Verify payment was recorded by AgentGatePay.
+def submit_and_verify_payment(payment_data: str) -> str:
+    """Submit payment proof and verify budget (matches Script 1)"""
+    global current_mandate
 
-    Args:
-        tx_hash: Merchant transaction hash
-
-    Returns:
-        Verification status message
-    """
     try:
-        print(f"\n🔍 Verifying payment: {tx_hash[:20]}...")
+        parts = payment_data.split(',')
+        if len(parts) != 4:
+            return f"Error: Invalid format"
 
-        # Use AgentGatePay SDK to verify payment
-        verification = agentpay.payments.verify(tx_hash)
+        merchant_tx = parts[0].strip()
+        commission_tx = parts[1].strip()
+        mandate_token = parts[2].strip()
+        price_usd = float(parts[3].strip())
 
-        if verification.get('verified'):
-            print(f"✅ Payment verified successfully")
-            print(f"   Amount: ${verification.get('amount_usd', 'N/A')}")
-            print(f"   Chain: {verification.get('chain', 'N/A')}")
-            print(f"   Status: {verification.get('status', 'N/A')}")
-            return f"Payment verified! Amount: ${verification.get('amount_usd')}, Status: {verification.get('status')}"
+        print(f"\n📤 Submitting to gateway...")
+
+        payment_payload = {
+            "scheme": "eip3009",
+            "tx_hash": merchant_tx,
+            "tx_hash_commission": commission_tx
+        }
+
+        payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
+
+        headers = {
+            "x-api-key": BUYER_API_KEY,
+            "x-mandate": mandate_token,
+            "x-payment": payment_b64
+        }
+
+        url = f"{AGENTPAY_API_URL}/x402/resource?chain={config.chain}&token={config.token}&price_usd={price_usd}"
+        response = requests.get(url, headers=headers)
+
+        if response.status_code >= 400:
+            result = response.json() if response.text else {}
+            error = result.get('error', response.text)
+            print(f"❌ Gateway error ({response.status_code}): {error}")
+            return f"Failed: {error}"
+
+        result = response.json()
+
+        # Check if payment was successful
+        if result.get('message') or result.get('success') or result.get('paid') or result.get('status') == 'confirmed':
+            print(f"✅ Payment recorded")
+
+            # Verify mandate to get updated budget
+            print(f"   🔍 Fetching updated budget...")
+            verify_response = requests.post(
+                f"{AGENTPAY_API_URL}/mandates/verify",
+                headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                json={"mandate_token": mandate_token}
+            )
+
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                new_budget = verify_data.get('budget_remaining', 'Unknown')
+                print(f"   ✅ Budget updated: ${new_budget}")
+
+                if current_mandate:
+                    current_mandate['budget_remaining'] = new_budget
+                    agent_id = f"research-assistant-tx-service"
+                    save_mandate(agent_id, current_mandate)
+
+                return f"Success! Paid: ${price_usd}, Remaining: ${new_budget}"
+            else:
+                print(f"   ⚠️  Could not fetch updated budget")
+                return f"Success! Paid: ${price_usd}"
+
         else:
-            print(f"❌ Payment verification failed")
-            return f"Payment verification failed: {verification.get('error', 'Unknown error')}"
+            error = result.get('error', 'Unknown error')
+            print(f"❌ Failed: {error}")
+            return f"Failed: {error}"
 
     except Exception as e:
-        error_msg = f"Verification error: {str(e)}"
-        print(f"❌ {error_msg}")
-        return error_msg
+        print(f"❌ Error: {str(e)}")
+        return f"Error: {str(e)}"
 
 
 # Define LangChain tools
@@ -263,37 +375,14 @@ tools = [
         description="Sign and execute a blockchain payment via external signing service (PRODUCTION). Creates two transactions: merchant payment and gateway commission. Input should be 'amount_usd,recipient_address'."
     ),
     Tool(
-        name="verify_payment",
-        func=verify_payment_completion,
-        description="Verify that a payment was successfully recorded by AgentGatePay. Input should be the merchant transaction hash."
+        name="submit_payment",
+        func=submit_and_verify_payment,
+        description="Submit payment proof to AgentGatePay gateway for verification and budget tracking. Input should be 'merchant_tx,commission_tx,mandate_token,price_usd'."
     ),
 ]
 
 # ========================================
-# AGENT PROMPT
-# ========================================
-
-agent_prompt = PromptTemplate.from_template("""
-You are an autonomous AI agent that can make blockchain payments for resources.
-
-You have access to the following tools:
-{tools}
-
-Tool Names: {tool_names}
-
-Your task: {input}
-
-Follow this workflow:
-1. Issue a payment mandate with the specified budget
-2. Sign the blockchain payment via external service (PRODUCTION READY - no private key in code)
-3. Verify the payment was recorded successfully
-
-Think step by step:
-{agent_scratchpad}
-""")
-
-# ========================================
-# CREATE AGENT
+# CREATE AGENT (LangChain 1.x)
 # ========================================
 
 # Initialize LLM
@@ -303,20 +392,33 @@ llm = ChatOpenAI(
     openai_api_key=os.getenv('OPENAI_API_KEY')
 )
 
-# Create agent
-agent = create_react_agent(
-    llm=llm,
-    tools=tools,
-    prompt=agent_prompt
-)
+# System prompt for agent behavior
+system_prompt = """You are an autonomous AI agent that can make blockchain payments for resources.
 
-# Create executor
-agent_executor = AgentExecutor(
-    agent=agent,
-    tools=tools,
-    verbose=True,
-    max_iterations=10,
-    handle_parsing_errors=True
+Follow this workflow:
+1. Issue a payment mandate with the specified budget using the issue_mandate tool
+   - The tool returns: MANDATE_TOKEN:{token}
+   - Extract the token after the colon
+2. Sign the blockchain payment for the specified amount to the recipient using the sign_payment tool
+   - This uses EXTERNAL SIGNING SERVICE (production-ready, no private key in code)
+   - The tool returns: TX_HASHES:{merchant_tx},{commission_tx}
+   - Extract both transaction hashes after the colon
+3. Submit the payment to AgentGatePay using the submit_payment tool with: merchant_tx,commission_tx,mandate_token,price_usd
+   - Use the mandate token from step 1
+   - Use the transaction hashes from step 2
+   - Use the payment amount specified in the task
+
+IMPORTANT:
+- Parse tool outputs to extract values (look for : separator)
+- Always submit payment to AgentGatePay after signing (step 3 is mandatory)
+- If any tool returns an error, STOP immediately and report the error
+- Do NOT retry failed operations"""
+
+# Create agent (LangChain 1.x with LangGraph backend)
+agent_executor = create_agent(
+    llm,
+    tools,
+    system_prompt=system_prompt
 )
 
 # ========================================
@@ -325,19 +427,33 @@ agent_executor = AgentExecutor(
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("🤖 AGENTGATEPAY + LANGCHAIN: PRODUCTION TX SIGNING DEMO")
+    print("AGENTGATEPAY + LANGCHAIN: PRODUCTION TX SIGNING DEMO")
     print("=" * 80)
     print()
     print("This demo shows PRODUCTION-READY autonomous agent payments using:")
-    print("  - AgentGatePay REST API (via SDK v1.1.3+)")
+    print("  - AgentGatePay REST API (latest SDK)")
     print("  - External transaction signing service (NO private key in code)")
     print("  - LangChain agent framework")
-    print("  - Base network (USDC payments)")
+    print("  - Multi-chain blockchain payments (Base/Ethereum/Polygon/Arbitrum)")
+    print("  - Multi-token support (USDC/USDT/DAI)")
     print()
     print("✅ SECURE: Private key stored in signing service, NOT in application")
     print("✅ SCALABLE: Signing service can be deployed independently")
     print("✅ PRODUCTION READY: Suitable for real-world deployments")
     print()
+
+    # Load chain/token configuration from .env
+    print("\nCHAIN & TOKEN CONFIGURATION")
+    print("=" * 80)
+
+    config = get_chain_config()
+
+    print(f"\nUsing configuration from .env:")
+    print(f"  Chain: {config.chain.title()} (ID: {config.chain_id})")
+    print(f"  Token: {config.token} ({config.decimals} decimals)")
+    print(f"  RPC: {config.rpc_url}")
+    print(f"  Contract: {config.token_contract}")
+    print(f"\nTo change chain/token: Edit PAYMENT_CHAIN and PAYMENT_TOKEN in .env file")
     print("=" * 80)
 
     # Check signing service health
@@ -359,43 +475,93 @@ if __name__ == "__main__":
         print(f"   See docs/TX_SIGNING_OPTIONS.md for setup instructions")
         exit(1)
 
+    agent_id = f"research-assistant-tx-service"
+    existing_mandate = get_mandate(agent_id)
+
+    if existing_mandate:
+        token = existing_mandate.get('mandate_token')
+
+        # Get LIVE budget from gateway
+        verify_response = requests.post(
+            f"{AGENTPAY_API_URL}/mandates/verify",
+            headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+            json={"mandate_token": token}
+        )
+
+        if verify_response.status_code == 200:
+            verify_data = verify_response.json()
+            budget_remaining = verify_data.get('budget_remaining', 'Unknown')
+        else:
+            # Fallback to JWT decode if verify fails
+            token_data = decode_mandate_token(token)
+            budget_remaining = token_data.get('budget_remaining', 'Unknown')
+
+        print(f"\n♻️  Using existing mandate (Budget: ${budget_remaining})")
+        print(f"   Token: {existing_mandate.get('mandate_token', 'N/A')[:50]}...")
+        print(f"   To delete: rm ../.agentgatepay_mandates.json\n")
+        mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
+        purpose = "research resource"
+    else:
+        budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
+        mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
+        purpose = input("📝 Enter payment purpose (default: research resource): ").strip()
+        purpose = purpose if purpose else "research resource"
+
     # Agent task
     task = f"""
-    Purchase a research resource for ${RESOURCE_PRICE_USD} USD using PRODUCTION signing.
+    Purchase a {purpose} for ${RESOURCE_PRICE_USD} USD using PRODUCTION signing service.
 
     Steps:
-    1. Issue a payment mandate with a ${MANDATE_BUDGET_USD} budget
-    2. Make a payment of ${RESOURCE_PRICE_USD} to the seller wallet: {SELLER_WALLET}
+    1. Issue a payment mandate with a ${mandate_budget} budget (or reuse existing)
+    2. Sign blockchain payment of ${RESOURCE_PRICE_USD} to seller: {SELLER_WALLET}
        (This will be signed by the external signing service - NO private key in code)
-    3. Verify the payment was recorded successfully
+    3. Submit payment proof to AgentGatePay with mandate token
 
     This is a PRODUCTION-READY payment using external signing service.
     """
 
     try:
-        # Run agent
-        result = agent_executor.invoke({"input": task})
+        # Run agent (LangGraph format expects messages)
+        result = agent_executor.invoke({"messages": [("user", task)]})
 
         print("\n" + "=" * 80)
-        print("✅ PRODUCTION PAYMENT WORKFLOW COMPLETED")
+        print("PRODUCTION PAYMENT WORKFLOW COMPLETED")
         print("=" * 80)
-        print(f"\nResult: {result['output']}")
+
+        # Extract final message from LangGraph response
+        if "messages" in result:
+            final_message = result["messages"][-1].content if result["messages"] else "No output"
+            print(f"\nResult: {final_message}")
+        else:
+            print(f"\nResult: {result}")
 
         # Display final status
         if current_mandate:
-            print(f"\n📊 Final Status:")
-            print(f"   Mandate: {current_mandate.get('mandateToken', 'N/A')[:50]}...")
-            print(f"   Budget remaining: ${current_mandate.get('budgetRemaining', 'N/A')}")
+            print(f"\nFinal Status:")
+            print(f"  Mandate: {current_mandate.get('mandate_token', 'N/A')[:50]}...")
+            print(f"  Budget remaining: ${current_mandate.get('budget_remaining', 'N/A')}")
 
         if merchant_tx_hash:
-            print(f"\n🔗 Blockchain Transactions:")
-            print(f"   Merchant TX: https://basescan.org/tx/{merchant_tx_hash}")
-            print(f"   Commission TX: https://basescan.org/tx/{commission_tx_hash}")
+            print(f"\nBlockchain Transactions:")
+            print(f"  Merchant TX: {config.explorer}/tx/{merchant_tx_hash}")
+            print(f"  Commission TX: {config.explorer}/tx/{commission_tx_hash}")
 
-        print(f"\n✅ PRODUCTION SUCCESS:")
-        print(f"   Private key: SECURE (stored in signing service)")
-        print(f"   Application code: CLEAN (no private keys)")
-        print(f"   Payment: VERIFIED (on Base blockchain)")
+            # Display gateway audit logs with curl commands (matches Script 1)
+            print(f"\nGateway Audit Logs (copy-paste these commands):")
+            print(f"\n# All payment logs:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_EMAIL}&event_type=x402_payment_settled&limit=10' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# This specific transaction:")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{merchant_tx_hash}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
+            print(f"\n# Audit stats (24h):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_EMAIL}&hours=24' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
+
+            print(f"\n✅ PRODUCTION SUCCESS:")
+            print(f"   Private key: SECURE (stored in signing service)")
+            print(f"   Application code: CLEAN (no private keys)")
+            print(f"   Payment: VERIFIED (on {config.chain.title()} blockchain)")
 
     except KeyboardInterrupt:
         print("\n\n⚠️  Demo interrupted by user")
