@@ -8,14 +8,15 @@
 
 ## Overview
 
-This repository contains **7 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
 - **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP, with webhook support)
-- **Example 5:** External TX signing (Docker local or Render cloud)
+- **Example 5:** REST API + External TX signing (Docker local or Render cloud)
 - **Examples 6a/6b:** Buyer & Seller Monitoring Dashboards (analytics & audit logs)
+- **Example 8:** MCP + External TX signing (production-ready MCP payments)
 
-**Note:** Examples 1-4 demonstrate all core payment features. Examples 5/6a/6b add production enhancements (external signing, monitoring).
+**Note:** Examples 1-4 demonstrate all core payment features. Examples 5/6a/6b/8 add production enhancements (external signing, monitoring, MCP production).
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -225,7 +226,7 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/4a_mcp_buyer_agent.py
 
-# Example 5: External TX signing (Docker or Render)
+# Example 5: REST API + External TX signing (Docker or Render)
 python examples/5_api_with_tx_service.py
 
 # Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
@@ -233,6 +234,9 @@ python examples/6a_monitoring_buyer.py
 
 # Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
 python examples/6b_monitoring_seller.py
+
+# Example 8: MCP + External TX signing (production MCP payments)
+python examples/8_mcp_with_tx_service.py
 ```
 
 ### Multi-Chain/Token Configuration
@@ -575,6 +579,99 @@ PRODUCTION SUCCESS:
 - Suitable for production deployments
 
 **See:** [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for additional deployment options (AWS, GCP, Azure, custom HSM).
+
+---
+
+### Example 8: MCP + External TX Signing (Production)
+
+**File:** `examples/8_mcp_with_tx_service.py`
+
+Combines the best of both worlds:
+- **MCP tools** for mandate management and payment submission (JSON-RPC 2.0 protocol)
+- **External TX signing** for production security (no private key in code)
+
+**Flow:**
+1. Issue mandate via MCP (`agentpay_issue_mandate` tool)
+2. Request signature from external TX service (Docker/Render/Railway)
+3. Service signs both transactions (merchant + commission)
+4. Submit payment proof via MCP (`agentpay_submit_payment` tool)
+5. Verify budget via MCP (`agentpay_verify_mandate` tool)
+
+**Why This Combination:**
+- ✅ **MCP Protocol**: Standardized agent communication (Anthropic-backed)
+- ✅ **Production Security**: Private keys isolated in signing service
+- ✅ **Scalable**: Both MCP and TX service can scale independently
+- ✅ **Future-proof**: MCP standard + secure key management
+- ✅ **Best Practices**: Combines industry standards from both protocols
+
+**Setup:**
+
+Same as Example 5 - setup external TX signing service:
+
+**Docker (Local):**
+```bash
+docker pull agentgatepay/tx-signing-service:latest
+docker run -d -p 3000:3000 --env-file .env.signing-service agentgatepay/tx-signing-service:latest
+```
+
+**Render (Cloud):**
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+Add to `.env`: `TX_SIGNING_SERVICE=http://localhost:3000` (or your Render URL)
+
+**Run:**
+```bash
+python examples/8_mcp_with_tx_service.py
+```
+
+**Output:**
+```
+AGENTGATEPAY + LANGCHAIN: PRODUCTION MCP + TX SIGNING DEMO
+==============================================================================
+
+✅ SECURE: Private key stored in signing service, NOT in application
+✅ SCALABLE: Signing service can be deployed independently
+✅ MCP PROTOCOL: Standardized agent communication
+✅ PRODUCTION READY: Suitable for real-world deployments
+
+Signing service is healthy
+Wallet configured: true
+
+   📡 Calling MCP tool: agentpay_issue_mandate
+🔐 Creating mandate ($100)...
+✅ Mandate created (Budget: $100.0)
+
+💳 Requesting payment signature from external service...
+✅ Payment signed and submitted by external service
+   Merchant TX: 0xad2fe7...
+   Commission TX: 0x29292d...
+   Status: Success
+
+   📡 Calling MCP tool: agentpay_submit_payment
+✅ Payment submitted via MCP
+   Status: Confirmed
+
+   📡 Calling MCP tool: agentpay_verify_mandate
+   ✅ Budget updated: $99.99
+
+✅ PRODUCTION SUCCESS:
+   Private key: SECURE (stored in signing service)
+   Application code: CLEAN (no private keys)
+   MCP protocol: STANDARDIZED (JSON-RPC 2.0)
+   Payment: VERIFIED (on Base blockchain)
+```
+
+**Use Cases:**
+- Production agent deployments requiring secure key management
+- Multi-agent systems needing standardized communication (MCP)
+- Scalable payment infrastructures with independent services
+- Agent frameworks with native MCP support (Claude Desktop, etc.)
+
+**Comparison to Other Examples:**
+- **vs Example 1/3**: Adds production security (external TX signing)
+- **vs Example 5**: Uses MCP protocol instead of REST API
+- **Best of both**: MCP standardization + production security
 
 ---
 
