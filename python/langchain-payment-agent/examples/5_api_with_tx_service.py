@@ -269,7 +269,7 @@ def sign_payment_via_service(payment_input: str) -> str:
         print(f"✅ Payment signed and submitted by external service")
         print(f"   Merchant TX: {merchant_tx_hash[:20]}... (length: {len(merchant_tx_hash)})")
         print(f"   Commission TX: {commission_tx_hash[:20]}... (length: {len(commission_tx_hash)})")
-        print(f"   Status: {result.get('status', 'N/A')}")
+        print(f"   Status: {'Success' if result.get('success') else 'Failed'}")
 
         # Verify hashes have correct format
         if len(merchant_tx_hash) != 66 or not merchant_tx_hash.startswith('0x'):
