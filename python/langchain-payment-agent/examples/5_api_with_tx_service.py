@@ -237,7 +237,7 @@ def sign_payment_via_service(payment_input: str) -> str:
             },
             json={
                 "merchant_address": recipient,
-                "amount_usd": str(amount_usd),
+                "total_amount": str(amount_usd),
                 "chain": config.chain,
                 "token": config.token
             },
