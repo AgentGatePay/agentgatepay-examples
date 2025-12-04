@@ -132,9 +132,11 @@ python examples/1_api_basic_payment.py
 
 ---
 
-## Option 1: Docker Container (Recommended for Production)
+## Option 1: Docker Container (Recommended for Self-Hosted Production)
 
 **Run signing service in isolated Docker container**
+
+**Complete Setup Guide:** [DOCKER_LOCAL_SETUP.md](DOCKER_LOCAL_SETUP.md)
 
 ### How It Works
 
@@ -312,9 +314,11 @@ docker-compose down
 
 ---
 
-## Option 2: Render One-Click Deploy
+## Option 2: Render One-Click Deploy (Recommended for Cloud Production)
 
 **Managed cloud hosting with one-click deployment**
+
+**Complete Setup Guide:** [RENDER_DEPLOYMENT_GUIDE.md](RENDER_DEPLOYMENT_GUIDE.md)
 
 ### How It Works
 

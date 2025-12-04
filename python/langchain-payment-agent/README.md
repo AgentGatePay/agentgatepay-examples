@@ -12,10 +12,10 @@ This repository contains **7 complete examples** demonstrating how to integrate 
 
 - **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
 - **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP, with webhook support)
-- **Example 5:** External TX service (production-ready signing)
+- **Example 5:** External TX signing (Docker local or Render cloud)
 - **Examples 6a/6b:** Buyer & Seller Monitoring Dashboards (analytics & audit logs)
 
-**Note:** Examples 1-4 demonstrate all core payment features. Examples 5-6a/6b add production enhancements (external signing, buyer/seller monitoring).
+**Note:** Examples 1-4 demonstrate all core payment features. Examples 5/6a/6b add production enhancements (external signing, monitoring).
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -154,9 +154,9 @@ TX_SIGNING_SERVICE=https://your-service.onrender.com
 
 ### Transaction Signing
 
-**Examples 1-8: Local Signing**
+**Examples 1-4, 6a/6b: Local Signing**
 
-These examples sign transactions using your private key from `.env` file:
+Sign transactions using your private key from `.env` file:
 
 ```bash
 # In your .env file:
@@ -167,35 +167,46 @@ BUYER_WALLET=0xYOUR_WALLET_ADDRESS_HERE
 python examples/1_api_basic_payment.py
 ```
 
-**Test Amounts:** Examples use **$0.01 USDC** for testing (safe small amount).
-
-**Note:** Private key in `.env` is for testing only. Do not use with large amounts or on mainnet with significant funds.
+**Note:** Examples use **$0.01 USDC** for testing. Private key in `.env` is suitable for development and testing with small amounts only.
 
 ---
 
 **Example 5: External Signing Service**
 
-This example uses a separate signing service:
+Deploy a separate signing service to isolate private keys from application code. Choose your deployment method:
 
-1. Deploy signing service (choose one):
-   - Docker: `docker run -p 3000:3000 agentgatepay/tx-signing-service`
-   - Render: [One-click deploy](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+**Option A: Docker (Local)**
 
-2. Add service URL to `.env`:
-   ```bash
-   TX_SIGNING_SERVICE=https://your-service.onrender.com
-   ```
+```bash
+docker pull agentgatepay/tx-signing-service:latest
+docker run -d -p 3000:3000 --env-file .env.signing-service agentgatepay/tx-signing-service:latest
+```
 
-3. Run example:
-   ```bash
-   python examples/5_api_with_tx_service.py
-   ```
+Add to `.env`: `TX_SIGNING_SERVICE=http://localhost:3000`
 
----
+See [DOCKER_LOCAL_SETUP.md](docs/DOCKER_LOCAL_SETUP.md) for detailed setup.
 
-**Other Options**
+**Option B: Render (Cloud)**
 
-For production deployments with wallet services, HSM, or custom implementations, see [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md).
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+When prompted, enter:
+- **WALLET_PRIVATE_KEY**: Your wallet private key
+- **AGENTGATEPAY_API_KEY**: Your API key
+
+Add to `.env`: `TX_SIGNING_SERVICE=https://your-service.onrender.com`
+
+See [RENDER_DEPLOYMENT_GUIDE.md](docs/RENDER_DEPLOYMENT_GUIDE.md) for detailed setup.
+
+**Run Example:**
+
+```bash
+python examples/5_api_with_tx_service.py
+```
+
+The script automatically uses whichever endpoint you configured in `.env` (Docker or Render).
+
+**Other Options:** For AWS, GCP, Azure, or custom HSM deployments, see [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md).
 
 ### Run Examples
 
@@ -220,7 +231,7 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/4a_mcp_buyer_agent.py
 
-# Example 5: Production TX signing (external service) - PRODUCTION READY 🚀
+# Example 5: External TX signing (Docker or Render)
 python examples/5_api_with_tx_service.py
 
 # Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
@@ -228,9 +239,6 @@ python examples/6a_monitoring_buyer.py
 
 # Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
 python examples/6b_monitoring_seller.py
-
-# Run with exports
-python examples/6a_monitoring_buyer.py --export-csv --export-json
 ```
 
 ### Multi-Chain/Token Configuration
@@ -485,15 +493,11 @@ curl 'https://api.agentgatepay.com/audit/logs?...' | python3 -m json.tool
 
 ---
 
-### Example 5: Production TX Signing (External Service) ⭐ **PRODUCTION READY**
+### Example 5: External TX Signing Service
 
 **File:** `examples/5_api_with_tx_service.py`
 
-**PRODUCTION-READY payment flow using external transaction signing service:**
-- ✅ NO private key in application code
-- ✅ Signing handled by external service (Render/Docker/Railway)
-- ✅ Secure private key storage
-- ✅ Scalable architecture
+Payment flow using external transaction signing service to isolate private keys from application code.
 
 **Flow:**
 1. Issue mandate via SDK
@@ -519,33 +523,52 @@ response = requests.post(
 ```
 
 **Security Benefits:**
-- ✅ Private key stored in signing service, NOT in code
-- ✅ Application cannot access private keys
-- ✅ Signing service can be audited independently
-- ✅ Scalable deployment (Render/Docker/Railway/self-hosted)
+- Private key stored in signing service, not in application code
+- Application cannot access private keys
+- Signing service can be audited independently
+- Scalable deployment (Docker local or Render cloud)
 
-**Setup:**
-1. Deploy TX signing service ([Render one-click](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX) or Docker)
-2. Add `TX_SIGNING_SERVICE=https://your-service.onrender.com` to `.env`
-3. Run `python examples/5_api_with_tx_service.py`
+**Setup Options:**
+
+**Docker (Local):**
+```bash
+docker pull agentgatepay/tx-signing-service:latest
+docker run -d -p 3000:3000 --env-file .env.signing-service agentgatepay/tx-signing-service:latest
+```
+Add to `.env`: `TX_SIGNING_SERVICE=http://localhost:3000`
+
+See [DOCKER_LOCAL_SETUP.md](docs/DOCKER_LOCAL_SETUP.md) for detailed setup.
+
+**Render (Cloud):**
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
+
+Add to `.env`: `TX_SIGNING_SERVICE=https://your-service.onrender.com`
+
+See [RENDER_DEPLOYMENT_GUIDE.md](docs/RENDER_DEPLOYMENT_GUIDE.md) for detailed setup.
+
+**Run:**
+```bash
+python examples/5_api_with_tx_service.py
+```
 
 **Output:**
 ```
-🏥 Signing service is healthy
-✅ Wallet configured: true
+Signing service is healthy
+Wallet configured: true
 
-🔐 Issuing mandate with $100 budget...
-✅ Mandate issued successfully
+Issuing mandate with $100 budget...
+Mandate issued successfully
 
-💳 Requesting payment signature from external service...
-✅ Payment signed and submitted by external service
+Requesting payment signature from external service...
+Payment signed and submitted by external service
    Merchant TX: 0xabc123...
    Commission TX: 0xdef456...
 
-🔍 Verifying payment: 0xabc123...
-✅ Payment verified successfully
+Verifying payment: 0xabc123...
+Payment verified successfully
 
-✅ PRODUCTION SUCCESS:
+PRODUCTION SUCCESS:
    Private key: SECURE (stored in signing service)
    Application code: CLEAN (no private keys)
    Payment: VERIFIED (on Base blockchain)
@@ -553,15 +576,15 @@ response = requests.post(
 
 **Why This Matters:**
 - Separates payment logic from key management
-- Allows secure production deployments
 - Keys can be rotated without code changes
 - Service can be scaled independently
+- Suitable for production deployments
 
-**See:** [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for complete deployment guide
+**See:** [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for additional deployment options (AWS, GCP, Azure, custom HSM).
 
 ---
 
-### Examples 6a/6b: Buyer & Seller Monitoring Dashboards ⭐ **SEPARATE DASHBOARDS**
+### Examples 6a/6b: Buyer & Seller Monitoring Dashboards
 
 **Files:**
 - `examples/6a_monitoring_buyer.py` - Buyer monitoring (spending, budgets, mandates)
@@ -588,7 +611,7 @@ Monitor your SPENDING as a buyer (outgoing payments):
 - **Budget tracking**: Mandate budgets, utilization percentage, remaining budget
 - **Smart alerts**: Budget warnings (critical/high/medium), mandate expiration, failed payments
 - **Outgoing payments**: Track what you paid to merchants
-- **CSV/JSON exports**: Export spending reports for accounting
+- **Live CURL commands**: Generated commands with actual results
 
 **Usage:**
 ```bash
@@ -597,9 +620,6 @@ python examples/6a_monitoring_buyer.py
 
 # With arguments
 python examples/6a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
-
-# Export reports
-python examples/6a_monitoring_buyer.py --export-csv --export-json
 ```
 
 **Output:**
@@ -701,7 +721,7 @@ TOP BUYERS (5)
 - Equivalent to n8n buyer/seller monitoring workflows
 - No n8n required - just Python + pip install
 - Can be run anytime to check payment/revenue status
-- CSV/JSON exports for accounting and analysis
+- Live CURL commands for API integration and debugging
 
 ---
 
@@ -868,7 +888,7 @@ PAYMENT_CHAIN=polygon python examples/1_api_basic_payment.py
 
 ## Next Steps
 
-1. **Try all 7 examples** - Understand both API and MCP approaches, plus buyer/seller monitoring
+1. **Try all examples** - Understand both API and MCP approaches, plus external signing and monitoring
 2. **Modify examples** - Adapt to your use case
 3. **Read comparison docs** - Choose API vs MCP for your stack
 4. **Build your agent** - Create custom payment workflows
