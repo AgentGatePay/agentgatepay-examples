@@ -200,15 +200,7 @@ Add to `.env`: `TX_SIGNING_SERVICE=https://your-service.onrender.com`
 
 See [RENDER_DEPLOYMENT_GUIDE.md](docs/RENDER_DEPLOYMENT_GUIDE.md) for detailed setup.
 
-**Run Example:**
-
-```bash
-python examples/5_api_with_tx_service.py
-```
-
-The script automatically uses whichever endpoint you configured in `.env` (Docker or Render).
-
-**Other Options:** For AWS, GCP, Azure, or custom HSM deployments, see [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md).
+**Other deployment options:** See [TX_SIGNING_OPTIONS.md](docs/TX_SIGNING_OPTIONS.md) for additional methods (cloud providers, self-hosted, custom infrastructure).
 
 ### Run Examples
 
