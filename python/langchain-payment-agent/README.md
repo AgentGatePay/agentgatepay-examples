@@ -10,13 +10,18 @@
 
 This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
-- **Examples 1-2:** REST API basics (payment flow + buyer/seller marketplace)
-- **Examples 3-4:** MCP tools basics (same features as 1-2 using MCP, with webhook support)
-- **Example 5:** REST API + External TX signing (Docker local or Render cloud)
-- **Examples 6a/6b:** Buyer & Seller Monitoring Dashboards (analytics & audit logs)
-- **Example 8:** MCP + External TX signing (production-ready MCP payments)
+- **Examples 1a/1b:** REST API (1a: local signing, 1b: external TX service)
+- **Examples 2a/2b:** REST API marketplace (buyer/seller split)
+- **Examples 3a/3b:** MCP tools (3a: local signing, 3b: external TX service)
+- **Examples 4a/4b:** MCP marketplace (buyer/seller split, with webhooks)
+- **Examples 6a/6b:** Monitoring dashboards (buyer spending, seller revenue)
 
-**Note:** Examples 1-4 demonstrate all core payment features. Examples 5/6a/6b/8 add production enhancements (external signing, monitoring, MCP production).
+**Logical Grouping:**
+- **1a/1b**: REST API payments (local vs external signing)
+- **2a/2b**: REST API marketplace (buyer vs seller)
+- **3a/3b**: MCP payments (local vs external signing)
+- **4a/4b**: MCP marketplace (buyer vs seller)
+- **6a/6b**: Monitoring (buyer vs seller dashboards)
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -155,7 +160,7 @@ TX_SIGNING_SERVICE=https://your-service.onrender.com
 
 ### Transaction Signing
 
-**Examples 1-4, 6a/6b: Local Signing**
+**Examples 1a, 2a/2b, 3a, 4a/4b, 6a/6b: Local Signing**
 
 Sign transactions using your private key from `.env` file:
 
@@ -165,14 +170,14 @@ BUYER_PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
 BUYER_WALLET=0xYOUR_WALLET_ADDRESS_HERE
 
 # Run example:
-python examples/1_api_basic_payment.py
+python examples/1a_api_basic_payment.py
 ```
 
 **Note:** Examples use **$0.01 USDC** for testing. Private key in `.env` is suitable for development and testing with small amounts only.
 
 ---
 
-**Example 5: External Signing Service**
+**Examples 1b, 3b: External Signing Service (Production)**
 
 Deploy a separate signing service to isolate private keys from application code.
 
@@ -206,8 +211,11 @@ See [RENDER_DEPLOYMENT_GUIDE.md](docs/RENDER_DEPLOYMENT_GUIDE.md) for detailed s
 ### Run Examples
 
 ```bash
-# Example 1: Basic payment (REST API)
-python examples/1_api_basic_payment.py
+# Example 1a: REST API + Local signing (basic)
+python examples/1a_api_basic_payment.py
+
+# Example 1b: REST API + External TX signing (production)
+python examples/1b_api_with_tx_service.py
 
 # Example 2: Buyer/seller marketplace (REST API) - TWO SCRIPTS
 # Terminal 1: Start seller first
@@ -216,8 +224,11 @@ python examples/2b_api_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/2a_api_buyer_agent.py
 
-# Example 3: Basic payment (MCP tools)
-python examples/3_mcp_basic_payment.py
+# Example 3a: MCP + Local signing (basic)
+python examples/3a_mcp_basic_payment.py
+
+# Example 3b: MCP + External TX signing (production)
+python examples/3b_mcp_with_tx_service.py
 
 # Example 4: Buyer/seller marketplace (MCP tools) - TWO SCRIPTS
 # Terminal 1: Start seller first
@@ -226,17 +237,11 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/4a_mcp_buyer_agent.py
 
-# Example 5: REST API + External TX signing (Docker or Render)
-python examples/5_api_with_tx_service.py
-
 # Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
 python examples/6a_monitoring_buyer.py
 
 # Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
 python examples/6b_monitoring_seller.py
-
-# Example 8: MCP + External TX signing (production MCP payments)
-python examples/8_mcp_with_tx_service.py
 ```
 
 ### Multi-Chain/Token Configuration
@@ -270,14 +275,14 @@ PAYMENT_TOKEN=USDC          # Options: USDC, USDT, DAI
 ```bash
 # Change from Base to Ethereum with USDT
 nano .env  # Edit PAYMENT_CHAIN=ethereum and PAYMENT_TOKEN=USDT
-python examples/1_api_basic_payment.py
+python examples/1a_api_basic_payment.py
 ```
 
 ## Examples Overview
 
-### Example 1: Basic Payment Flow (REST API)
+### Example 1a: Basic Payment Flow (REST API + Local Signing)
 
-**File:** `examples/1_api_basic_payment.py`
+**File:** `examples/1a_api_basic_payment.py`
 
 Simple autonomous payment flow demonstrating the complete 3-step process:
 1. **Issue Mandate**: Create AP2 mandate with $100 budget and budget tracking
@@ -394,11 +399,11 @@ Enter public webhook URL: https://your-seller.com/webhooks/payment
 
 ---
 
-### Example 3: Basic Payment Flow (MCP Tools)
+### Example 3a: Basic Payment Flow (MCP + Local Signing)
 
-**File:** `examples/3_mcp_basic_payment.py`
+**File:** `examples/3a_mcp_basic_payment.py`
 
-MCP version of Example 1, demonstrating the same payment flow using AgentGatePay's MCP tools instead of REST API.
+MCP version of Example 1a, demonstrating the same payment flow using AgentGatePay's MCP tools instead of REST API.
 
 **Flow:**
 1. Issue mandate via `agentpay_issue_mandate` tool
@@ -412,7 +417,7 @@ MCP version of Example 1, demonstrating the same payment flow using AgentGatePay
 - Cleaner tool abstraction
 
 **Key Features:**
-- Matches Script 1 exact flow (3 steps)
+- Matches Script 1a exact flow (3 steps)
 - Combined submit+verify for efficiency
 - Audit log curl commands for verification
 - Same output format as REST API version
@@ -491,11 +496,11 @@ curl 'https://api.agentgatepay.com/audit/logs?...' | python3 -m json.tool
 
 ---
 
-### Example 5: External TX Signing Service
+### Example 1b: REST API + External TX Signing (Production)
 
-**File:** `examples/5_api_with_tx_service.py`
+**File:** `examples/1b_api_with_tx_service.py`
 
-Payment flow using external transaction signing service to isolate private keys from application code.
+Same payment flow as Example 1a, but using external transaction signing service to isolate private keys from application code (production-ready).
 
 **Flow:**
 1. Issue mandate via SDK
@@ -547,7 +552,7 @@ See [RENDER_DEPLOYMENT_GUIDE.md](docs/RENDER_DEPLOYMENT_GUIDE.md) for detailed s
 
 **Run:**
 ```bash
-python examples/5_api_with_tx_service.py
+python examples/1b_api_with_tx_service.py
 ```
 
 **Output:**
@@ -582,9 +587,11 @@ PRODUCTION SUCCESS:
 
 ---
 
-### Example 8: MCP + External TX Signing (Production)
+### Example 3b: MCP + External TX Signing (Production)
 
-**File:** `examples/8_mcp_with_tx_service.py`
+**File:** `examples/3b_mcp_with_tx_service.py`
+
+Same payment flow as Example 3a, but using external transaction signing service for production security.
 
 Combines the best of both worlds:
 - **MCP tools** for mandate management and payment submission (JSON-RPC 2.0 protocol)
@@ -606,7 +613,7 @@ Combines the best of both worlds:
 
 **Setup:**
 
-Same as Example 5 - setup external TX signing service:
+Same as Example 1b - setup external TX signing service:
 
 **Docker (Local):**
 ```bash
@@ -622,7 +629,7 @@ Add to `.env`: `TX_SIGNING_SERVICE=http://localhost:3000` (or your Render URL)
 
 **Run:**
 ```bash
-python examples/8_mcp_with_tx_service.py
+python examples/3b_mcp_with_tx_service.py
 ```
 
 **Output:**
@@ -669,8 +676,8 @@ Wallet configured: true
 - Agent frameworks with native MCP support (Claude Desktop, etc.)
 
 **Comparison to Other Examples:**
-- **vs Example 1/3**: Adds production security (external TX signing)
-- **vs Example 5**: Uses MCP protocol instead of REST API
+- **vs Example 1a/3a**: Adds production security (external TX signing)
+- **vs Example 1b**: Uses MCP protocol instead of REST API
 - **Best of both**: MCP standardization + production security
 
 ---
@@ -972,7 +979,7 @@ pytest tests/
 pytest tests/test_api_integration.py
 
 # Test with different chains
-PAYMENT_CHAIN=polygon python examples/1_api_basic_payment.py
+PAYMENT_CHAIN=polygon python examples/1a_api_basic_payment.py
 ```
 
 ---

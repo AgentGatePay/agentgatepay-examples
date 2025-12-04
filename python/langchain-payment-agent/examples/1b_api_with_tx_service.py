@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-AgentGatePay + LangChain Integration - External TX Signing Service
+AgentGatePay + LangChain Integration - Example 1b: REST API + External TX Signing
 
-This example demonstrates the SAME payment flow as 1_api_basic_payment.py,
+This example demonstrates the SAME payment flow as Example 1a,
 but using an external transaction signing service for production security.
 
 Flow:
@@ -25,6 +25,9 @@ Setup Options:
 Requirements:
 - pip install agentgatepay-sdk langchain langchain-openai python-dotenv requests
 - .env file with TX_SIGNING_SERVICE configured
+
+For Development: See Example 1a (local signing, simpler setup)
+For MCP Version: See Example 3b (MCP + external signing)
 """
 
 import os

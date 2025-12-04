@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-AgentGatePay + LangChain Integration - MCP Tools + External TX Signing Service
+AgentGatePay + LangChain Integration - Example 3b: MCP + External TX Signing
 
 This example demonstrates PRODUCTION-READY autonomous agent payments by combining:
 - AgentGatePay MCP tools (JSON-RPC 2.0 protocol)
 - External transaction signing service (NO private key in code)
 
 Combines best of both worlds:
-- Script 3: MCP tools for mandate management and payment submission
-- Script 5: External TX signing for production security
+- Example 3a: MCP tools for mandate management and payment submission
+- Example 1b: External TX signing for production security
 
 MCP Tools Used:
 - agentpay_issue_mandate - Issue AP2 payment mandate
@@ -36,6 +36,9 @@ Setup Options:
 Requirements:
 - pip install langchain langchain-openai python-dotenv requests
 - .env file with TX_SIGNING_SERVICE configured
+
+For Development: See Example 3a (MCP + local signing, simpler setup)
+For REST API Version: See Example 1b (REST API + external signing)
 """
 
 import os

@@ -1,29 +1,32 @@
 #!/usr/bin/env python3
 """
-AgentGatePay + LangChain Integration - Basic Payment Flow (MCP TOOLS)
+AgentGatePay + LangChain Integration - Example 1a: REST API + Local Signing
 
-This example demonstrates the SAME payment flow as 1_api_basic_payment.py,
-but using AgentGatePay's MCP (Model Context Protocol) tools instead of REST API.
-
-MCP Advantages:
-- Native tool discovery (framework can list all 15 AgentGatePay tools)
-- Standardized JSON-RPC 2.0 protocol
-- Future-proof (Anthropic-backed standard)
-- Cleaner separation between agent logic and API calls
-
-MCP Tools Used:
-- agentpay_issue_mandate - Issue AP2 payment mandate
-- agentpay_submit_payment - Submit blockchain payment proof
-- agentpay_verify_mandate - Verify mandate is valid
+This example demonstrates a simple autonomous payment flow using:
+- AgentGatePay REST API (via published SDK v1.1.0)
+- LangChain agent with payment tools
+- Local transaction signing (private key in .env)
+- Multi-chain blockchain payments (Base, Ethereum, Polygon, Arbitrum)
+- Multi-token support (USDC, USDT, DAI)
 
 Flow:
-1. Issue AP2 mandate ($100 budget)
-2. Sign blockchain transaction (USDC on Base)
-3. Submit payment and verify budget via MCP tool
+1. Configure chain and token (from .env file)
+2. Issue AP2 mandate ($100 budget)
+3. Sign blockchain transactions locally (Web3.py)
+4. Submit payment proof to AgentGatePay
+5. Verify payment completion and view audit logs
 
 Requirements:
-- pip install langchain langchain-openai web3 python-dotenv requests
+- pip install agentgatepay-sdk langchain langchain-openai web3 python-dotenv
 - .env file with configuration (see .env.example)
+
+Multi-Chain Configuration:
+- Edit .env file: PAYMENT_CHAIN=base (options: base, ethereum, polygon, arbitrum)
+- Edit .env file: PAYMENT_TOKEN=USDC (options: USDC, USDT, DAI)
+- Note: USDT not available on Base, DAI uses 18 decimals
+- See README.md for complete chain/token compatibility matrix
+
+For Production: See Example 1b (external TX signing service)
 """
 
 import os
@@ -31,11 +34,12 @@ import sys
 import time
 import json
 import base64
-import requests
 from typing import Dict, Any
 from dotenv import load_dotenv
 from web3 import Web3
 from eth_account import Account
+from agentgatepay_sdk import AgentGatePay
+import requests
 
 # LangChain imports (updated for LangChain 1.x)
 from langchain_core.tools import Tool
@@ -80,8 +84,8 @@ from chain_config import get_chain_config
 # ========================================
 
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
-AGENTPAY_MCP_ENDPOINT = os.getenv('MCP_API_URL', 'https://mcp.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
+BUYER_EMAIL = os.getenv('BUYER_EMAIL')
 BUYER_PRIVATE_KEY = os.getenv('BUYER_PRIVATE_KEY')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
 
@@ -101,14 +105,25 @@ MANDATE_BUDGET_USD = 100.0
 #     explorer="https://etherscan.io"
 # )
 # Note: USDT not available on Base. DAI uses 18 decimals. See CHAIN_TOKEN_GUIDE.md
-config = None  # Will be set via get_chain_config() in main()
+config = None  # Will be set via get_or_create_config() in main()
 
 # ========================================
-# HELPER FUNCTIONS
+# INITIALIZE CLIENTS
 # ========================================
+# Note: Clients initialized in main() after chain/token configuration
+
+agentpay = None
+web3 = None
+buyer_account = None
+
+# ========================================
+# AGENT TOOLS
+# ========================================
+
+# Global mandate storage
+current_mandate = None
 
 def get_commission_config() -> dict:
-    """Fetch commission configuration from AgentGatePay API"""
     try:
         response = requests.get(
             f"{AGENTPAY_API_URL}/v1/config/commission",
@@ -121,7 +136,6 @@ def get_commission_config() -> dict:
         return None
 
 def decode_mandate_token(token: str) -> dict:
-    """Decode AP2 mandate token to extract payload"""
     try:
         parts = token.split('.')
         if len(parts) != 3:
@@ -135,71 +149,7 @@ def decode_mandate_token(token: str) -> dict:
     except:
         return {}
 
-# ========================================
-# MCP TOOL WRAPPER
-# ========================================
-
-def call_mcp_tool(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Call AgentGatePay MCP tool via JSON-RPC 2.0 protocol.
-
-    Args:
-        tool_name: MCP tool name (e.g., "agentpay_issue_mandate")
-        arguments: Tool arguments as dictionary
-
-    Returns:
-        Tool result as dictionary
-    """
-    payload = {
-        "jsonrpc": "2.0",
-        "method": "tools/call",
-        "params": {
-            "name": tool_name,
-            "arguments": arguments
-        },
-        "id": 1
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "x-api-key": BUYER_API_KEY
-    }
-
-    print(f"   📡 Calling MCP tool: {tool_name}")
-
-    response = requests.post(AGENTPAY_MCP_ENDPOINT, json=payload, headers=headers)
-    response.raise_for_status()
-
-    result = response.json()
-
-    if "error" in result:
-        raise Exception(f"MCP error: {result['error']}")
-
-    # MCP response format: result.content[0].text (JSON string)
-    content_text = result['result']['content'][0]['text']
-    return json.loads(content_text)
-
-
-# ========================================
-# INITIALIZE CLIENTS
-# ========================================
-# Note: Clients initialized in main() after chain/token configuration
-
-web3 = None
-buyer_account = None
-
-# ========================================
-# AGENT TOOLS (MCP-BASED)
-# ========================================
-
-# Global state
-current_mandate = None
-merchant_tx_hash = None
-commission_tx_hash = None
-
-
-def mcp_issue_mandate(budget_usd: float) -> str:
-    """Issue mandate using MCP tool (with reuse logic matching Script 1)"""
+def issue_payment_mandate(budget_usd: float) -> str:
     global current_mandate
 
     try:
@@ -209,20 +159,18 @@ def mcp_issue_mandate(budget_usd: float) -> str:
         if existing_mandate:
             token = existing_mandate.get('mandate_token')
 
-            # Get LIVE budget from gateway (via MCP verify tool)
-            try:
-                verify_result = call_mcp_tool("agentpay_verify_mandate", {
-                    "mandate_token": token
-                })
+            # Get LIVE budget from gateway
+            verify_response = requests.post(
+                f"{AGENTPAY_API_URL}/mandates/verify",
+                headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                json={"mandate_token": token}
+            )
 
-                if verify_result.get('valid'):
-                    budget_remaining = verify_result.get('budget_remaining', 'Unknown')
-                else:
-                    # Fallback to JWT decode if MCP verify fails
-                    token_data = decode_mandate_token(token)
-                    budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
-            except:
-                # Fallback to JWT if MCP call fails
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                budget_remaining = verify_data.get('budget_remaining', 'Unknown')
+            else:
+                # Fallback to JWT if verify fails
                 token_data = decode_mandate_token(token)
                 budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
 
@@ -233,14 +181,14 @@ def mcp_issue_mandate(budget_usd: float) -> str:
 
         print(f"\n🔐 Creating mandate (${budget_usd})...")
 
-        mandate = call_mcp_tool("agentpay_issue_mandate", {
-            "subject": agent_id,
-            "budget_usd": budget_usd,
-            "scope": "resource.read,payment.execute",
-            "ttl_minutes": 168 * 60
-        })
+        mandate = agentpay.mandates.issue(
+            subject=agent_id,
+            budget=budget_usd,
+            scope="resource.read,payment.execute",
+            ttl_minutes=168 * 60
+        )
 
-        # Store mandate with budget info (MCP response only includes token)
+        # Store mandate with budget info
         token = mandate['mandate_token']
         mandate_with_budget = {
             **mandate,
@@ -260,27 +208,26 @@ def mcp_issue_mandate(budget_usd: float) -> str:
         return f"Failed: {str(e)}"
 
 
-def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
-    """
-    Sign blockchain payment locally (same as API version).
-    Note: Blockchain signing is NOT done via MCP (requires private key).
-    """
-    global merchant_tx_hash, commission_tx_hash
-
-    print(f"\n💳 Signing payment (${amount_usd} {config.token})...")
-    print(f"   Chain: {config.chain.title()} (ID: {config.chain_id})")
-    print(f"   Token: {config.token} ({config.decimals} decimals)")
-
+def sign_blockchain_payment(payment_input: str) -> str:
     try:
-        # Fetch commission configuration from API
+        parts = payment_input.split(',')
+        if len(parts) != 2:
+            return f"Error: Invalid format"
+
+        amount_usd = float(parts[0].strip())
+        recipient = parts[1].strip()
+
         commission_config = get_commission_config()
         if not commission_config:
-            return "Error: Failed to fetch commission configuration"
+            return "Error: Failed to fetch commission config"
 
         commission_address = commission_config['commission_address']
         commission_rate = commission_config['commission_rate']
 
-        # Calculate amounts
+        print(f"\n💳 Signing payment (${amount_usd} {config.token})...")
+        print(f"   Chain: {config.chain.title()} (ID: {config.chain_id})")
+        print(f"   Token: {config.token} ({config.decimals} decimals)")
+
         commission_amount_usd = amount_usd * commission_rate
         merchant_amount_usd = amount_usd - commission_amount_usd
         merchant_amount_atomic = int(merchant_amount_usd * (10 ** config.decimals))
@@ -333,8 +280,10 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         tx_hash_commission = f"0x{tx_hash_commission_raw.hex()}" if not tx_hash_commission_raw.hex().startswith('0x') else tx_hash_commission_raw.hex()
         print(f"   ✅ TX 2/2 sent: {tx_hash_commission[:20]}...")
 
+        global merchant_tx_hash, commission_tx_hash, signed_amount_usd
         merchant_tx_hash = tx_hash_merchant
         commission_tx_hash = tx_hash_commission
+        signed_amount_usd = amount_usd
 
         return f"TX_HASHES:{tx_hash_merchant},{tx_hash_commission}"
 
@@ -343,71 +292,99 @@ def sign_blockchain_payment(amount_usd: float, recipient: str) -> str:
         raise Exception(f"Payment failed: {str(e)}")
 
 
-def mcp_submit_and_verify_payment() -> str:
-    """Submit payment proof using MCP tool and verify budget (combined)"""
+def submit_and_verify_payment(payment_data: str) -> str:
     global current_mandate
 
-    if not current_mandate or not merchant_tx_hash:
-        return "Error: Must issue mandate and sign payment first"
-
-    print(f"\n📤 [MCP] Submitting payment proof...")
-
     try:
-        # Submit payment via MCP
-        result = call_mcp_tool("agentpay_submit_payment", {
-            "mandate_token": current_mandate['mandate_token'],
-            "tx_hash": merchant_tx_hash,
-            "tx_hash_commission": commission_tx_hash,
-            "chain": config.chain,
-            "token": config.token
-        })
+        parts = payment_data.split(',')
+        if len(parts) != 4:
+            return f"Error: Invalid format"
 
-        print(f"✅ Payment submitted via MCP")
-        print(f"   Status: {result.get('status', 'N/A')}")
+        merchant_tx = parts[0].strip()
+        commission_tx = parts[1].strip()
+        mandate_token = parts[2].strip()
+        price_usd = float(parts[3].strip())
 
-        # Verify mandate to get updated budget
-        print(f"   🔍 Fetching updated budget...")
-        verify_result = call_mcp_tool("agentpay_verify_mandate", {
-            "mandate_token": current_mandate['mandate_token']
-        })
+        print(f"\n📤 Submitting to gateway...")
 
-        if verify_result.get('valid'):
-            new_budget = verify_result.get('budget_remaining', 'Unknown')
-            print(f"   ✅ Budget updated: ${new_budget}")
+        payment_payload = {
+            "scheme": "eip3009",
+            "tx_hash": merchant_tx,
+            "tx_hash_commission": commission_tx
+        }
 
-            # Update and save mandate (matching Script 1)
-            if current_mandate:
-                current_mandate['budget_remaining'] = new_budget
-                agent_id = f"research-assistant-{buyer_account.address}"
-                save_mandate(agent_id, current_mandate)
+        payment_b64 = base64.b64encode(json.dumps(payment_payload).encode()).decode()
 
-            return f"Success! Paid: ${RESOURCE_PRICE_USD}, Remaining: ${new_budget}"
+        headers = {
+            "x-api-key": BUYER_API_KEY,
+            "x-mandate": mandate_token,
+            "x-payment": payment_b64
+        }
+
+        url = f"{AGENTPAY_API_URL}/x402/resource?chain={config.chain}&token={config.token}&price_usd={price_usd}"
+        response = requests.get(url, headers=headers)
+
+        if response.status_code >= 400:
+            result = response.json() if response.text else {}
+            error = result.get('error', response.text)
+            print(f"❌ Gateway error ({response.status_code}): {error}")
+            return f"Failed: {error}"
+
+        result = response.json()
+
+        # Check if payment was successful
+        if result.get('message') or result.get('success') or result.get('paid') or result.get('status') == 'confirmed':
+            print(f"✅ Payment recorded")
+
+            # Verify mandate to get updated budget
+            print(f"   🔍 Fetching updated budget...")
+            verify_response = requests.post(
+                f"{AGENTPAY_API_URL}/mandates/verify",
+                headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+                json={"mandate_token": mandate_token}
+            )
+
+            if verify_response.status_code == 200:
+                verify_data = verify_response.json()
+                new_budget = verify_data.get('budget_remaining', 'Unknown')
+                print(f"   ✅ Budget updated: ${new_budget}")
+
+                if current_mandate:
+                    current_mandate['budget_remaining'] = new_budget
+                    agent_id = f"research-assistant-{buyer_account.address}"
+                    save_mandate(agent_id, current_mandate)
+
+                return f"Success! Paid: ${price_usd}, Remaining: ${new_budget}"
+            else:
+                print(f"   ⚠️  Could not fetch updated budget")
+                return f"Success! Paid: ${price_usd}"
+
         else:
-            print(f"   ⚠️  Could not fetch updated budget")
-            return f"Success! Paid: ${RESOURCE_PRICE_USD}"
+            error = result.get('error', 'Unknown error')
+            print(f"❌ Failed: {error}")
+            return f"Failed: {error}"
 
     except Exception as e:
-        error_msg = f"Payment submission failed: {str(e)}"
-        print(f"❌ {error_msg}")
-        return error_msg
+        print(f"❌ Error: {str(e)}")
+        return f"Error: {str(e)}"
 
 
 # Define LangChain tools
 tools = [
     Tool(
-        name="issue_mandate_mcp",
-        func=lambda budget: mcp_issue_mandate(float(budget)),
-        description="Issue AP2 mandate using MCP tool. Input: budget amount in USD."
+        name="issue_mandate",
+        func=issue_payment_mandate,
+        description="Issue an AP2 payment mandate with a specified budget in USD. Use this FIRST before making any payments. Input should be a float representing the budget amount."
     ),
     Tool(
         name="sign_payment",
-        func=lambda params: sign_blockchain_payment(*[float(params.split(',')[0]), params.split(',')[1]]),
-        description="Sign blockchain payment locally (Web3). Input: 'amount_usd,recipient_address'"
+        func=sign_blockchain_payment,
+        description="Sign and execute a blockchain payment on the configured network and token. Creates two transactions: merchant payment and gateway commission. Input should be 'amount_usd,recipient_address'."
     ),
     Tool(
-        name="submit_and_verify_payment",
-        func=lambda _: mcp_submit_and_verify_payment(),
-        description="Submit payment proof via MCP and verify updated budget. No input needed."
+        name="submit_payment",
+        func=submit_and_verify_payment,
+        description="Submit payment proof to AgentGatePay gateway for verification and budget tracking. Input should be 'merchant_tx,commission_tx,mandate_token,price_usd'."
     ),
 ]
 
@@ -423,23 +400,23 @@ llm = ChatOpenAI(
 )
 
 # System prompt for agent behavior
-system_prompt = """You are an autonomous AI agent using AgentGatePay MCP tools for payments.
+system_prompt = """You are an autonomous AI agent that can make blockchain payments for resources.
 
 Follow this workflow:
-1. Issue mandate using MCP tool (issue_mandate_mcp) with the specified budget
-   - The tool returns: "Mandate issued via MCP. Budget: $X, Token: ..."
-   - Extract the mandate information from the response
-2. Sign blockchain payment locally (sign_payment) for the specified amount to the recipient
-   - Input format: 'amount_usd,recipient_address'
-   - The tool returns: "TX_HASHES:{merchant_tx},{commission_tx}"
+1. Issue a payment mandate with the specified budget using the issue_mandate tool
+   - The tool returns: MANDATE_TOKEN:{token}
+   - Extract the token after the colon
+2. Sign the blockchain payment for the specified amount to the recipient using the sign_payment tool
+   - The tool returns: TX_HASHES:{merchant_tx},{commission_tx}
    - Extract both transaction hashes after the colon
-3. Submit payment and verify budget using MCP tool (submit_and_verify_payment)
-   - This tool automatically uses the mandate and transaction hashes from previous steps
-   - Returns updated budget after payment
+3. Submit the payment to AgentGatePay using the submit_payment tool with: merchant_tx,commission_tx,mandate_token,price_usd
+   - Use the mandate token from step 1
+   - Use the transaction hashes from step 2
+   - Use the payment amount specified in the task
 
 IMPORTANT:
-- All three steps must complete successfully
-- Parse tool outputs to extract values
+- Parse tool outputs to extract values (look for : separator)
+- Always submit payment to AgentGatePay after signing (step 3 is mandatory)
 - If any tool returns an error, STOP immediately and report the error
 - Do NOT retry failed operations"""
 
@@ -456,11 +433,11 @@ agent_executor = create_agent(
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("AGENTGATEPAY + LANGCHAIN: BASIC PAYMENT DEMO (MCP TOOLS)")
+    print("AGENTGATEPAY + LANGCHAIN: BASIC PAYMENT DEMO (REST API)")
     print("=" * 80)
     print()
     print("This demo shows an autonomous agent making a blockchain payment using:")
-    print("  - AgentGatePay MCP tools (JSON-RPC 2.0)")
+    print("  - AgentGatePay REST API (latest SDK)")
     print("  - LangChain agent framework")
     print("  - Multi-chain blockchain payments (Base/Ethereum/Polygon/Arbitrum)")
     print("  - Multi-token support (USDC/USDT/DAI)")
@@ -481,10 +458,14 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # Initialize clients with selected configuration
+    agentpay = AgentGatePay(
+        api_url=AGENTPAY_API_URL,
+        api_key=BUYER_API_KEY
+    )
     web3 = Web3(Web3.HTTPProvider(config.rpc_url))
     buyer_account = Account.from_key(BUYER_PRIVATE_KEY)
 
-    print(f"\nInitialized AgentGatePay MCP client: {AGENTPAY_MCP_ENDPOINT}")
+    print(f"\nInitialized AgentGatePay client: {AGENTPAY_API_URL}")
     print(f"Initialized Web3 client: {config.chain.title()} network")
     print(f"Buyer wallet: {buyer_account.address}\n")
 
@@ -494,20 +475,18 @@ if __name__ == "__main__":
     if existing_mandate:
         token = existing_mandate.get('mandate_token')
 
-        # Get LIVE budget from gateway (via MCP verify tool)
-        try:
-            verify_result = call_mcp_tool("agentpay_verify_mandate", {
-                "mandate_token": token
-            })
+        # Get LIVE budget from gateway (not JWT which is static)
+        verify_response = requests.post(
+            f"{AGENTPAY_API_URL}/mandates/verify",
+            headers={"x-api-key": BUYER_API_KEY, "Content-Type": "application/json"},
+            json={"mandate_token": token}
+        )
 
-            if verify_result.get('valid'):
-                budget_remaining = verify_result.get('budget_remaining', 'Unknown')
-            else:
-                # Fallback to JWT decode if MCP verify fails
-                token_data = decode_mandate_token(token)
-                budget_remaining = token_data.get('budget_remaining', 'Unknown')
-        except:
-            # Fallback to JWT if MCP call fails
+        if verify_response.status_code == 200:
+            verify_data = verify_response.json()
+            budget_remaining = verify_data.get('budget_remaining', 'Unknown')
+        else:
+            # Fallback to JWT decode if verify fails
             token_data = decode_mandate_token(token)
             budget_remaining = token_data.get('budget_remaining', 'Unknown')
 
