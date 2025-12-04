@@ -77,6 +77,7 @@ from chain_config import get_chain_config
 AGENTPAY_API_URL = os.getenv('AGENTPAY_API_URL', 'https://api.agentgatepay.com')
 BUYER_API_KEY = os.getenv('BUYER_API_KEY')
 BUYER_EMAIL = os.getenv('BUYER_EMAIL')
+BUYER_WALLET = os.getenv('BUYER_WALLET')
 SELLER_WALLET = os.getenv('SELLER_WALLET')
 TX_SIGNING_SERVICE = os.getenv('TX_SIGNING_SERVICE')
 
@@ -106,6 +107,7 @@ agentpay = AgentGatePay(
 
 print(f"✅ Initialized AgentGatePay client: {AGENTPAY_API_URL}")
 print(f"✅ Configured TX signing service: {TX_SIGNING_SERVICE}")
+print(f"✅ Buyer wallet: {BUYER_WALLET}")
 print(f"✅ PRODUCTION MODE: Private key NOT in application code\n")
 
 # ========================================
@@ -141,7 +143,7 @@ def issue_payment_mandate(budget_usd: float) -> str:
     global current_mandate
 
     try:
-        agent_id = f"research-assistant-tx-service"
+        agent_id = f"research-assistant-{BUYER_WALLET}"
         existing_mandate = get_mandate(agent_id)
 
         if existing_mandate:
@@ -361,7 +363,7 @@ def submit_and_verify_payment(payment_data: str) -> str:
 
                 if current_mandate:
                     current_mandate['budget_remaining'] = new_budget
-                    agent_id = f"research-assistant-tx-service"
+                    agent_id = f"research-assistant-{BUYER_WALLET}"
                     save_mandate(agent_id, current_mandate)
 
                 return f"Success! Paid: ${price_usd}, Remaining: ${new_budget}"
@@ -492,7 +494,7 @@ if __name__ == "__main__":
         print(f"   See docs/TX_SIGNING_OPTIONS.md for setup instructions")
         exit(1)
 
-    agent_id = f"research-assistant-tx-service"
+    agent_id = f"research-assistant-{BUYER_WALLET}"
     existing_mandate = get_mandate(agent_id)
 
     if existing_mandate:
@@ -565,14 +567,14 @@ if __name__ == "__main__":
 
             # Display gateway audit logs with curl commands (matches Script 1)
             print(f"\nGateway Audit Logs (copy-paste these commands):")
-            print(f"\n# All payment logs:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_EMAIL}&event_type=x402_payment_settled&limit=10' \\")
+            print(f"\n# All payment logs (by wallet):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_WALLET}&event_type=x402_payment_settled&limit=10' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
             print(f"\n# This specific transaction:")
             print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{merchant_tx_hash}' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
             print(f"\n# Audit stats (24h):")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_EMAIL}&hours=24' \\")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_WALLET}&hours=24' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
 
             print(f"\n✅ PRODUCTION SUCCESS:")
