@@ -589,17 +589,17 @@ if __name__ == "__main__":
             print(f"  Merchant TX: {config.explorer}/tx/{merchant_tx_hash}")
             print(f"  Commission TX: {config.explorer}/tx/{commission_tx_hash}")
 
-            # Display gateway audit logs with curl commands (matches Script 1)
+            # Display gateway audit logs with curl commands
             print(f"\nGateway Audit Logs (copy-paste these commands):")
             print(f"\n# All payment logs (by wallet):")
             print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_WALLET}&event_type=x402_payment_settled&limit=10' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-            print(f"\n# This specific transaction:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{merchant_tx_hash}' \\")
+            print(f"\n# Recent payments (24h):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_WALLET}&event_type=x402_payment_settled&hours=24' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-            print(f"\n# Audit stats (24h):")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={BUYER_WALLET}&hours=24' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
+            print(f"\n# Payment verification (by tx_hash):")
+            print(f"curl '{AGENTPAY_API_URL}/v1/payments/verify/{merchant_tx_hash}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
 
             print(f"\n✅ PRODUCTION SUCCESS:")
             print(f"   Private key: SECURE (stored in signing service)")

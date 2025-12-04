@@ -2334,11 +2334,16 @@ curl https://api.agentgatepay.com/audit/stats \
   -H "x-api-key: YOUR_API_KEY"
 ```
 
-**GET /audit/logs/transaction/{txHash}**
-Get logs by blockchain transaction.
+**GET /audit/logs** (by transaction - use event_type filter)
+Get payment logs by filtering for specific transactions.
 
 ```bash
-curl https://api.agentgatepay.com/audit/logs/transaction/0xABC123... \
+# Query recent payments with event type filter
+curl "https://api.agentgatepay.com/audit/logs?event_type=x402_payment_settled&hours=24" \
+  -H "x-api-key: YOUR_API_KEY"
+
+# Verify specific payment by tx_hash
+curl "https://api.agentgatepay.com/v1/payments/verify/0xABC123..." \
   -H "x-api-key: YOUR_API_KEY"
 ```
 

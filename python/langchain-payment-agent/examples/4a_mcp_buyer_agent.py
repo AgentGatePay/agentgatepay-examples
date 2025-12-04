@@ -897,12 +897,12 @@ Think step by step and complete the workflow for ONE resource."""
             print(f"\n# All payment logs (by wallet):")
             print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&event_type=x402_payment_settled&limit=10' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-            print(f"\n# This specific transaction:")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs/transaction/{buyer.last_payment['merchant_tx']}' \\")
+            print(f"\n# Recent payments (24h):")
+            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&event_type=x402_payment_settled&hours=24' \\")
             print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
-            print(f"\n# Audit stats (24h):")
-            print(f"curl '{AGENTPAY_API_URL}/audit/logs?client_id={buyer.account.address}&hours=24' \\")
-            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool | grep -E '(event_type|timestamp|amount)' | head -20")
+            print(f"\n# Payment verification (by tx_hash):")
+            print(f"curl '{AGENTPAY_API_URL}/v1/payments/verify/{buyer.last_payment['merchant_tx']}' \\")
+            print(f"  -H 'x-api-key: {BUYER_API_KEY}' | python3 -m json.tool")
 
         if buyer.last_payment and 'resource_data' in buyer.last_payment:
             print(f"\n📦 Received Resource:")
