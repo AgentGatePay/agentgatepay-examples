@@ -222,8 +222,11 @@ def sign_payment_via_service(payment_input: str) -> str:
         amount_usd = float(parts[0].strip())
         recipient = parts[1].strip()
 
+        # Convert USD to atomic units
+        amount_atomic = int(amount_usd * (10 ** config.decimals))
+
         print(f"\n💳 Requesting payment signature from external service...")
-        print(f"   Amount: ${amount_usd} {config.token}")
+        print(f"   Amount: ${amount_usd} {config.token} ({amount_atomic} atomic units)")
         print(f"   Chain: {config.chain.title()}")
         print(f"   Recipient: {recipient[:10]}...")
         print(f"   Service: {TX_SIGNING_SERVICE}")
@@ -237,7 +240,7 @@ def sign_payment_via_service(payment_input: str) -> str:
             },
             json={
                 "merchant_address": recipient,
-                "total_amount": str(amount_usd),
+                "total_amount": str(amount_atomic),
                 "chain": config.chain,
                 "token": config.token
             },
