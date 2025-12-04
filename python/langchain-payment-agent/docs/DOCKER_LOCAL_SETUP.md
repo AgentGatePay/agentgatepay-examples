@@ -2,6 +2,8 @@
 
 **Run production-ready transaction signing service on your local machine using Docker**
 
+**Note:** This guide demonstrates Docker deployment as an example. You can deploy the TX signing service using any method you prefer (AWS, GCP, Azure, Railway, DigitalOcean, your own infrastructure, etc.).
+
 ## Overview
 
 This guide shows you how to run the AgentGatePay TX signing service locally using Docker. This is perfect for:

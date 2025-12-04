@@ -2,6 +2,8 @@
 
 **Deploy production-ready transaction signing service to Render cloud in 3 minutes**
 
+**Note:** This guide demonstrates Render deployment as an example. You can deploy the TX signing service using any method you prefer (AWS, GCP, Azure, Railway, Docker, DigitalOcean, your own infrastructure, etc.).
+
 ## Overview
 
 This guide shows you how to deploy the AgentGatePay TX signing service to Render cloud. This is perfect for:

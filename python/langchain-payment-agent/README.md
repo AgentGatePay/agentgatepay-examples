@@ -173,7 +173,9 @@ python examples/1_api_basic_payment.py
 
 **Example 5: External Signing Service**
 
-Deploy a separate signing service to isolate private keys from application code. Choose your deployment method:
+Deploy a separate signing service to isolate private keys from application code.
+
+**Note:** Docker and Render are shown as examples, but you can deploy the signing service using any method you prefer (AWS ECS, GCP Cloud Run, Azure Container Instances, Railway, your own VPS, etc.). The example script works with any HTTP endpoint.
 
 **Option A: Docker (Local)**
 
