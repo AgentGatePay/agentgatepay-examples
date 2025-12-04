@@ -133,8 +133,8 @@ TX_SIGNING_SERVICE=http://localhost:3000
 # Navigate to examples directory
 cd /path/to/agentgatepay-examples/python/langchain-payment-agent
 
-# Run the Docker TX signing example
-python examples/5a_docker_tx_signing.py
+# Run the external TX signing example
+python examples/5_api_with_tx_service.py
 ```
 
 **Expected output:**
@@ -636,7 +636,7 @@ docker-compose up -d
 
 1. **Test with small amount** ($0.01) first
 2. **Monitor transactions** on BaseScan
-3. **Run example scripts** (5a_docker_tx_signing.py)
+3. **Run example scripts** (5_api_with_tx_service.py)
 4. **Read Render guide** if you need always-on service (RENDER_DEPLOYMENT_GUIDE.md)
 5. **Scale up** when comfortable
 

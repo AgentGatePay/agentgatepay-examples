@@ -122,8 +122,8 @@ TX_SIGNING_SERVICE=https://your-service-name.onrender.com
 # Navigate to examples directory
 cd /path/to/agentgatepay-examples/python/langchain-payment-agent
 
-# Run the Render TX signing example
-python examples/5b_render_tx_signing.py
+# Run the external TX signing example
+python examples/5_api_with_tx_service.py
 ```
 
 **Expected output:**
@@ -691,7 +691,7 @@ HTTP 500 - Internal Server Error
 
 1. **Test with small amount** ($0.01) first
 2. **Monitor transactions** on BaseScan
-3. **Run example scripts** (5b_render_tx_signing.py)
+3. **Run example scripts** (5_api_with_tx_service.py)
 4. **Set up alerts** for service health
 5. **Upgrade to Starter** when ready for production
 6. **Scale up** when comfortable
