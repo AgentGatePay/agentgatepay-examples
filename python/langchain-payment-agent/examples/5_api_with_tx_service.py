@@ -263,10 +263,22 @@ def sign_payment_via_service(payment_input: str) -> str:
             print(f"❌ {error_msg}")
             return error_msg
 
+        # Debug: Verify hash lengths
         print(f"✅ Payment signed and submitted by external service")
-        print(f"   Merchant TX: {merchant_tx_hash[:20]}...")
-        print(f"   Commission TX: {commission_tx_hash[:20]}...")
+        print(f"   Merchant TX: {merchant_tx_hash[:20]}... (length: {len(merchant_tx_hash)})")
+        print(f"   Commission TX: {commission_tx_hash[:20]}... (length: {len(commission_tx_hash)})")
         print(f"   Status: {result.get('status', 'N/A')}")
+
+        # Verify hashes have correct format
+        if len(merchant_tx_hash) != 66 or not merchant_tx_hash.startswith('0x'):
+            error_msg = f"Invalid merchant tx_hash format from service: {merchant_tx_hash}"
+            print(f"❌ {error_msg}")
+            return error_msg
+
+        if len(commission_tx_hash) != 66 or not commission_tx_hash.startswith('0x'):
+            error_msg = f"Invalid commission tx_hash format from service: {commission_tx_hash}"
+            print(f"❌ {error_msg}")
+            return error_msg
 
         return f"TX_HASHES:{merchant_tx_hash},{commission_tx_hash}"
 
@@ -294,7 +306,7 @@ def submit_and_verify_payment(payment_data: str) -> str:
     try:
         parts = payment_data.split(',')
         if len(parts) != 4:
-            return f"Error: Invalid format"
+            return f"Error: Invalid format (expected 4 parts, got {len(parts)})"
 
         merchant_tx = parts[0].strip()
         commission_tx = parts[1].strip()
@@ -302,6 +314,8 @@ def submit_and_verify_payment(payment_data: str) -> str:
         price_usd = float(parts[3].strip())
 
         print(f"\n📤 Submitting to gateway...")
+        print(f"   Debug: Merchant TX length = {len(merchant_tx)}")
+        print(f"   Debug: Commission TX length = {len(commission_tx)}")
 
         payment_payload = {
             "scheme": "eip3009",
