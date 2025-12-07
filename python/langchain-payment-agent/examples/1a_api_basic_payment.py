@@ -496,7 +496,7 @@ if __name__ == "__main__":
         mandate_budget = float(budget_remaining) if budget_remaining != 'Unknown' else MANDATE_BUDGET_USD
         purpose = "research resource"
     else:
-        budget_input = input("\n💰 Enter mandate budget in USD (default: 100): ").strip()
+        budget_input = input("\n💰 Enter mandate budget in USD Coins (default: 100): ").strip()
         mandate_budget = float(budget_input) if budget_input else MANDATE_BUDGET_USD
         purpose = input("📝 Enter payment purpose (default: research resource): ").strip()
         purpose = purpose if purpose else "research resource"

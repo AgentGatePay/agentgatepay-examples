@@ -383,10 +383,10 @@ if __name__ == "__main__":
     print("━" * 70)
     print("💰 SPENDING SUMMARY")
     print("━" * 70)
-    print(f"Total Spent: ${stats['total_spent']:.2f} USD")
+    print(f"Total Spent: ${stats['total_spent']:.2f} USD Coins")
     print(f"Payment Count: {stats['payment_count']} (outgoing payments)")
-    print(f"Average Payment: ${stats['average_payment']:.2f} USD")
-    print(f"Last 24h: {stats['payments_24h']} payments (${stats['spent_24h']:.2f} USD)")
+    print(f"Average Payment: ${stats['average_payment']:.2f} USD Coins")
+    print(f"Last 24h: {stats['payments_24h']} payments (${stats['spent_24h']:.2f} USD Coins)")
     print(f"Spending Trend: {stats['spending_trend']}")
     print()
 
@@ -394,8 +394,8 @@ if __name__ == "__main__":
     print("━" * 70)
     print("🔑 BUDGET STATUS")
     print("━" * 70)
-    print(f"Total Allocated: ${stats['budget_total']:.2f} USD")
-    print(f"Remaining: ${stats['budget_remaining']:.2f} USD")
+    print(f"Total Allocated: ${stats['budget_total']:.2f} USD Coins")
+    print(f"Remaining: ${stats['budget_remaining']:.2f} USD Coins")
     print(f"Utilization: {stats['budget_utilization']:.1f}%")
     print(f"Active Mandates: {stats['active_mandates']}")
     print()
@@ -428,12 +428,13 @@ if __name__ == "__main__":
         print("━" * 70)
         print("(Payments YOU sent to merchants)\n")
         for i, payment in enumerate(payments[:10], 1):
+            # Payment data already has timestamp in ISO format from build process (line 351)
             timestamp = payment.get('timestamp', payment.get('created_at', 'N/A'))
             amount = float(payment.get('amount_usd', 0))
             status = payment.get('status', 'unknown')
             tx_hash = payment.get('tx_hash', 'N/A')
 
-            # Get receiver/merchant address
+            # Get receiver/merchant address (already set in build process as receiver_address)
             receiver = (payment.get('receiver_address') or
                        payment.get('receiver') or
                        payment.get('to_address', 'Unknown'))
@@ -578,9 +579,9 @@ if __name__ == "__main__":
     total_you_paid = merchant_received + total_commission
 
     print(f"Unique Merchants: {len(unique_merchants)}")
-    print(f"Total You Paid (100%): ${total_you_paid:.2f} USD")
-    print(f"Merchant Received (99.5%): ${merchant_received:.2f} USD")
-    print(f"Commission Paid (0.5%): ${total_commission:.4f} USD")
+    print(f"Total You Paid (100%): ${total_you_paid:.2f} USD Coins")
+    print(f"Merchant Received (99.5%): ${merchant_received:.2f} USD Coins")
+    print(f"Commission Paid (0.5%): ${total_commission:.4f} USD Coins")
     print()
 
     # MANUAL CURL COMMANDS WITH LIVE OUTPUT

@@ -320,11 +320,11 @@ if __name__ == "__main__":
     print("━" * 70)
     print("💰 REVENUE SUMMARY")
     print("━" * 70)
-    print(f"Total Revenue: ${stats['total_revenue']:.2f} USD")
+    print(f"Total Revenue: ${stats['total_revenue']:.2f} USD Coins")
     print(f"Payment Count: {stats['payment_count']} (incoming payments)")
-    print(f"Average Payment: ${stats['average_payment']:.2f} USD")
-    print(f"This Month: ${stats['revenue_this_month']:.2f} USD")
-    print(f"Last 24h: {stats['payments_24h']} payments (${stats['revenue_24h']:.2f} USD)")
+    print(f"Average Payment: ${stats['average_payment']:.2f} USD Coins")
+    print(f"This Month: ${stats['revenue_this_month']:.2f} USD Coins")
+    print(f"Last 24h: {stats['payments_24h']} payments (${stats['revenue_24h']:.2f} USD Coins)")
     print()
 
     # Webhook Status - SELLER FOCUS
@@ -374,17 +374,26 @@ if __name__ == "__main__":
         print("━" * 70)
         print("(Payments buyers sent to YOU)\n")
         for i, payment in enumerate(payments[:10], 1):
-            timestamp = payment.get('timestamp', payment.get('created_at', 'N/A'))
+            # API returns paid_at - handle both Unix timestamp (int) and ISO string
+            paid_at = payment.get('paid_at', 0)
+            if isinstance(paid_at, str):
+                timestamp = paid_at  # Already formatted
+            elif isinstance(paid_at, (int, float)) and paid_at > 0:
+                timestamp = datetime.fromtimestamp(paid_at).isoformat()
+            else:
+                timestamp = 'N/A'
+
             amount = float(payment.get('amount_usd', 0))
             status = payment.get('status', 'unknown')
             tx_hash = payment.get('tx_hash', 'N/A')
 
-            # Try multiple field names for buyer/payer address
-            buyer = (payment.get('payer_address') or
+            # API returns from_address - check that FIRST
+            buyer = (payment.get('from_address') or
+                    payment.get('payer_address') or
                     payment.get('payer') or
                     payment.get('sender_address') or
                     payment.get('client_id') or
-                    payment.get('from_address', 'Unknown'))
+                    'Unknown')
 
             print(f"{i}. YOU RECEIVED ${amount:.2f} ← {buyer} | {timestamp} | {status} | TX {tx_hash}")
         print()
@@ -517,9 +526,9 @@ if __name__ == "__main__":
     original_amount = merchant_received / 0.995 if merchant_received > 0 else 0  # Reverse calculate from 99.5%
 
     print(f"Unique Buyers: {len(unique_buyers)}")
-    print(f"Original Amount (buyer paid): ${original_amount:.2f} USD")
-    print(f"Merchant Received (99.5%): ${merchant_received:.2f} USD")
-    print(f"Commission Deducted (0.5%): ${total_commission:.4f} USD")
+    print(f"Original Amount (buyer paid): ${original_amount:.2f} USD Coins")
+    print(f"Merchant Received (99.5%): ${merchant_received:.2f} USD Coins")
+    print(f"Commission Deducted (0.5%): ${total_commission:.4f} USD Coins")
     print()
 
     # MANUAL CURL COMMANDS WITH LIVE OUTPUT
