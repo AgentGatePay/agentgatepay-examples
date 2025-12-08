@@ -288,7 +288,21 @@ const CONFIG = {
 };
 ```
 
-**Important:**
+**Important - Webhook URL Format:**
+
+When you copy the webhook URL from N8N, it will show the FULL path including dynamic parameters:
+```
+https://your-instance.app.n8n.cloud/webhook/abc123def456/resource/:resourceId
+```
+
+**You must ONLY use the base URL** (remove `/resource/:resourceId` from the end):
+```javascript
+api_url: "https://your-instance.app.n8n.cloud/webhook/abc123def456"  // ✅ CORRECT - Base URL only
+```
+
+**Why?** The buyer workflow automatically appends `/resource/{resource_id}` when making requests. If you include it in the config, the URL will be doubled and requests will fail.
+
+**Other replacements:**
 - Replace `YOUR_N8N.app.n8n.cloud` with your actual N8N webhook domain
 - Replace `YOUR_APP.onrender.com` with your Render/Railway service URL
 
@@ -315,23 +329,52 @@ const SELLER_CONFIG = {
 ```
 
 **Get Webhook URL:**
-1. Click "Webhook" node (Node 2)
-2. Copy "Production URL" (example: `https://your-instance.app.n8n.cloud/webhook/seller-resource-api-test`)
-3. Use this URL in buyer agent configuration
+1. Click the **Webhook** trigger node in your seller workflow
+2. Copy the **"Production URL"** shown in the node settings
+3. **IMPORTANT:** N8N shows the full URL with path parameters like:
+   ```
+   https://your-instance.app.n8n.cloud/webhook/abc123def456/resource/:resourceId
+   ```
+4. **Remove** the `/resource/:resourceId` part, use ONLY the base URL:
+   ```
+   https://your-instance.app.n8n.cloud/webhook/abc123def456
+   ```
+5. Paste this base URL into the buyer agent configuration (Node 1, `seller.api_url`)
 
 ---
 
 #### Configure Monitoring Templates
 
-**Buyer Monitoring:**
-1. Open **"📊 Buyer Monitoring - MANUAL RUN"**
-2. Edit Node 1: Set `buyer_wallet` to your buyer wallet address
-3. Edit Node 2: Set `api_key` to your buyer API key
+**⚠️ NOTE:** Monitoring workflows do NOT require Data Tables (unlike the buyer agent).
 
-**Seller Monitoring:**
+**Buyer Monitoring Setup:**
+1. Open **"📊 Buyer Monitoring - MANUAL RUN"**
+2. Click **Node 2** "🔐 Set Credentials"
+3. Edit the configuration node:
+   ```javascript
+   {
+     "email": "buyer@example.com",        // Your buyer account email
+     "api_key": "pk_live_abc123...",      // Your buyer API key
+     "wallet_address": "0xYourBuyerWallet..."  // Your buyer wallet address
+   }
+   ```
+4. Click **Save**
+
+**Seller Monitoring Setup:**
 1. Open **"💲 Seller Monitoring - MANUAL RUN"**
-2. Edit Node 1: Set `seller_wallet` to your seller wallet address
-3. Edit Node 2: Set `api_key` to your seller API key
+2. Click **Node 2** "🔐 Set Credentials"
+3. Edit the configuration node:
+   ```javascript
+   {
+     "wallet_address": "0xYourSellerWallet...",  // Your seller wallet address
+     "api_key": "pk_live_xyz789..."              // Your seller API key
+   }
+   ```
+4. Click **Save**
+
+**What monitoring workflows do:**
+- **Buyer Monitoring**: Shows spending history, mandate budget status, total spent, transaction count
+- **Seller Monitoring**: Shows revenue analytics, incoming payments, top payers, commission breakdown
 
 ---
 
@@ -372,17 +415,37 @@ Check transaction on BaseScan:
 
 ## Configuration Reference
 
-### N8N Data Table Setup
+### N8N Data Table Setup (CRITICAL - Required for Buyer Agent)
 
-The buyer agent template uses N8N Data Tables to persist mandate tokens across executions.
+⚠️ **IMPORTANT:** The buyer agent MUST have a Data Table configured. Follow these steps EXACTLY:
 
-**Create Data Table:**
-1. Go to N8N Settings → Data
-2. Create new table: `mandate_storage`
+**Step 1: Create the Data Table**
+1. In N8N, go to: **Data** → **Data Tables** → **+ Create New**
+2. Name: `AgentPay_Mandates` (exact name - case sensitive!)
 3. Add column: `mandate_token` (type: String)
-4. Save
+4. Click **Save**
 
-**Note:** First execution will auto-create mandate and store token. Subsequent executions will reuse the mandate until budget exhausted or TTL expired.
+**Step 2: Link Table to Workflow Nodes (CRITICAL!)**
+After importing the buyer workflow, you MUST re-link the table:
+
+1. Open buyer workflow
+2. Click **Node 2** "📊 Get Mandate Token"
+3. Click the **"Data table"** dropdown
+4. Select: `AgentPay_Mandates`
+5. Click **Save**
+6. Click **Node 7** "💾 Insert Token"
+7. Click the **"Data table"** dropdown
+8. Select: `AgentPay_Mandates`
+9. Click **Save**
+
+**Why this step is needed:** N8N imports don't preserve Data Table links. You must manually re-select the table after import, or the workflow will fail with "Data table not found."
+
+**How it works:**
+- First execution: Creates new mandate, stores token in table
+- Subsequent executions: Reuses token from table (faster, saves budget)
+- Token persists until mandate expires or you manually delete the row
+
+**To renew mandate:** Delete the row from Data Table, workflow creates new mandate on next run.
 
 ---
 
@@ -842,17 +905,10 @@ Set monitoring workflows to run on schedule:
 - **Python SDK Examples:** https://github.com/agentgatepay/agentgatepay-python-sdk/tree/main/examples
 - **JavaScript SDK Examples:** https://github.com/agentgatepay/agentgatepay-sdk/tree/main/examples
 
-### Community
+### Support
 
-- **Discord Server:** https://discord.gg/agentgatepay (coming soon)
 - **GitHub Issues:** https://github.com/agentgatepay/agentgatepay-sdk/issues
 - **Email Support:** support@agentgatepay.com
-
-### Video Tutorials
-
-- **N8N 5-Minute Setup:** https://youtube.com/agentgatepay (coming soon)
-- **SDK Quickstart:** https://youtube.com/agentgatepay (coming soon)
-- **MCP Integration:** https://youtube.com/agentgatepay (coming soon)
 
 ---
 
@@ -891,11 +947,11 @@ Found a bug or have a feature request?
 
 1. **Report Issues:** https://github.com/agentgatepay/agentgatepay-sdk/issues
 2. **Submit Pull Requests:** https://github.com/agentgatepay/n8n-templates
-3. **Share Your Templates:** Email community@agentgatepay.com
+3. **Share Your Templates:** Email support@agentgatepay.com
 
 ---
 
-**Questions?** Contact support@agentgatepay.com or join our Discord community.
+**Questions?** Contact support@agentgatepay.com
 
 **Ready to get started?** Follow Step 1 above and have your first autonomous agent payment running in under 10 minutes!
 

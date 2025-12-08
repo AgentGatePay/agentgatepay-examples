@@ -2499,11 +2499,8 @@ Response: {
 - N8N Documentation: https://docs.n8n.io
 - Base Network: https://docs.base.org
 
-**Community:**
-- Discord: (provide link)
-- GitHub Issues: (provide link)
-
 **Technical Support:**
+- GitHub Issues: https://github.com/agentgatepay/agentgatepay-sdk/issues
 - Email: support@agentgatepay.com
 
 ---

@@ -8,7 +8,7 @@
 
 ## Overview
 
-This repository contains **8 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
+This repository contains **10 complete examples** demonstrating how to integrate AgentGatePay with LangChain for autonomous agent payments:
 
 - **Examples 1a/1b:** REST API (1a: local signing, 1b: external TX service)
 - **Examples 2a/2b:** REST API marketplace (buyer/seller split)
@@ -940,7 +940,6 @@ mandate = call_mcp_tool("agentpay_issue_mandate", {"subject": "...", "budget_usd
 ## Documentation
 
 ### Core Guides
-- **[CHAIN_TOKEN_GUIDE.md](CHAIN_TOKEN_GUIDE.md)** - 🆕 Multi-chain/token configuration guide
 - **[API_INTEGRATION.md](docs/API_INTEGRATION.md)** - Complete REST API guide
 - **[MCP_INTEGRATION.md](docs/MCP_INTEGRATION.md)** - Complete MCP tools guide
 - **[API_VS_MCP.md](docs/API_VS_MCP.md)** - Detailed comparison
@@ -1007,7 +1006,6 @@ PAYMENT_CHAIN=polygon python examples/1a_api_basic_payment.py
 
 - **Email**: support@agentgatepay.com
 - **GitHub Issues**: https://github.com/AgentGatePay/agentgatepay-sdks/issues
-- **Discord**: https://discord.gg/agentgatepay (coming soon)
 
 ---
 

@@ -1157,11 +1157,8 @@ curl -H "x-api-key: pk_live_..." http://localhost:3000/health
 - Render: https://render.com/docs
 - Railway: https://docs.railway.app
 
-**Community:**
-- GitHub Issues: https://github.com/AgentGatePay/agentgatepay-examples/issues
-- Discord: (coming soon)
-
 **Technical Support:**
+- GitHub Issues: https://github.com/AgentGatePay/agentgatepay-examples/issues
 - Email: support@agentgatepay.com
 
 ---

@@ -75,7 +75,7 @@ from chain_config import get_chain_config
 # - Option 4: Self-hosted service
 #
 # See docs/TX_SIGNING_OPTIONS.md for complete guide.
-# See Example 9 (examples/9_api_with_tx_service.py) for external signing usage.
+# See Example 1b (examples/1b_api_with_tx_service.py) for external signing usage.
 #
 # ========================================
 
@@ -104,7 +104,7 @@ MANDATE_BUDGET_USD = 100.0
 #     decimals=6,
 #     explorer="https://etherscan.io"
 # )
-# Note: USDT not available on Base. DAI uses 18 decimals. See CHAIN_TOKEN_GUIDE.md
+# Note: USDT not available on Base. DAI uses 18 decimals. See README.md
 config = None  # Will be set via get_or_create_config() in main()
 
 # ========================================

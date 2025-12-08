@@ -131,7 +131,7 @@ const CONFIG = {
     mandate_ttl_days: 7                      // 7-day validity
   },
   seller: {
-    api_url: "https://YOUR-N8N.app.n8n.cloud/webhook/seller-api"  // ← Seller webhook URL
+    api_url: "https://YOUR-N8N.app.n8n.cloud/webhook/YOUR-WEBHOOK-ID"  // ← Seller webhook base URL ONLY (see README.md for extraction instructions)
   },
   render: {
     service_url: "https://your-app.onrender.com"  // ← Your Render URL
