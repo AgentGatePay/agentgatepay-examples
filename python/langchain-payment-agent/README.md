@@ -2,6 +2,13 @@
 
 **Autonomous AI agent payments using blockchain and LangChain framework**
 
+**Version:** 1.0 BETA
+**Last Updated:** November 2025
+**Python:** 3.12+
+**LangChain:** 1.0.0+
+
+> **⚠️ BETA VERSION**: These examples are currently in beta. We're actively adding features and improvements based on user feedback. Expect updates for enhanced functionality, additional framework integrations, improved error handling, and expanded multi-chain support.
+
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.4+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
 [![LangChain](https://img.shields.io/badge/langchain-1.0.0+-orange.svg)](https://www.langchain.com/)
@@ -673,7 +680,7 @@ Wallet configured: true
 - Production agent deployments requiring secure key management
 - Multi-agent systems needing standardized communication (MCP)
 - Scalable payment infrastructures with independent services
-- Agent frameworks with native MCP support (Claude Desktop, etc.)
+- Agent frameworks with native MCP support
 
 **Comparison to Other Examples:**
 - **vs Example 1a/3a**: Adds production security (external TX signing)
