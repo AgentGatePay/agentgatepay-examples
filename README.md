@@ -51,15 +51,12 @@
   Production examples for popular AI agent frameworks using AgentGatePay SDKs.
 
   **Python Framework Examples:**
-  - [LangChain Integration](python/langchain/) - Autonomous tool-calling agents with payment capabilities
-  - [Python SDK Quickstart](python/quickstart/) - Basic payment integration examples
+  - [LangChain Integration](python/langchain-payment-agent/) - Autonomous tool-calling agents with payment capabilities (10 complete examples)
 
-  **JavaScript Framework Examples:**
-  - [Vercel AI SDK Integration](javascript/vercel-ai/) - Streaming AI applications with pay-per-token pricing
-  - [LangChain.js Integration](javascript/langchain/) - Node.js agents with blockchain payments
-  - [JavaScript SDK Quickstart](javascript/quickstart/) - Basic payment integration examples
-
-  [Browse all framework examples](frameworks/)
+  **JavaScript Framework Examples** (Coming Soon):
+  - Vercel AI SDK Integration - Streaming AI applications with pay-per-token pricing
+  - LangChain.js Integration - Node.js agents with blockchain payments
+  - JavaScript SDK Quickstart - Basic payment integration examples
 
   Star this repository to receive notifications when new framework examples are released.
 
@@ -107,20 +104,15 @@
 
   Official SDK integration examples for popular AI agent frameworks.
 
-  **Python SDK Examples**
-  - **LangChain** - Payment-enabled tool agents, API marketplace agents, budget-managed research assistants
-  - **Quickstart Examples** - Simple payment flows, mandate management, webhook handling
+  **Python SDK Examples** ([Browse Python examples](python/langchain-payment-agent/))
+  - **LangChain** - Payment-enabled tool agents, API marketplace agents, budget-managed research assistants (10 complete examples)
+  - **REST API Integration** - Integration guides for any framework
+  - **MCP Integration** - Model Context Protocol (15 tools)
 
-  **JavaScript SDK Examples**
+  **JavaScript SDK Examples** (Coming Soon)
   - **Vercel AI SDK** - Streaming chat with usage-based payments
   - **LangChain.js** - Node.js payment agents, Express.js webhook servers
   - **Quickstart Examples** - Simple payment flows, mandate management, webhook handling
-
-  **Additional Resources**
-  - **REST API Integration** - Integration guides for any framework
-  - **cURL Examples** - Command-line testing and debugging
-
-  [Browse framework examples](frameworks/)
 
   ---
 
@@ -162,7 +154,7 @@
   - [Python SDK Documentation](https://pypi.org/project/agentgatepay-sdk/) - Python package reference
   - [JavaScript SDK Documentation](https://www.npmjs.com/package/agentgatepay-sdk/) - npm package reference
   - [n8n Complete Guide](n8n/README.md) - Full setup, configuration, and troubleshooting
-  - [Multi-Token & Multi-Chain Guide](docs/guides/MULTI_TOKEN_CHAIN_GUIDE.md) - Detailed token/chain configuration
+  - [Python LangChain Examples](python/langchain-payment-agent/README.md) - Complete guide with multi-token/chain configuration
   - [MCP Integration](https://mcp.agentgatepay.com) - Model Context Protocol (15 tools)
 
   ---

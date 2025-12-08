@@ -46,13 +46,6 @@ This package includes comprehensive documentation to get you started:
 - Blockchain verification internals
 - All 15 MCP endpoints reference
 
-### Release Strategy
-**[RELEASE_STRATEGY.md](RELEASE_STRATEGY.md)** - Distribution and launch plan
-- Official n8n workflow library submission guide
-- GitHub repository setup
-- Community engagement strategy
-- Product Hunt launch preparation
-
 **Choose your path:**
 - **Fast track:** Start with QUICK_START.md (10 minutes)
 - **Comprehensive:** Follow this README.md (30 minutes)
