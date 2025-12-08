@@ -149,13 +149,13 @@
 
   ## Documentation
 
-  - [AgentGatePay API Documentation](https://docs.agentgatepay.com/api) - REST API reference
+  - **API Endpoint:** https://api.agentgatepay.com - REST API for payments, mandates, webhooks
+  - **MCP Endpoint:** https://mcp.agentgatepay.com - Model Context Protocol (15 tools)
   - [SDK Repository](https://github.com/AgentGatePay/agentgatepay-sdks) - Official SDKs (JavaScript + Python)
-  - [Python SDK Documentation](https://pypi.org/project/agentgatepay-sdk/) - Python package reference
-  - [JavaScript SDK Documentation](https://www.npmjs.com/package/agentgatepay-sdk/) - npm package reference
+  - [Python SDK on PyPI](https://pypi.org/project/agentgatepay-sdk/) - Install: `pip install agentgatepay-sdk`
+  - [JavaScript SDK on npm](https://www.npmjs.com/package/agentgatepay-sdk/) - Install: `npm install agentgatepay-sdk`
   - [n8n Complete Guide](n8n/README.md) - Full setup, configuration, and troubleshooting
   - [Python LangChain Examples](python/langchain-payment-agent/README.md) - Complete guide with multi-token/chain configuration
-  - [MCP Integration](https://mcp.agentgatepay.com) - Model Context Protocol (15 tools)
 
   ---
 
@@ -204,9 +204,8 @@
 
   ---
 
-  **Website:** [agentgatepay.com](https://agentgatepay.com)
-  **API:** [api.agentgatepay.com](https://api.agentgatepay.com)
-  **MCP:** [mcp.agentgatepay.com](https://mcp.agentgatepay.com)
+  **API Endpoint:** [api.agentgatepay.com](https://api.agentgatepay.com)
+  **MCP Endpoint:** [mcp.agentgatepay.com](https://mcp.agentgatepay.com)
 
   Maintained by the AgentGatePay team.
 
