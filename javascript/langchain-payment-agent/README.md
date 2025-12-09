@@ -87,12 +87,19 @@ nano .env  # Add your API keys and wallet addresses
 npm run example:1a
 ```
 
-**Need API keys?** Create accounts:
+**Need API keys?** Create 2 accounts (buyer + seller):
 ```bash
+# Buyer account
 curl -X POST https://api.agentgatepay.com/v1/users/signup \
   -H "Content-Type: application/json" \
   -d '{"email":"buyer@example.com","password":"YourPass123!","user_type":"agent"}'
+
+# Seller account
+curl -X POST https://api.agentgatepay.com/v1/users/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"seller@example.com","password":"YourPass123!","user_type":"merchant"}'
 ```
+**Save the API keys** from responses (shown only once): `pk_live_...`
 
 ---
 
@@ -101,22 +108,7 @@ curl -X POST https://api.agentgatepay.com/v1/users/signup \
 ### Prerequisites
 
 1. **Node.js 18+**
-2. **AgentGatePay accounts** (2 accounts for buyer/seller demos)
-
-   **Create accounts via API:**
-   ```bash
-   # Create buyer/agent account
-   curl -X POST https://api.agentgatepay.com/v1/users/signup \
-     -H "Content-Type: application/json" \
-     -d '{"email": "buyer@example.com", "password": "YourPass123!", "user_type": "agent"}'
-
-   # Create seller/merchant account
-   curl -X POST https://api.agentgatepay.com/v1/users/signup \
-     -H "Content-Type: application/json" \
-     -d '{"email": "seller@example.com", "password": "YourPass123!", "user_type": "merchant"}'
-   ```
-
-   **Save the API keys** from the response (shown only once): `pk_live_...`
+2. **AgentGatePay accounts** (see Quick Start section above for signup commands)
 
 3. **Wallet setup**
 
