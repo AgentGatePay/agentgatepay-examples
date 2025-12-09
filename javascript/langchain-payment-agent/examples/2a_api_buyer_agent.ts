@@ -27,6 +27,7 @@
 import 'dotenv/config';
 import axios from 'axios';
 import { ethers } from 'ethers';
+import readline from 'readline';
 import { ChatOpenAI } from '@langchain/openai';
 import { tool } from '@langchain/core/tools';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
@@ -34,6 +35,21 @@ import { z } from 'zod';
 import { AgentGatePay } from 'agentgatepay-sdk';
 import { getChainConfig, ChainConfig } from '../chain_config.js';
 import { saveMandate, getMandate, StoredMandate } from '../utils/index.js';
+
+// Helper function for user input
+function question(prompt: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise((resolve) => {
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
 
 // ========================================
 // TRANSACTION SIGNING
@@ -713,6 +729,74 @@ async function main() {
     console.log(`   To delete: rm ../.agentgatepay_mandates.json\n`);
     mandateBudget = budgetRemaining !== 'Unknown' ? parseFloat(budgetRemaining) : MANDATE_BUDGET_USD;
     userNeed = mandatePurpose; // Use mandate purpose for purchases
+  } else {
+    // Ask user for mandate parameters
+    const budgetInput = await question('\n💰 Enter mandate budget in USD Coins (default: 100): ');
+    mandateBudget = budgetInput.trim() ? parseFloat(budgetInput.trim()) : MANDATE_BUDGET_USD;
+
+    // Ask user for mandate TTL duration
+    console.log(`\n⏰ Set mandate duration (format: number + unit)`);
+    console.log(`   Examples: 10m (10 minutes), 2h (2 hours), 7d (7 days)`);
+    let ttlInput = await question('   Enter duration (default: 7d): ');
+    ttlInput = ttlInput.trim().toLowerCase();
+
+    if (!ttlInput) {
+      ttlInput = '7d';
+    }
+
+    // Parse duration
+    const match = ttlInput.match(/^(\d+)([mhd])$/);
+
+    if (match) {
+      const value = parseInt(match[1]);
+      const unit = match[2];
+
+      let unitName: string;
+      if (unit === 'm') {
+        mandateTtlMinutes = value;
+        unitName = 'minutes';
+      } else if (unit === 'h') {
+        mandateTtlMinutes = value * 60;
+        unitName = 'hours';
+      } else if (unit === 'd') {
+        mandateTtlMinutes = value * 1440;
+        unitName = 'days';
+      } else {
+        mandateTtlMinutes = 10080;
+        unitName = '7 days';
+      }
+
+      console.log(`   ✅ Mandate will be valid for ${value} ${unitName} (${mandateTtlMinutes} minutes)`);
+    } else {
+      console.log(`   ⚠️  Invalid format, using default: 7 days`);
+      mandateTtlMinutes = 10080;
+    }
+
+    // Ask user for mandate PURPOSE
+    console.log(`\n🎯 What is this mandate for? (This defines what resources can be purchased)`);
+    console.log(`   Examples from our seller:`);
+    console.log(`   1. Research papers and academic content`);
+    console.log(`   2. Market data and API access`);
+    console.log(`   3. AI training datasets`);
+    console.log(`   Or enter custom purpose in natural language`);
+    const purposeInput = await question('\n   Enter mandate purpose (default: research papers): ');
+
+    if (purposeInput.trim() === '1') {
+      userNeed = 'research papers and academic content';
+    } else if (purposeInput.trim() === '2') {
+      userNeed = 'market data and API access';
+    } else if (purposeInput.trim() === '3') {
+      userNeed = 'AI training datasets';
+    } else if (purposeInput.trim()) {
+      userNeed = purposeInput.trim();
+    } else {
+      userNeed = 'research papers and academic content';
+    }
+
+    console.log(`   ✅ Mandate purpose: ${userNeed}`);
+
+    // Set global mandate_purpose for tool use
+    mandatePurpose = userNeed;
   }
 
   // Define tools
