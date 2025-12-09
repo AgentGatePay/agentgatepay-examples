@@ -150,7 +150,7 @@ const mcpIssueMandateTool = tool(
 
       const token = mandate.mandate_token;
       const mandateWithBudget = {
-        mandate_token: token,
+        ...mandate,  // Include ALL MCP response fields (expires_at, subject, scope, etc.)
         budget_usd: budgetUsd,
         budget_remaining: budgetUsd
       };

@@ -158,17 +158,17 @@ const issueMandateTool = tool(
 
       console.log(`\n🔐 Creating mandate ($${budgetUsd})...`);
 
-      const mandate = await agentpay.mandates.issue({
-        subject: agentId,
-        budget: budgetUsd,
-        scope: 'resource.read,payment.execute',
-        ttlMinutes: 168 * 60
-      });
+      const mandate = await agentpay.mandates.issue(
+        agentId,
+        budgetUsd,
+        'resource.read,payment.execute',
+        168 * 60
+      );
 
       // Store mandate with budget info
-      const token = mandate.mandateToken;
+      const token = mandate.mandate_token;
       const mandateWithBudget = {
-        mandate_token: token,
+        ...mandate,  // Include ALL SDK response fields (expires_at, subject, scope, etc.)
         budget_usd: budgetUsd,
         budget_remaining: budgetUsd
       };

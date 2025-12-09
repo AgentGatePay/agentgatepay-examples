@@ -203,12 +203,12 @@ class BuyerAgent {
       }
 
       // Create new mandate
-      const mandate = await this.agentpay.mandates.issue({
-        subject: agentId,
-        budget: budgetUsd,
-        scope: 'resource.read,payment.execute',
+      const mandate = await this.agentpay.mandates.issue(
+        agentId,
+        budgetUsd,
+        'resource.read,payment.execute',
         ttlMinutes
-      });
+      );
 
       // Fetch live budget from API
       const token = mandate.mandate_token;
