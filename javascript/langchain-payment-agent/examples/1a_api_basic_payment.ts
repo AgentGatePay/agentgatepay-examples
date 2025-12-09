@@ -36,6 +36,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { createInterface } from 'readline';
 import { saveMandate, getMandate } from '../utils/index.js';
 import { getChainConfig, displayChainConfig } from '../chain_config.js';
 
@@ -482,11 +483,24 @@ async function main() {
     mandateBudget = typeof budgetRemaining === 'number' ? budgetRemaining : MANDATE_BUDGET_USD;
     purpose = 'research resource';
   } else {
-    // For simplicity in the automated example, use defaults
-    mandateBudget = MANDATE_BUDGET_USD;
-    purpose = 'research resource';
-    console.log(`\n💰 Using default mandate budget: $${mandateBudget}`);
-    console.log(`📝 Using default purpose: ${purpose}\n`);
+    // Prompt user for input (matching Python behavior)
+    const readline = createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const askQuestion = (query: string): Promise<string> => {
+      return new Promise(resolve => readline.question(query, resolve));
+    };
+
+    const budgetInput = await askQuestion('\n💰 Enter mandate budget in USD Coins (default: 100): ');
+    mandateBudget = budgetInput.trim() ? parseFloat(budgetInput.trim()) : MANDATE_BUDGET_USD;
+
+    const purposeInput = await askQuestion('📝 Enter payment purpose (default: research resource): ');
+    purpose = purposeInput.trim() || 'research resource';
+
+    readline.close();
+    console.log();
   }
 
   // Create agent with tools
@@ -498,15 +512,15 @@ async function main() {
     messageModifier: systemPrompt
   });
 
-  // Agent task
+  // Agent task - EXPLICIT parameter instructions for LangChain.js
   const task = `Purchase a ${purpose} for $${RESOURCE_PRICE_USD} USD.
 
 Steps:
-1. Issue a payment mandate with a $${mandateBudget} budget (or reuse existing)
-2. Sign blockchain payment of $${RESOURCE_PRICE_USD} to seller: ${SELLER_WALLET}
-3. Submit payment proof to AgentGatePay with mandate token
+1. Call issue_mandate tool with parameter: {budgetUsd: ${mandateBudget}}
+2. Call sign_payment tool with parameters: {amountUsd: ${RESOURCE_PRICE_USD}, recipient: "${SELLER_WALLET}"}
+3. Call submit_payment tool with the mandate token from step 1 and transaction hashes from step 2
 
-The mandate token and transaction hashes will be available after steps 1 and 2.`;
+IMPORTANT: Use the exact parameter names shown above (budgetUsd, amountUsd, recipient, etc.).`;
 
   try {
     // Run agent
