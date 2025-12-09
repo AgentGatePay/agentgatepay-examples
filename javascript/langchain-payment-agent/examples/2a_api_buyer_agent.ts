@@ -31,7 +31,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { tool } from '@langchain/core/tools';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { z } from 'zod';
-import AgentGatePay from 'agentgatepay-sdk';
+import { AgentGatePay } from 'agentgatepay-sdk';
 import { getChainConfig, ChainConfig } from '../chain_config.js';
 import { saveMandate, getMandate, StoredMandate } from '../utils/index.js';
 
