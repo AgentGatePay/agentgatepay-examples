@@ -173,10 +173,11 @@ const issueMandateTool = tool(
         ttlMinutes: 168 * 60
       });
 
-      // Store mandate with budget info
+      // Store mandate with budget info (spread all SDK fields like Python)
       const token = mandate.mandateToken;
       const mandateWithBudget = {
-        mandate_token: token,
+        ...mandate,  // Include ALL SDK response fields (expires_at, subject, scope, etc.)
+        mandate_token: token,  // Normalize camelCase to snake_case for consistency
         budget_usd: budgetUsd,
         budget_remaining: budgetUsd // Initially, remaining = total
       };
