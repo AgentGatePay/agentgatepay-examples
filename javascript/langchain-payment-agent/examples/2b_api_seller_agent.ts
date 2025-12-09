@@ -27,11 +27,27 @@ import { config } from 'dotenv';
 import express, { Request, Response } from 'express';
 import { createHmac, timingSafeEqual } from 'crypto';
 import axios from 'axios';
+import readline from 'readline';
 import { AgentGatePay } from 'agentgatepay-sdk';
 import { getChainConfig, type ChainConfig } from '../chain_config.js';
 
 // Load environment variables
 config();
+
+// Helper function for user input
+function question(prompt: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise((resolve) => {
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
 
 // ========================================
 // CONFIGURATION
@@ -549,10 +565,31 @@ async function main() {
   // Initialize seller
   seller = new SellerAgent(CHAIN_CONFIG);
 
-  // Set default prices to $0.01 for demo
-  console.log(`\n💵 Setting all resource prices to $0.01 for demo...`);
+  // Ask user to set resource prices
+  console.log(`\n💵 Set resource prices (press Enter for default $0.01):`);
   for (const resId in seller.catalog) {
-    seller.catalog[resId].price_usd = 0.01;
+    const resource = seller.catalog[resId];
+    const priceInput = await question(`   ${resource.name}: $`);
+
+    if (priceInput.trim()) {
+      try {
+        const newPrice = parseFloat(priceInput.trim());
+        if (newPrice > 0) {
+          seller.catalog[resId].price_usd = newPrice;
+          console.log(`      ✅ Set to $${newPrice}`);
+        } else {
+          console.log(`      ⚠️  Invalid price, using default $0.01`);
+          seller.catalog[resId].price_usd = 0.01;
+        }
+      } catch (error) {
+        console.log(`      ⚠️  Invalid input, using default $0.01`);
+        seller.catalog[resId].price_usd = 0.01;
+      }
+    } else {
+      // User pressed Enter without typing - default to $0.01
+      seller.catalog[resId].price_usd = 0.01;
+      console.log(`      ✅ Set to default: $0.01`);
+    }
   }
 
   console.log(`\n✅ Final prices:`);
@@ -568,8 +605,48 @@ async function main() {
   console.log(`   GET /health                 - Health check`);
   console.log();
 
-  // Revenue summary
+  // Ask about webhook configuration
   console.log('='.repeat(60));
+  console.log('🔔 WEBHOOK CONFIGURATION (PRODUCTION MODE)');
+  console.log('='.repeat(60));
+  console.log();
+  console.log('For production deployment, configure webhooks to receive');
+  console.log('automatic payment notifications from AgentGatePay.');
+  console.log();
+  console.log('⚠️  For local testing, webhooks require a public URL.');
+  console.log('   Options: ngrok, localtunnel, Render, Railway, etc.');
+  console.log();
+
+  const webhookChoice = await question('Configure webhooks now? (y/n, default: n): ');
+
+  if (webhookChoice.trim().toLowerCase() === 'y') {
+    const webhookUrl = await question('Enter public webhook URL (e.g., https://your-domain.com/webhooks/payment): ');
+
+    if (webhookUrl.trim()) {
+      const result = await seller.configureWebhook(webhookUrl.trim());
+
+      if (!result.error) {
+        console.log(`\n✅ Webhooks enabled! Gateway will send notifications to:`);
+        console.log(`   ${webhookUrl.trim()}`);
+        console.log(`\n📦 Resources will be auto-delivered when payments are confirmed.`);
+      } else {
+        console.log(`\n⚠️  Continuing without webhooks (using manual verification)`);
+      }
+    } else {
+      console.log(`\n⚠️  No URL provided - continuing without webhooks`);
+    }
+  } else {
+    console.log(`\n⚠️  Skipping webhook configuration (using manual verification)`);
+    console.log(`   Note: For production, webhooks provide better UX and scalability`);
+  }
+
+  console.log();
+  console.log('='.repeat(60));
+  // ========================================
+  // REVENUE SUMMARY (Before starting server)
+  // ========================================
+
+  console.log('\n' + '='.repeat(60));
   console.log('📊 REVENUE SUMMARY');
   console.log('='.repeat(60));
   console.log('   Fetching your payment history from AgentGatePay...');
