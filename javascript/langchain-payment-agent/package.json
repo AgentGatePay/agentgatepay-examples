@@ -1,0 +1,55 @@
+{
+  "name": "agentgatepay-langchain-examples",
+  "version": "1.0.0",
+  "description": "AgentGatePay + LangChain.js Integration Examples - Autonomous AI agent payments",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "example:1a": "tsx examples/1a_api_basic_payment.ts",
+    "example:1b": "tsx examples/1b_api_with_tx_service.ts",
+    "example:2a": "tsx examples/2a_api_buyer_agent.ts",
+    "example:2b": "tsx examples/2b_api_seller_agent.ts",
+    "example:3a": "tsx examples/3a_mcp_basic_payment.ts",
+    "example:3b": "tsx examples/3b_mcp_with_tx_service.ts",
+    "example:4a": "tsx examples/4a_mcp_buyer_agent.ts",
+    "example:4b": "tsx examples/4b_mcp_seller_agent.ts",
+    "example:6a": "tsx examples/6a_monitoring_buyer.ts",
+    "example:6b": "tsx examples/6b_monitoring_seller.ts"
+  },
+  "keywords": [
+    "agentgatepay",
+    "langchain",
+    "ai-agents",
+    "blockchain",
+    "payments",
+    "crypto",
+    "usdc",
+    "ethereum",
+    "base",
+    "polygon",
+    "arbitrum"
+  ],
+  "author": "AgentGatePay",
+  "license": "MIT",
+  "dependencies": {
+    "agentgatepay-sdk": "^1.1.4",
+    "langchain": "^0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/openai": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
+    "ethers": "^6.13.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
