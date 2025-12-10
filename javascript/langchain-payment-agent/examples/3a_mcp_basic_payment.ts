@@ -36,6 +36,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
+import { createInterface } from 'readline';
 import { saveMandate, getMandate } from '../utils/index.js';
 import { getChainConfig, displayChainConfig, type ChainConfig } from '../chain_config.js';
 
@@ -375,10 +376,24 @@ async function main() {
     }
     purpose = 'research resource';
   } else {
-    mandateBudget = MANDATE_BUDGET_USD;
-    purpose = 'research resource';
-    console.log(`\n💰 Using default mandate budget: $${mandateBudget}`);
-    console.log(`📝 Using default purpose: ${purpose}\n`);
+    // Prompt user for input (matching Python and Script 1a behavior)
+    const readline = createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const askQuestion = (query: string): Promise<string> => {
+      return new Promise(resolve => readline.question(query, resolve));
+    };
+
+    const budgetInput = await askQuestion('\n💰 Enter mandate budget in USD Coins (default: 100): ');
+    mandateBudget = budgetInput.trim() ? parseFloat(budgetInput.trim()) : MANDATE_BUDGET_USD;
+
+    const purposeInput = await askQuestion('📝 Enter payment purpose (default: research resource): ');
+    purpose = purposeInput.trim() || 'research resource';
+
+    readline.close();
+    console.log();
   }
 
   const tools = [mcpIssueMandateTool, signPaymentTool, mcpSubmitAndVerifyTool];

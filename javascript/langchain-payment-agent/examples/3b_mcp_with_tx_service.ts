@@ -46,6 +46,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { tool } from '@langchain/core/tools';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { z } from 'zod';
+import { createInterface } from 'readline';
 import { getChainConfig } from '../chain_config.js';
 import { saveMandate, getMandate, StoredMandate } from '../utils/index.js';
 
@@ -491,8 +492,8 @@ async function main() {
   const agentId = `research-assistant-${BUYER_WALLET}`;
   const existingMandate = getMandate(agentId);
 
-  let mandateBudget = MANDATE_BUDGET_USD;
-  let purpose = 'research resource';
+  let mandateBudget: number;
+  let purpose: string;
 
   if (existingMandate) {
     const token = existingMandate.mandate_token;
@@ -519,6 +520,26 @@ async function main() {
     console.log(`   Token: ${existingMandate.mandate_token?.substring(0, 50)}...`);
     console.log(`   To delete: rm ../.agentgatepay_mandates.json\n`);
     mandateBudget = budgetRemaining !== 'Unknown' ? parseFloat(budgetRemaining) : MANDATE_BUDGET_USD;
+    purpose = 'research resource';
+  } else {
+    // Prompt user for input (matching Python and Script 1a behavior)
+    const readline = createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    const askQuestion = (query: string): Promise<string> => {
+      return new Promise(resolve => readline.question(query, resolve));
+    };
+
+    const budgetInput = await askQuestion('\n💰 Enter mandate budget in USD Coins (default: 100): ');
+    mandateBudget = budgetInput.trim() ? parseFloat(budgetInput.trim()) : MANDATE_BUDGET_USD;
+
+    const purposeInput = await askQuestion('📝 Enter payment purpose (default: research resource): ');
+    purpose = purposeInput.trim() || 'research resource';
+
+    readline.close();
+    console.log();
   }
 
   // Agent task
