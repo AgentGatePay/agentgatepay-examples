@@ -300,7 +300,7 @@ async function main() {
     console.log('━'.repeat(70));
     console.log('🔑 BUDGET STATUS (Combined Across All Mandates)');
     console.log('━'.repeat(70));
-    console.log(`Total Allocated: $${stats.budgetTotal.toFixed(2)} USD Coins (sum of ${mandates.length} mandates)`);
+    console.log(`Total Mandate Budget: $${stats.budgetTotal.toFixed(2)} USD Coins (sum of ${mandates.length} mandates)`);
     console.log(`Spent: $${stats.totalSpent.toFixed(2)} USD Coins (from actual payments)`);
     console.log(`Remaining: $${stats.budgetRemaining.toFixed(2)} USD Coins (calculated: total - spent)`);
     console.log(`Utilization: ${stats.budgetUtilization.toFixed(1)}% (spent / total budget)`);
