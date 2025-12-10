@@ -842,27 +842,27 @@ async function main() {
   );
 
   const executePaymentTool = tool(
-    async ({ _unused }: { _unused?: string }): Promise<string> => {
+    async ({ _unused }: { _unused?: string | null }): Promise<string> => {
       return await buyer.executePayment();
     },
     {
       name: 'execute_payment',
       description: 'Execute blockchain payment (2 transactions) AND submit to gateway. No input needed. After this succeeds, you MUST call claim_resource to complete the purchase and get the resource.',
       schema: z.object({
-        _unused: z.string().optional().describe('No input needed')
+        _unused: z.string().optional().nullable().describe('No input needed')
       })
     }
   );
 
   const claimResourceTool = tool(
-    async ({ _unused }: { _unused?: string }): Promise<string> => {
+    async ({ _unused }: { _unused?: string | null }): Promise<string> => {
       return await buyer.claimResource();
     },
     {
       name: 'claim_resource',
       description: 'Claim resource after payment by submitting payment proof to seller. No input needed.',
       schema: z.object({
-        _unused: z.string().optional().describe('No input needed')
+        _unused: z.string().optional().nullable().describe('No input needed')
       })
     }
   );
