@@ -303,45 +303,52 @@ const submitAndVerifyPaymentTool = tool(
     try {
       console.log(`\n📤 Submitting to gateway...`);
 
+      // Build payment payload (EXACTLY like Python - lines 155-161)
       const paymentPayload = {
         scheme: 'eip3009',
         tx_hash: merchantTx,
         tx_hash_commission: commissionTx
       };
 
-      const paymentB64 = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
+      // Base64 encode payload (EXACTLY like Python - line 161)
+      const paymentB64 = Buffer.from(JSON.dumps(paymentPayload)).toString('base64');
 
+      // Set headers (EXACTLY like Python - lines 163-167)
       const headers = {
         'x-api-key': BUYER_API_KEY,
         'x-mandate': mandateToken,
         'x-payment': paymentB64
       };
 
+      // Make request (EXACTLY like Python - lines 169-170)
       const url = `${AGENTPAY_API_URL}/x402/resource?chain=${chainConfig.chain}&token=${chainConfig.token}&price_usd=${priceUsd}`;
       const response = await axios.get(url, { headers, validateStatus: () => true });
 
+      // Check for errors (EXACTLY like Python - lines 172-176)
       if (response.status >= 400) {
-        const error = response.data?.error || response.data || 'Unknown error';
+        const result = response.data || {};
+        const error = result.error || response.statusText;
         console.error(`❌ Gateway error (${response.status}): ${error}`);
         return `Failed: ${error}`;
       }
 
       const result = response.data;
 
-      // Check if payment was successful
+      // Check if payment was successful (EXACTLY like Python - line 181)
       if (result.message || result.success || result.paid || result.status === 'confirmed') {
         console.log(`✅ Payment recorded`);
 
-        // Verify mandate to get updated budget
+        // Verify mandate to get updated budget (EXACTLY like Python - lines 184-190)
         console.log(`   🔍 Fetching updated budget...`);
         const verifyResponse = await axios.post(
           `${AGENTPAY_API_URL}/mandates/verify`,
           { mandate_token: mandateToken },
-          { headers: { 'x-api-key': BUYER_API_KEY, 'Content-Type': 'application/json' } }
+          { headers: { 'x-api-key': BUYER_API_KEY, 'Content-Type': 'application/json' }, validateStatus: () => true }
         );
 
         if (verifyResponse.status === 200) {
-          const newBudget = verifyResponse.data.budget_remaining;
+          const verifyData = verifyResponse.data;
+          const newBudget = verifyData.budget_remaining || 'Unknown';
           console.log(`   ✅ Budget updated: $${newBudget}`);
 
           if (currentMandate) {
