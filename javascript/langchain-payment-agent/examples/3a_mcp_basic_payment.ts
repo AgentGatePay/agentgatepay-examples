@@ -435,6 +435,12 @@ The mandate token and transaction hashes will be available after steps 1 and 2.`
       console.log(`\n# All payment logs (by wallet):`);
       console.log(`curl '${AGENTPAY_API_URL}/audit/logs?client_id=${buyerWallet.address}&event_type=x402_payment_settled&limit=10' \\`);
       console.log(`  -H 'x-api-key: ${BUYER_API_KEY}' | jq`);
+      console.log(`\n# Recent payments (24h):`);
+      console.log(`curl '${AGENTPAY_API_URL}/audit/logs?client_id=${buyerWallet.address}&event_type=x402_payment_settled&hours=24' \\`);
+      console.log(`  -H 'x-api-key: ${BUYER_API_KEY}' | jq`);
+      console.log(`\n# Payment verification (by tx_hash):`);
+      console.log(`curl '${AGENTPAY_API_URL}/v1/payments/verify/${merchantTxHash}' \\`);
+      console.log(`  -H 'x-api-key: ${BUYER_API_KEY}' | jq`);
     }
   } catch (error: any) {
     console.error(`\n\n❌ Error: ${error.message}`);
