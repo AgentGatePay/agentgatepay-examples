@@ -146,11 +146,10 @@ def calculate_buyer_stats(analytics, payments, mandates, logs):
         else float(m.get('details', {}).get('budget_usd', 0))
         for m in mandates
     )
-    budget_remaining = sum(
-        float(json.loads(m.get('details', '{}')).get('budget_remaining', 0)) if isinstance(m.get('details'), str)
-        else float(m.get('details', {}).get('budget_remaining', 0))
-        for m in mandates
-    )
+
+    # Calculate ACTUAL remaining based on real spending (API mandate records may be stale)
+    budget_remaining = budget_total - total_spent
+
     budget_utilization = ((budget_total - budget_remaining) / budget_total * 100) if budget_total > 0 else 0
 
     # Active mandates count
@@ -392,12 +391,13 @@ if __name__ == "__main__":
 
     # Budget Status - BUYER FOCUS
     print("━" * 70)
-    print("🔑 BUDGET STATUS")
+    print("🔑 BUDGET STATUS (Combined Across All Mandates)")
     print("━" * 70)
-    print(f"Total Allocated: ${stats['budget_total']:.2f} USD Coins")
-    print(f"Remaining: ${stats['budget_remaining']:.2f} USD Coins")
-    print(f"Utilization: {stats['budget_utilization']:.1f}%")
-    print(f"Active Mandates: {stats['active_mandates']}")
+    print(f"Total Allocated: ${stats['budget_total']:.2f} USD Coins (sum of {len(mandates)} mandates)")
+    print(f"Spent: ${stats['total_spent']:.2f} USD Coins (from actual payments)")
+    print(f"Remaining: ${stats['budget_remaining']:.2f} USD Coins (calculated: total - spent)")
+    print(f"Utilization: {stats['budget_utilization']:.1f}% (spent / total budget)")
+    print(f"Active Mandates: {stats['active_mandates']} of {len(mandates)} total")
     print()
 
     # Payment Metrics

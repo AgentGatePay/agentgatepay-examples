@@ -107,10 +107,8 @@ function calculateBuyerStats(analytics: any, payments: any[], mandates: any[], l
     return sum + parseFloat(details.budget_usd || '0');
   }, 0);
 
-  const budgetRemaining = mandates.reduce((sum, m) => {
-    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details || {};
-    return sum + parseFloat(details.budget_remaining || '0');
-  }, 0);
+  // Calculate ACTUAL remaining based on real spending (API mandate records may be stale)
+  const budgetRemaining = budgetTotal - totalSpent;
 
   const budgetUtilization = budgetTotal > 0 ? ((budgetTotal - budgetRemaining) / budgetTotal) * 100 : 0;
 
@@ -300,12 +298,13 @@ async function main() {
 
     // Budget Status
     console.log('━'.repeat(70));
-    console.log('🔑 BUDGET STATUS');
+    console.log('🔑 BUDGET STATUS (Combined Across All Mandates)');
     console.log('━'.repeat(70));
-    console.log(`Total Allocated: $${stats.budgetTotal.toFixed(2)} USD Coins`);
-    console.log(`Remaining: $${stats.budgetRemaining.toFixed(2)} USD Coins`);
-    console.log(`Utilization: ${stats.budgetUtilization.toFixed(1)}%`);
-    console.log(`Active Mandates: ${stats.activeMandates}`);
+    console.log(`Total Allocated: $${stats.budgetTotal.toFixed(2)} USD Coins (sum of ${mandates.length} mandates)`);
+    console.log(`Spent: $${stats.totalSpent.toFixed(2)} USD Coins (from actual payments)`);
+    console.log(`Remaining: $${stats.budgetRemaining.toFixed(2)} USD Coins (calculated: total - spent)`);
+    console.log(`Utilization: ${stats.budgetUtilization.toFixed(1)}% (spent / total budget)`);
+    console.log(`Active Mandates: ${stats.activeMandates} of ${mandates.length} total`);
     console.log();
 
     // Payment Metrics
