@@ -338,7 +338,7 @@ const signPaymentTool = tool(
 
 // Tool 3: Submit payment and verify budget
 const mcpSubmitAndVerifyTool = tool(
-  async ({ _unused }: { _unused?: string }): Promise<string> => {
+  async (): Promise<string> => {
     if (!currentMandate || !merchantTxHash) {
       return 'Error: Must issue mandate and sign payment first';
     }
@@ -389,9 +389,7 @@ const mcpSubmitAndVerifyTool = tool(
   {
     name: 'submit_and_verify_payment',
     description: 'Submit payment proof via MCP and verify updated budget. No input needed.',
-    schema: z.object({
-      _unused: z.string().optional().describe('No input needed')
-    })
+    schema: z.object({})
   }
 );
 
