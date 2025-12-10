@@ -25,6 +25,7 @@ import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
+import readline from 'readline';
 import { getChainConfig, ChainConfig } from '../chain_config.js';
 
 // ========================================
@@ -38,6 +39,21 @@ const SELLER_WALLET = process.env.SELLER_WALLET;
 const COMMISSION_RATE = 0.005; // 0.5%
 
 const SELLER_API_PORT = parseInt(process.env.SELLER_API_PORT || '8000', 10);
+
+// Helper function for user input
+function question(prompt: string): Promise<string> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  return new Promise((resolve) => {
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
 
 // Fetch commission address from API dynamically
 async function getCommissionAddress(): Promise<string> {
@@ -583,16 +599,36 @@ async function main() {
   // Initialize seller agent
   seller = new SellerAgentMCP(config);
 
-  // Set default prices to $0.01
-  console.log(`\n💵 Setting all resources to default price: $0.01`);
+  // Ask user to set resource prices
+  console.log(`\n💵 Set resource prices (press Enter for default $0.01):`);
   for (const resId in seller.catalog) {
-    seller.catalog[resId].price_usd = 0.01;
+    const resource = seller.catalog[resId];
+    const priceInput = await question(`   ${resource.name}: $`);
+
+    if (priceInput.trim()) {
+      try {
+        const newPrice = parseFloat(priceInput.trim());
+        if (newPrice > 0) {
+          seller.catalog[resId].price_usd = newPrice;
+          console.log(`      ✅ Set to $${newPrice}`);
+        } else {
+          console.log(`      ⚠️  Invalid price, using default $0.01`);
+          seller.catalog[resId].price_usd = 0.01;
+        }
+      } catch (error) {
+        console.log(`      ⚠️  Invalid input, using default $0.01`);
+        seller.catalog[resId].price_usd = 0.01;
+      }
+    } else {
+      // User pressed Enter without typing - default to $0.01
+      seller.catalog[resId].price_usd = 0.01;
+      console.log(`      ✅ Set to default: $0.01`);
+    }
   }
 
   console.log(`\n✅ Final prices:`);
   for (const resId in seller.catalog) {
-    const res = seller.catalog[resId];
-    console.log(`   - ${res.name}: $${res.price_usd}`);
+    console.log(`   - ${seller.catalog[resId].name}: $${seller.catalog[resId].price_usd}`);
   }
 
   console.log();
@@ -613,8 +649,29 @@ async function main() {
   console.log('⚠️  For local testing, webhooks require a public URL.');
   console.log('   Options: ngrok, localtunnel, Render, Railway, etc.');
   console.log();
-  console.log('⚠️  Skipping webhook configuration (using manual verification)');
-  console.log('   Note: For production, webhooks provide better UX and scalability');
+
+  const webhookChoice = await question('Configure webhooks now? (y/n, default: n): ');
+
+  if (webhookChoice.trim().toLowerCase() === 'y') {
+    const webhookUrl = await question('Enter public webhook URL (e.g., https://your-domain.com/webhooks/payment): ');
+
+    if (webhookUrl.trim()) {
+      const result = await seller.configureWebhook(webhookUrl.trim());
+
+      if (!result.error) {
+        console.log(`\n✅ Webhooks enabled! Gateway will send notifications to:`);
+        console.log(`   ${webhookUrl.trim()}`);
+        console.log(`\n📦 Resources will be auto-delivered when payments are confirmed.`);
+      } else {
+        console.log(`\n⚠️  Continuing without webhooks (using manual verification)`);
+      }
+    } else {
+      console.log(`\n⚠️  No URL provided - continuing without webhooks`);
+    }
+  } else {
+    console.log(`\n⚠️  Skipping webhook configuration (using manual verification)`);
+    console.log(`   Note: For production, webhooks provide better UX and scalability`);
+  }
 
   console.log();
   console.log(`💡 MCP Tools Used:`);
