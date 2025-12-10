@@ -311,7 +311,7 @@ const submitAndVerifyPaymentTool = tool(
       };
 
       // Base64 encode payload (EXACTLY like Python - line 161)
-      const paymentB64 = Buffer.from(JSON.dumps(paymentPayload)).toString('base64');
+      const paymentB64 = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
 
       // Set headers (EXACTLY like Python - lines 163-167)
       const headers = {
