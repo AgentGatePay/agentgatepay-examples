@@ -21,14 +21,14 @@ This repository contains **10 complete examples** demonstrating how to integrate
 - **Examples 2a/2b:** REST API marketplace (buyer/seller split)
 - **Examples 3a/3b:** MCP tools (3a: local signing, 3b: external TX service)
 - **Examples 4a/4b:** MCP marketplace (buyer/seller split, with webhooks)
-- **Examples 6a/6b:** Monitoring dashboards (buyer spending, seller revenue)
+- **Examples 5a/5b:** Monitoring dashboards (buyer spending, seller revenue)
 
 **Logical Grouping:**
 - **1a/1b**: REST API payments (local vs external signing)
 - **2a/2b**: REST API marketplace (buyer vs seller)
 - **3a/3b**: MCP payments (local vs external signing)
 - **4a/4b**: MCP marketplace (buyer vs seller)
-- **6a/6b**: Monitoring (buyer vs seller dashboards)
+- **5a/5b**: Monitoring (buyer vs seller dashboards)
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
@@ -167,7 +167,7 @@ TX_SIGNING_SERVICE=https://your-service.onrender.com
 
 ### Transaction Signing
 
-**Examples 1a, 2a/2b, 3a, 4a/4b, 6a/6b: Local Signing**
+**Examples 1a, 2a/2b, 3a, 4a/4b, 5a/5b: Local Signing**
 
 Sign transactions using your private key from `.env` file:
 
@@ -245,10 +245,10 @@ python examples/4b_mcp_seller_agent.py
 python examples/4a_mcp_buyer_agent.py
 
 # Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
-python examples/6a_monitoring_buyer.py
+python examples/5a_monitoring_buyer.py
 
 # Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
-python examples/6b_monitoring_seller.py
+python examples/5b_monitoring_seller.py
 ```
 
 ### Multi-Chain/Token Configuration
@@ -689,11 +689,11 @@ Wallet configured: true
 
 ---
 
-### Examples 6a/6b: Buyer & Seller Monitoring Dashboards
+### Examples 5a/5b: Buyer & Seller Monitoring Dashboards
 
 **Files:**
-- `examples/6a_monitoring_buyer.py` - Buyer monitoring (spending, budgets, mandates)
-- `examples/6b_monitoring_seller.py` - Seller monitoring (revenue, webhooks, top buyers)
+- `examples/5a_monitoring_buyer.py` - Buyer monitoring (spending, budgets, mandates)
+- `examples/5b_monitoring_seller.py` - Seller monitoring (revenue, webhooks, top buyers)
 
 Standalone monitoring tools for tracking AgentGatePay payments - similar to n8n monitoring workflows but as Python CLI tools. Split into **buyer** and **seller** dashboards to match real-world usage patterns.
 
@@ -707,7 +707,7 @@ Standalone monitoring tools for tracking AgentGatePay payments - similar to n8n 
 
 #### Example 6a: Buyer Monitoring Dashboard
 
-**File:** `examples/6a_monitoring_buyer.py`
+**File:** `examples/5a_monitoring_buyer.py`
 
 Monitor your SPENDING as a buyer (outgoing payments):
 
@@ -721,10 +721,10 @@ Monitor your SPENDING as a buyer (outgoing payments):
 **Usage:**
 ```bash
 # Standalone mode (prompts for credentials)
-python examples/6a_monitoring_buyer.py
+python examples/5a_monitoring_buyer.py
 
 # With arguments
-python examples/6a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
+python examples/5a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
 ```
 
 **Output:**
@@ -764,7 +764,7 @@ ACTIVE MANDATES (2)
 
 #### Example 6b: Seller Monitoring Dashboard
 
-**File:** `examples/6b_monitoring_seller.py`
+**File:** `examples/5b_monitoring_seller.py`
 
 Monitor your REVENUE as a seller (incoming payments):
 
@@ -778,10 +778,10 @@ Monitor your REVENUE as a seller (incoming payments):
 **Usage:**
 ```bash
 # Standalone mode (prompts for credentials)
-python examples/6b_monitoring_seller.py
+python examples/5b_monitoring_seller.py
 
 # With arguments
-python examples/6b_monitoring_seller.py --api-key pk_live_... --wallet 0xDEF...
+python examples/5b_monitoring_seller.py --api-key pk_live_... --wallet 0xDEF...
 ```
 
 **Output:**

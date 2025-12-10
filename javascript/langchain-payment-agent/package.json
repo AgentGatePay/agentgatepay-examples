@@ -14,8 +14,8 @@
     "example:3b": "tsx examples/3b_mcp_with_tx_service.ts",
     "example:4a": "tsx examples/4a_mcp_buyer_agent.ts",
     "example:4b": "tsx examples/4b_mcp_seller_agent.ts",
-    "example:6a": "tsx examples/6a_monitoring_buyer.ts",
-    "example:6b": "tsx examples/6b_monitoring_seller.ts"
+    "example:5a": "tsx examples/5a_monitoring_buyer.ts",
+    "example:5b": "tsx examples/5b_monitoring_seller.ts"
   },
   "keywords": [
     "agentgatepay",

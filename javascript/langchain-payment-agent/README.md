@@ -29,14 +29,14 @@ Both versions have **identical functionality** - same flows, same features, same
 - **Examples 2a/2b:** REST API marketplace (buyer/seller split)
 - **Examples 3a/3b:** MCP tools (3a: local signing, 3b: external TX service)
 - **Examples 4a/4b:** MCP marketplace (buyer/seller split, with webhooks)
-- **Examples 6a/6b:** Monitoring dashboards (buyer spending, seller revenue)
+- **Examples 5a/5b:** Monitoring dashboards (buyer spending, seller revenue)
 
 **Logical Grouping:**
 - **1a/1b**: REST API payments (local vs external signing)
 - **2a/2b**: REST API marketplace (buyer vs seller)
 - **3a/3b**: MCP payments (local vs external signing)
 - **4a/4b**: MCP marketplace (buyer vs seller)
-- **6a/6b**: Monitoring (buyer vs seller dashboards)
+- **5a/5b**: Monitoring (buyer vs seller dashboards)
 
 **Integration Approaches:**
 - **REST API version** - Uses published AgentGatePay SDK (v1.1.4+) from npm
@@ -201,7 +201,7 @@ TX_SIGNING_SERVICE=https://your-service.onrender.com
 
 ### Transaction Signing
 
-**Examples 1a, 2a/2b, 3a, 4a/4b, 6a/6b: Local Signing**
+**Examples 1a, 2a/2b, 3a, 4a/4b, 5a/5b: Local Signing**
 
 Sign transactions using your private key from `.env` file:
 
@@ -267,10 +267,10 @@ npm run example:4b
 npm run example:4a
 
 # Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
-npm run example:6a
+npm run example:5a
 
 # Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
-npm run example:6b
+npm run example:5b
 ```
 
 ### Multi-Chain/Token Configuration
@@ -400,11 +400,11 @@ Same marketplace pattern as Example 2, but using MCP tools for mandate and payme
 
 ---
 
-### Examples 6a/6b: Buyer & Seller Monitoring Dashboards
+### Examples 5a/5b: Buyer & Seller Monitoring Dashboards
 
 **Files:**
-- `examples/6a_monitoring_buyer.ts` - Buyer monitoring (spending, budgets, mandates)
-- `examples/6b_monitoring_seller.ts` - Seller monitoring (revenue, webhooks, top buyers)
+- `examples/5a_monitoring_buyer.ts` - Buyer monitoring (spending, budgets, mandates)
+- `examples/5b_monitoring_seller.ts` - Seller monitoring (revenue, webhooks, top buyers)
 
 Standalone monitoring tools for tracking AgentGatePay payments - similar to n8n monitoring workflows but as TypeScript CLI tools.
 
@@ -632,8 +632,8 @@ javascript/langchain-payment-agent/
 │   ├── 3b_mcp_with_tx_service.ts
 │   ├── 4a_mcp_buyer_agent.ts
 │   ├── 4b_mcp_seller_agent.ts
-│   ├── 6a_monitoring_buyer.ts
-│   └── 6b_monitoring_seller.ts
+│   ├── 5a_monitoring_buyer.ts
+│   └── 5b_monitoring_seller.ts
 ├── utils/                  # Utility modules
 │   ├── mandateStorage.ts   # Persistent mandate storage
 │   └── index.ts            # Exports
@@ -654,7 +654,7 @@ javascript/langchain-payment-agent/
     "build": "tsc",                    // Compile TypeScript (optional)
     "example:1a": "tsx examples/1a_api_basic_payment.ts",  // Run with tsx
     "example:2a": "tsx examples/2a_api_buyer_agent.ts",
-    "example:6a": "tsx examples/6a_monitoring_buyer.ts"
+    "example:5a": "tsx examples/5a_monitoring_buyer.ts"
   },
   "engines": {
     "node": ">=18.0.0"  // Minimum Node.js version
