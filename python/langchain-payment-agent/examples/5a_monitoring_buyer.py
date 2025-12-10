@@ -396,7 +396,7 @@ if __name__ == "__main__":
     print(f"Total Mandate Budget: ${stats['budget_total']:.2f} USD Coins (sum of {len(mandates)} mandates)")
     print(f"Spent: ${stats['total_spent']:.2f} USD Coins (from actual payments)")
     print(f"Remaining: ${stats['budget_remaining']:.2f} USD Coins (calculated: total - spent)")
-    print(f"Utilization: {stats['budget_utilization']:.1f}% (spent / total budget)")
+    print(f"Utilization: {stats['budget_utilization']:.2f}% (spent / total budget)")
     print(f"Active Mandates: {stats['active_mandates']} of {len(mandates)} total")
     print()
 
