@@ -299,12 +299,7 @@ const signBlockchainPaymentTool = tool(
 
 // Tool 3: Submit and Verify Payment
 const submitAndVerifyPaymentTool = tool(
-  async ({ merchantTx, commissionTx, mandateToken, priceUsd }: {
-    merchantTx: string;
-    commissionTx: string;
-    mandateToken: string;
-    priceUsd: number;
-  }): Promise<string> => {
+  async ({ merchantTx, commissionTx, mandateToken, priceUsd }: { merchantTx: string; commissionTx: string; mandateToken: string; priceUsd: number; }): Promise<string> => {
     try {
       console.log(`\n📤 Submitting to gateway...`);
 
@@ -512,15 +507,15 @@ async function main() {
     messageModifier: systemPrompt
   });
 
-  // Agent task - EXPLICIT parameter instructions for LangChain.js
+  // Agent task
   const task = `Purchase a ${purpose} for $${RESOURCE_PRICE_USD} USD.
 
 Steps:
-1. Call issue_mandate tool with parameter: {budgetUsd: ${mandateBudget}}
-2. Call sign_payment tool with parameters: {amountUsd: ${RESOURCE_PRICE_USD}, recipient: "${SELLER_WALLET}"}
-3. Call submit_payment tool with the mandate token from step 1 and transaction hashes from step 2
+1. Issue a payment mandate with a $${mandateBudget} budget (or reuse existing)
+2. Sign blockchain payment of $${RESOURCE_PRICE_USD} to seller: ${SELLER_WALLET}
+3. Submit payment proof to AgentGatePay with mandate token
 
-IMPORTANT: Use the exact parameter names shown above (budgetUsd, amountUsd, recipient, etc.).`;
+The mandate token and transaction hashes will be available after steps 1 and 2.`;
 
   try {
     // Run agent
