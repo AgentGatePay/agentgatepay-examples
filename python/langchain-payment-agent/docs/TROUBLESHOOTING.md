@@ -181,11 +181,15 @@ print(f"Budget remaining: ${budget_remaining}")
 
 ---
 
-### Error: "Mandate verification failed"
+### Error: "Mandate verification failed" or "Invalid or expired mandate"
 
 **Symptom:**
 ```
 AuthenticationError: Mandate verification failed
+```
+or
+```
+Error: Invalid or expired mandate
 ```
 
 **Solution:**
@@ -196,6 +200,15 @@ AuthenticationError: Mandate verification failed
 ```python
 scope="resource.read,payment.execute"  # Required for payments
 ```
+5. If error persists with a fresh mandate, delete the cached mandate file and restart:
+```bash
+# Delete cached mandate file
+rm ../.agentgatepay_mandates.json
+# Run example again (will create fresh mandate)
+python3 examples/1a_api_basic_payment.py
+```
+
+**Note**: Old or corrupt mandate tokens from before a gateway update may cause verification errors. Deleting the cached mandate file forces creation of a fresh, valid mandate.
 
 ---
 

@@ -537,8 +537,15 @@ npx tsc --noEmit  # Check for errors without outputting files
 
 ### Payment-Related Issues
 
-**Error: "Mandate not found or expired"**
+**Error: "Mandate not found or expired" or "Invalid or expired mandate"**
 - Solution: Mandate TTL is 7 days. Issue a new mandate or delete `.agentgatepay_mandates.json`.
+- If error persists after creating a fresh mandate, delete `.agentgatepay_mandates.json` and restart the script to force a new mandate issuance.
+```bash
+# Delete cached mandate file
+rm .agentgatepay_mandates.json
+# Run example again (will create fresh mandate)
+npm run example:1a
+```
 
 **Error: "Payment verification failed"**
 - Solution: Wait 10-15 seconds for Base network confirmation, then retry.
