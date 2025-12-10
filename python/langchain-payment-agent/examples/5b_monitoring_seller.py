@@ -11,7 +11,7 @@ Monitor your revenue as a SELLER (incoming payments):
 - CSV/JSON exports
 
 This is for sellers who RECEIVE payments. For buyers who SEND payments,
-use 6a_monitoring_buyer.py instead.
+use 5a_monitoring_buyer.py instead.
 
 Features (Seller-Focused):
 - Total revenue, payment count, average payment
@@ -23,10 +23,10 @@ Features (Seller-Focused):
 
 Usage:
     # Standalone mode (will prompt for credentials)
-    python 6b_monitoring_seller.py
+    python 5b_monitoring_seller.py
 
     # With arguments
-    python 6b_monitoring_seller.py --api-key pk_live_... --wallet 0xDEF...
+    python 5b_monitoring_seller.py --api-key pk_live_... --wallet 0xDEF...
 
 Requirements:
 - pip install agentgatepay-sdk>=1.1.3 python-dotenv requests
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     print("  ✅ Top buyers analysis")
     print("  ✅ Payment success rate monitoring")
     print()
-    print("For SPENDING tracking (outgoing payments), use 6a_monitoring_buyer.py")
+    print("For SPENDING tracking (outgoing payments), use 5a_monitoring_buyer.py")
     print()
     print("=" * 70)
 

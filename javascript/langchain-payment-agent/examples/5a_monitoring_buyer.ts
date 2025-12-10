@@ -9,7 +9,7 @@
  * - Commission tracking (what you paid to the gateway)
  *
  * This is for buyers who SEND payments. For sellers who RECEIVE payments,
- * use 6b_monitoring_seller.ts instead.
+ * use 5b_monitoring_seller.ts instead.
  *
  * Features (Buyer-Focused):
  * - Total spent, payment count, average payment
@@ -20,7 +20,7 @@
  * - Commission breakdown per transaction
  *
  * Usage:
- *     npm run example:6a
+ *     npm run example:5a
  *
  * Requirements:
  * - npm install
@@ -220,7 +220,7 @@ async function main() {
   console.log('  ✅ Spending alerts and budget warnings');
   console.log('  ✅ Commission tracking (what you paid to gateway)');
   console.log();
-  console.log('For REVENUE tracking (incoming payments), use 6b_monitoring_seller.ts');
+  console.log('For REVENUE tracking (incoming payments), use 5b_monitoring_seller.ts');
   console.log();
   console.log('='.repeat(70));
 

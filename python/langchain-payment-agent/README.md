@@ -244,10 +244,10 @@ python examples/4b_mcp_seller_agent.py
 # Terminal 2: Then run buyer
 python examples/4a_mcp_buyer_agent.py
 
-# Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
+# Example 5a: Buyer monitoring dashboard (SPENDING & BUDGETS)
 python examples/5a_monitoring_buyer.py
 
-# Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
+# Example 5b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
 python examples/5b_monitoring_seller.py
 ```
 
@@ -705,7 +705,7 @@ Standalone monitoring tools for tracking AgentGatePay payments - similar to n8n 
 
 ---
 
-#### Example 6a: Buyer Monitoring Dashboard
+#### Example 5a: Buyer Monitoring Dashboard
 
 **File:** `examples/5a_monitoring_buyer.py`
 
@@ -762,7 +762,7 @@ ACTIVE MANDATES (2)
 
 ---
 
-#### Example 6b: Seller Monitoring Dashboard
+#### Example 5b: Seller Monitoring Dashboard
 
 **File:** `examples/5b_monitoring_seller.py`
 

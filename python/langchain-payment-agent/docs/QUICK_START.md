@@ -258,11 +258,11 @@ python examples/4a_mcp_buyer_agent.py
 # Example 5: Production signing (external service) - PRODUCTION READY 🚀
 python examples/5_api_with_tx_service.py
 
-# Example 6a: Buyer monitoring dashboard (spending & budgets)
-python examples/6a_monitoring_buyer.py
+# Example 5a: Buyer monitoring dashboard (spending & budgets)
+python examples/5a_monitoring_buyer.py
 
-# Example 6b: Seller monitoring dashboard (revenue & webhooks)
-python examples/6b_monitoring_seller.py
+# Example 5b: Seller monitoring dashboard (revenue & webhooks)
+python examples/5b_monitoring_seller.py
 ```
 
 **Example 5 Requirements:**
@@ -270,7 +270,7 @@ python examples/6b_monitoring_seller.py
 - `TX_SIGNING_SERVICE` must be set in `.env` file
 - Uses external service for secure transaction signing (NO private key in code)
 
-**Examples 6a/6b:**
+**Examples 5a/5b:**
 - Separate monitoring dashboards for buyers (spending) and sellers (revenue)
 - Matches n8n monitoring workflow pattern
 - Can be run anytime to check payment status

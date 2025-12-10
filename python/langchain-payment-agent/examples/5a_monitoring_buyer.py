@@ -11,7 +11,7 @@ Monitor your payment activity as a BUYER (outgoing payments):
 - Live CURL command execution with results
 
 This is for buyers who SEND payments. For sellers who RECEIVE payments,
-use 6b_monitoring_seller.py instead.
+use 5b_monitoring_seller.py instead.
 
 Features (Buyer-Focused):
 - Total spent, payment count, average payment
@@ -24,10 +24,10 @@ Features (Buyer-Focused):
 
 Usage:
     # Standalone mode (will prompt for credentials)
-    python 6a_monitoring_buyer.py
+    python 5a_monitoring_buyer.py
 
     # With arguments
-    python 6a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
+    python 5a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
 
 Requirements:
 - pip install agentgatepay-sdk>=1.1.3 python-dotenv requests
@@ -296,7 +296,7 @@ if __name__ == "__main__":
     print("  ✅ Spending alerts and budget warnings")
     print("  ✅ Commission tracking (what you paid to gateway)")
     print()
-    print("For REVENUE tracking (incoming payments), use 6b_monitoring_seller.py")
+    print("For REVENUE tracking (incoming payments), use 5b_monitoring_seller.py")
     print()
     print("=" * 70)
 

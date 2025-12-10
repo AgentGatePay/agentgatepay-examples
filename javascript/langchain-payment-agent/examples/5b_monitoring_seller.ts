@@ -9,7 +9,7 @@
  * - Smart alerts (payment failures, webhook issues)
  *
  * This is for sellers who RECEIVE payments. For buyers who SEND payments,
- * use 6a_monitoring_buyer.ts instead.
+ * use 5a_monitoring_buyer.ts instead.
  *
  * Features (Seller-Focused):
  * - Total revenue, payment count, average payment
@@ -20,7 +20,7 @@
  * - Payment success rate monitoring
  *
  * Usage:
- *     npm run example:6b
+ *     npm run example:5b
  *
  * Requirements:
  * - npm install
@@ -209,7 +209,7 @@ async function main() {
   console.log('  ✅ Top buyers analysis');
   console.log('  ✅ Payment success rate monitoring');
   console.log();
-  console.log('For SPENDING tracking (outgoing payments), use 6a_monitoring_buyer.ts');
+  console.log('For SPENDING tracking (outgoing payments), use 5a_monitoring_buyer.ts');
   console.log();
   console.log('='.repeat(70));
 

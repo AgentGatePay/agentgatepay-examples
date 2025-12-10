@@ -266,10 +266,10 @@ npm run example:4b
 # Terminal 2: Then run buyer
 npm run example:4a
 
-# Example 6a: Buyer monitoring dashboard (SPENDING & BUDGETS)
+# Example 5a: Buyer monitoring dashboard (SPENDING & BUDGETS)
 npm run example:5a
 
-# Example 6b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
+# Example 5b: Seller monitoring dashboard (REVENUE & WEBHOOKS)
 npm run example:5b
 ```
 
