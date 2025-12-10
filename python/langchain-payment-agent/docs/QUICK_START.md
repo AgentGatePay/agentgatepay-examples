@@ -128,8 +128,8 @@ Private key stored in `.env` file. Used in examples 1-6.
    # Add to .env file
    TX_SIGNING_SERVICE=https://your-service.onrender.com
 
-   # Run Example 5 (uses external signing)
-   python examples/5_api_with_tx_service.py
+   # Run Example 1b (uses external signing)
+   python examples/1b_api_with_tx_service.py
    ```
 
 **See:** [TX_SIGNING_OPTIONS.md](TX_SIGNING_OPTIONS.md) for all signing methods (Docker, Railway, self-hosted, etc.)
@@ -183,10 +183,10 @@ TX_SIGNING_SERVICE=https://your-service.onrender.com
 
 ## Step 6: Run Your First Example (30 seconds)
 
-### Example 1: Basic Payment
+### Example 1a: Basic Payment (Local Signing)
 
 ```bash
-python examples/1_api_basic_payment.py
+python examples/1a_api_basic_payment.py
 ```
 
 **Expected Output:**
@@ -238,25 +238,28 @@ Your autonomous agent completed the **3-step payment flow**:
 ### Try More Examples
 
 ```bash
-# Example 2: Buyer/Seller marketplace (run seller first)
+# Example 2a/2b: Buyer/Seller marketplace (run seller first)
 # Terminal 1:
 python examples/2b_api_seller_agent.py
 
 # Terminal 2:
 python examples/2a_api_buyer_agent.py
 
-# Example 3: Basic payment using MCP tools
-python examples/3_mcp_basic_payment.py
+# Example 3a: Basic payment using MCP tools (Local Signing)
+python examples/3a_mcp_basic_payment.py
 
-# Example 4: Buyer/Seller marketplace (MCP tools) - run seller first
+# Example 4a/4b: Buyer/Seller marketplace (MCP tools) - run seller first
 # Terminal 1:
 python examples/4b_mcp_seller_agent.py
 
 # Terminal 2:
 python examples/4a_mcp_buyer_agent.py
 
-# Example 5: Production signing (external service) - PRODUCTION READY 🚀
-python examples/5_api_with_tx_service.py
+# Example 1b: Production signing (external service) - PRODUCTION READY 🚀
+python examples/1b_api_with_tx_service.py
+
+# Example 3b: MCP + Production signing (external service)
+python examples/3b_mcp_with_tx_service.py
 
 # Example 5a: Buyer monitoring dashboard (spending & budgets)
 python examples/5a_monitoring_buyer.py
@@ -265,7 +268,7 @@ python examples/5a_monitoring_buyer.py
 python examples/5b_monitoring_seller.py
 ```
 
-**Example 5 Requirements:**
+**Examples 1b/3b Requirements:**
 - TX signing service must be deployed (see Step 4, Option B)
 - `TX_SIGNING_SERVICE` must be set in `.env` file
 - Uses external service for secure transaction signing (NO private key in code)
