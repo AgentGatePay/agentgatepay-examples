@@ -352,7 +352,8 @@ class BuyerAgent {
         `${SELLER_API_URL}/resource`,
         {
           params: { resource_id: resourceId },
-          timeout: 10000
+          timeout: 10000,
+          validateStatus: (status) => status < 500 // Accept all status codes < 500
         }
       );
 
@@ -629,7 +630,8 @@ class BuyerAgent {
           {
             params: { resource_id: paymentInfo.resource_id },
             headers: { 'x-payment': paymentHeader },
-            timeout: 30000
+            timeout: 30000,
+            validateStatus: (status) => status < 500 // Accept all status codes < 500
           }
         );
 
