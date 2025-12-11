@@ -1,39 +1,26 @@
 Copyright (c) 2025 AgentGatePay
 
-EXAMPLES LICENSE
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this example code, to deal in the examples without restriction, including
+without limitation the rights to use, copy, modify, merge, publish, and
+distribute the examples, and to permit persons to whom the examples are
+furnished to do so, subject to the following conditions:
 
-These examples are provided to help you get started with AgentGatePay quickly.
+1. The examples may be used for integration with AgentGatePay services or
+   for educational and reference purposes.
 
-YOU ARE FREE TO:
-✓ Copy and paste any code from these examples
-✓ Modify examples for your specific use case
-✓ Use examples in your commercial or non-commercial projects
-✓ Learn from and build upon these examples
-✓ Share examples with your team and other developers
-✓ Create your own tutorials based on these examples
-✓ Include example code in your open source projects
-✓ Use examples as starting points for production applications
+2. The examples may not be used for illegal purposes or in violation of any
+   applicable laws and regulations.
 
-REALLY, USE THEM FREELY:
-These examples exist to help you succeed. Copy them, modify them, learn from
-them, share them - that's exactly what they're for! No complicated restrictions.
+3. The above copyright notice and this permission notice shall be included
+   in substantial portions of the examples when redistributed.
 
-SIMPLE REQUEST:
-If you create a tutorial or blog post using these examples, a mention of
-AgentGatePay would be nice (but totally optional - we won't hunt you down!).
+THE EXAMPLES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE EXAMPLES OR THE USE OR OTHER DEALINGS IN
+THE EXAMPLES.
 
-ONE THING:
-Please don't use these examples to build a competing payment gateway service.
-Use them to integrate with AgentGatePay instead!
-
-NO WARRANTY:
-These examples are provided "as is" without warranty of any kind.
-
-QUESTIONS?
-Contact us at: support@agentgatepay.com
-
----
-
-Happy coding! We can't wait to see what you build with AgentGatePay.
-
-Last updated: December 11, 2025
+For questions regarding usage rights: support@agentgatepay.com
