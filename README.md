@@ -53,12 +53,10 @@
   **Python Framework Examples:**
   - [LangChain Integration](python/langchain-payment-agent/) - Autonomous tool-calling agents with payment capabilities (10 complete examples)
 
-  **JavaScript Framework Examples** (Coming Soon):
-  - Vercel AI SDK Integration - Streaming AI applications with pay-per-token pricing
-  - LangChain.js Integration - Node.js agents with blockchain payments
-  - JavaScript SDK Quickstart - Basic payment integration examples
+  **JavaScript/TypeScript Framework Examples:**
+  - [LangChain.js Integration](javascript/langchain-payment-agent/) - Node.js/TypeScript agents with blockchain payments (10 complete examples)
 
-  Star this repository to receive notifications when new framework examples are released.
+  **Need help with other platforms or languages?** Contact support@agentgatepay.com and we'll help you integrate AgentGatePay with your framework.
 
   ---
 
@@ -109,10 +107,10 @@
   - **REST API Integration** - Integration guides for any framework
   - **MCP Integration** - Model Context Protocol (15 tools)
 
-  **JavaScript SDK Examples** (Coming Soon)
-  - **Vercel AI SDK** - Streaming chat with usage-based payments
-  - **LangChain.js** - Node.js payment agents, Express.js webhook servers
-  - **Quickstart Examples** - Simple payment flows, mandate management, webhook handling
+  **JavaScript/TypeScript SDK Examples** ([Browse JavaScript examples](javascript/langchain-payment-agent/))
+  - **LangChain.js** - Node.js/TypeScript payment agents, Express.js webhook servers (10 complete examples)
+  - **REST API Integration** - Integration guides for any JavaScript framework
+  - **MCP Integration** - Model Context Protocol (15 tools)
 
   ---
 
@@ -156,6 +154,7 @@
   - [JavaScript SDK on npm](https://www.npmjs.com/package/agentgatepay-sdk/) - Install: `npm install agentgatepay-sdk`
   - [n8n Complete Guide](n8n/README.md) - Full setup, configuration, and troubleshooting
   - [Python LangChain Examples](python/langchain-payment-agent/README.md) - Complete guide with multi-token/chain configuration
+  - [JavaScript/TypeScript LangChain.js Examples](javascript/langchain-payment-agent/README.md) - Complete guide with multi-token/chain configuration
 
   ---
 
