@@ -1,26 +1,37 @@
-Copyright (c) 2025 AgentGatePay
+Copyright (c) 2025 AgentGatePay. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this example code, to deal in the examples without restriction, including
-without limitation the rights to use, copy, modify, merge, publish, and
-distribute the examples, and to permit persons to whom the examples are
-furnished to do so, subject to the following conditions:
+EXAMPLES LICENSE
 
-1. The examples may be used for integration with AgentGatePay services or
-   for educational and reference purposes.
+These examples are provided to help you integrate with AgentGatePay services.
 
-2. The examples may not be used for illegal purposes or in violation of any
-   applicable laws and regulations.
+PERMITTED USE:
+You may freely use these examples to:
+- Integrate AgentGatePay into your applications (commercial or non-commercial)
+- Copy, modify, and adapt code for your projects
+- Build products and services that connect to AgentGatePay APIs
+- Create proprietary/closed-source applications based on these examples
+- Share modified examples with your team or community
+- Use example code in production applications
 
-3. The above copyright notice and this permission notice shall be included
-   in substantial portions of the examples when redistributed.
+RESTRICTIONS:
+This license does NOT grant rights to:
+- The AgentGatePay service, infrastructure, or backend systems
+- Recreate or duplicate the AgentGatePay platform
+- Create competing payment gateway services
 
-THE EXAMPLES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE EXAMPLES OR THE USE OR OTHER DEALINGS IN
-THE EXAMPLES.
+OWNERSHIP:
+AgentGatePay services, APIs, protocols, and infrastructure remain the
+exclusive proprietary property of AgentGatePay.
 
-For questions regarding usage rights: support@agentgatepay.com
+NO WARRANTY:
+These examples are provided "AS IS" without warranty of any kind.
+
+---
+
+INTEGRATIONS WELCOMED
+
+You are explicitly encouraged to use these examples as the foundation for
+commercial applications, SaaS products, and proprietary systems. Copy freely.
+Adapt freely. No approval needed.
+
+Questions? support@agentgatepay.com
