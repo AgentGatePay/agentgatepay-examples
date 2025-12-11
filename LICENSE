@@ -1,21 +1,47 @@
-MIT License
-
 Copyright (c) 2025 AgentGatePay
+All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This example code is proprietary to AgentGatePay.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+PERMITTED USE:
+You may use these examples for the following purposes:
+- Learning how to integrate AgentGatePay into your applications
+- Using code snippets as a starting point for your AgentGatePay integration
+- Adapting and modifying examples for your own applications that use AgentGatePay
+- Internal training and reference within your organization
+- Development and production deployment of applications using AgentGatePay
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+RESTRICTIONS:
+You may NOT:
+- Use these examples to build competing payment gateway services
+- Redistribute these examples as part of competing services or products
+- Remove or modify copyright notices and attributions
+- Present these examples as your own work without attribution
+- Use these examples to recreate AgentGatePay functionality
+
+DISTRIBUTION:
+You may share modified versions of these examples with others, provided that:
+- All copyright and attribution notices are maintained
+- The examples are only used for integrating with AgentGatePay services
+- They are not used to enable competitors to bypass AgentGatePay
+
+INTELLECTUAL PROPERTY:
+All code, patterns, and integration methods in these examples are the exclusive
+property of AgentGatePay and are protected by copyright and other intellectual
+property laws.
+
+NO WARRANTY:
+These examples are provided "as is" without warranty of any kind, express or
+implied, including but not limited to warranties of merchantability, fitness
+for a particular purpose, or non-infringement.
+
+LIMITATION OF LIABILITY:
+In no event shall AgentGatePay be liable for any claim, damages, or other
+liability, whether in an action of contract, tort, or otherwise, arising from
+the use of these examples or AgentGatePay services.
+
+PERMISSION REQUESTS:
+For permission to use these examples beyond the permitted scope, please contact:
+support@agentgatepay.com
+
+Last updated: December 11, 2025
