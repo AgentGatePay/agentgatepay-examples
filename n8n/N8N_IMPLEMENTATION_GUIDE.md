@@ -158,7 +158,7 @@ Ed25519 signature over header + payload
 1. **Distributed Rate Limiting**
    - 100 requests/minute for authenticated users (with API key)
    - 20 requests/minute for anonymous users
-   - DynamoDB atomic counters across all Lambda containers
+   - Distributed rate limiting across all server instances
    - Standard RFC 6585 headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
 
 2. **Replay Protection**
@@ -411,7 +411,7 @@ After deployment completes:
 - ✅ **Server-Fetched Config:** Commission address and rate fetched from AgentGatePay (you cannot modify)
 - ✅ **Encrypted Secrets:** Private key encrypted at rest by Render
 - ✅ **HTTPS Only:** All requests over TLS 1.3
-- ✅ **No Commission Bypass:** Commission is MANDATORY (enforced server-side)
+- ✅ **No Commission Bypass:** Commission is MANDATORY (enforced by the gateway)
 
 **Upgrade to Secret Files (Optional - Maximum Security):**
 
@@ -643,7 +643,7 @@ app.listen(3000, () => console.log('Signing service running on port 3000'));
 - Need to maintain and update code
 
 **Cost:**
-- AWS Lambda: ~$0.20 per 1 million requests
+- Serverless hosting: ~$0.20 per 1 million requests
 - VPS: $5-50/month depending on specs
 
 ---
@@ -1250,7 +1250,7 @@ catalog: {
 - View results in Node output or send to Slack/email
 
 **Technical Note (Nov 19, 2025):**
-Buyer monitoring is powered by the **PayerIndex Global Secondary Index** on the Charges DynamoDB table. This index enables efficient querying of all payments made by a specific buyer wallet address, sorted by timestamp. Prior to November 19, 2025, only seller monitoring was supported (via ReceiverIndex). The addition of PayerIndex completed the bidirectional monitoring capability.
+Buyer monitoring enables efficient querying of all payments made by a specific buyer wallet address, sorted by timestamp. Prior to November 19, 2025, only seller monitoring was supported. The addition of buyer monitoring completed the bidirectional monitoring capability.
 
 ### Seller Monitoring Dashboard
 
@@ -1458,7 +1458,7 @@ Expected: HTTP 200 with resource data (if tx_hash valid) or HTTP 400 (if invalid
                                                ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                   AGENTGATEPAY GATEWAY                       │
-│                  (Lambda + DynamoDB)                         │
+│                  (Cloud Infrastructure)                      │
 │                                                              │
 │  - Issue/verify mandates (AP2 protocol)                     │
 │  - Verify blockchain transactions                           │

@@ -321,7 +321,7 @@ Simple autonomous payment flow demonstrating the complete 3-step process:
 **Uses:**
 - AgentGatePay SDK (agentgatepay-sdk@^1.1.4) from npm
 - ethers.js for blockchain signing
-- LangChain.js agent with LangGraph backend
+- LangChain.js agent framework
 
 **Key Features:**
 - Dynamic commission fetching from API

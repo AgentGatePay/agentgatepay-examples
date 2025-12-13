@@ -356,14 +356,14 @@ call_mcp_tool("agentpay_  # No autocomplete
 ### 10. Performance
 
 #### REST API
-- Direct HTTP requests to API Gateway
+- Direct HTTP requests to the API
 - SDK handles connection pooling
 - Typical latency: **100-200ms**
 
 ---
 
 #### MCP Tools
-- HTTP request to `/mcp` endpoint → routes to same Lambda function
+- HTTP request to `/mcp` endpoint → processes the request
 - JSON-RPC adds ~5-10ms overhead
 - Typical latency: **110-210ms**
 

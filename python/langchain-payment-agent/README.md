@@ -299,7 +299,7 @@ Simple autonomous payment flow demonstrating the complete 3-step process:
 **Uses:**
 - AgentGatePay SDK (agentgatepay-sdk>=1.1.3) from PyPI
 - Web3.py for blockchain signing
-- LangChain 1.x agent with LangGraph backend
+- LangChain agent framework
 
 **Key Features:**
 - Dynamic commission fetching from API
