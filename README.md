@@ -12,6 +12,22 @@
 
   ---
 
+  ## ⚠️ IMPORTANT DISCLAIMER
+
+  **AgentGatePay is currently in BETA.** By using these examples and the AgentGatePay service, you acknowledge and accept:
+
+  - **Service Availability:** The service may be unavailable, suspended, or permanently shut down at any time without prior notice. No SLA or uptime guarantees.
+  - **Data Loss Risk:** All data may be lost at any time without recovery. Users are solely responsible for maintaining independent backups of transaction records.
+  - **No Liability:** AgentGatePay is NOT LIABLE for any direct, indirect, or consequential damages including lost cryptocurrency, failed transactions, service interruptions, or loss of revenue.
+  - **Financial Risk:** Blockchain transactions are irreversible. Users are solely responsible for securing private keys, API keys, and compliance with applicable laws.
+  - **No Warranty:** These examples and the service are provided "AS IS" without warranties of any kind.
+
+  **📄 Read the full [DISCLAIMER.md](DISCLAIMER.md) before using these examples or AgentGatePay.**
+
+  **BY USING THESE EXAMPLES, YOU AGREE TO THESE TERMS.**
+
+  ---
+
   ## Supported Payment Methods
 
   **Cryptocurrencies:** USDC, USDT, DAI
