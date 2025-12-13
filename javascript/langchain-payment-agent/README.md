@@ -10,7 +10,7 @@
 > **⚠️ BETA VERSION**: These examples are currently in beta. We're actively adding features and improvements based on user feedback. Expect updates for enhanced functionality, additional framework integrations, improved error handling, and expanded multi-chain support.
 
 [![Node.js 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org/)
-[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.4+-blue.svg)](https://www.npmjs.com/package/agentgatepay-sdk)
+[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.5+-blue.svg)](https://www.npmjs.com/package/agentgatepay-sdk)
 [![LangChain.js](https://img.shields.io/badge/langchain-0.3.0+-orange.svg)](https://js.langchain.com/)
 
 ## Overview
@@ -39,7 +39,7 @@ Both versions have **identical functionality** - same flows, same features, same
 - **5a/5b**: Monitoring (buyer vs seller dashboards)
 
 **Integration Approaches:**
-- **REST API version** - Uses published AgentGatePay SDK (v1.1.4+) from npm
+- **REST API version** - Uses published AgentGatePay SDK (v1.1.5+) from npm
 - **MCP version** - Uses AgentGatePay's 15 MCP tools (Model Context Protocol)
 
 **Multi-Chain/Token Support** - All examples support **4 chains** (Base, Ethereum, Polygon, Arbitrum) and **3 tokens** (USDC, USDT, DAI) with configuration via .env file.
@@ -319,7 +319,7 @@ Simple autonomous payment flow demonstrating the complete 3-step process:
 3. **Submit to Gateway**: Submit payment proof to AgentGatePay for verification
 
 **Uses:**
-- AgentGatePay SDK (agentgatepay-sdk@^1.1.4) from npm
+- AgentGatePay SDK (agentgatepay-sdk@^1.1.5) from npm
 - ethers.js for blockchain signing
 - LangChain.js agent framework
 

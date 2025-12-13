@@ -33,7 +33,7 @@
   "author": "AgentGatePay",
   "license": "MIT",
   "dependencies": {
-    "agentgatepay-sdk": "^1.1.4",
+    "agentgatepay-sdk": "^1.1.5",
     "langchain": "^0.3.0",
     "@langchain/core": "^0.3.0",
     "@langchain/openai": "^0.3.0",

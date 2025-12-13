@@ -10,7 +10,7 @@
 > **⚠️ BETA VERSION**: These examples are currently in beta. We're actively adding features and improvements based on user feedback. Expect updates for enhanced functionality, additional framework integrations, improved error handling, and expanded multi-chain support.
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.4+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
+[![AgentGatePay SDK](https://img.shields.io/badge/agentgatepay--sdk-1.1.5+-green.svg)](https://pypi.org/project/agentgatepay-sdk/)
 [![LangChain](https://img.shields.io/badge/langchain-1.0.0+-orange.svg)](https://www.langchain.com/)
 
 ## Overview
@@ -31,7 +31,7 @@ This repository contains **10 complete examples** demonstrating how to integrate
 - **5a/5b**: Monitoring (buyer vs seller dashboards)
 
 **Integration Approaches:**
-- **REST API version** - Uses published AgentGatePay SDK (v1.1.3+) from PyPI
+- **REST API version** - Uses published AgentGatePay SDK (v1.1.5+) from PyPI
 - **MCP version** - Uses AgentGatePay's 15 MCP tools (Model Context Protocol)
 
 **Multi-Chain/Token Support** - All examples support **4 chains** (Base, Ethereum, Polygon, Arbitrum) and **3 tokens** (USDC, USDT, DAI) with interactive selection on first run.
@@ -297,7 +297,7 @@ Simple autonomous payment flow demonstrating the complete 3-step process:
 3. **Submit to Gateway**: Submit payment proof to AgentGatePay for verification
 
 **Uses:**
-- AgentGatePay SDK (agentgatepay-sdk>=1.1.3) from PyPI
+- AgentGatePay SDK (agentgatepay-sdk>=1.1.5) from PyPI
 - Web3.py for blockchain signing
 - LangChain agent framework
 

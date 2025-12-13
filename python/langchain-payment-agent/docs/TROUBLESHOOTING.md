@@ -56,7 +56,7 @@ ModuleNotFoundError: No module named 'agentgatepay_sdk'
 source venv/bin/activate  # or venv\Scripts\activate on Windows
 
 # Install/upgrade SDK
-pip install --upgrade agentgatepay-sdk>=1.1.3
+pip install --upgrade agentgatepay-sdk>=1.1.5
 
 # Verify installation
 python -c "import agentgatepay_sdk; print(agentgatepay_sdk.__version__)"
@@ -68,12 +68,12 @@ python -c "import agentgatepay_sdk; print(agentgatepay_sdk.__version__)"
 
 **Symptom:**
 ```
-SDK version 1.1.0 is too old (requires >= 1.1.3)
+SDK version 1.1.0 is too old (requires >= 1.1.5)
 ```
 
 **Solution:**
 ```bash
-pip install --upgrade agentgatepay-sdk>=1.1.3
+pip install --upgrade agentgatepay-sdk>=1.1.5
 ```
 
 ---

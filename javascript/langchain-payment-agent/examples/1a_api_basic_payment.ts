@@ -3,7 +3,7 @@
  * AgentGatePay + LangChain.js Integration - Example 1a: REST API + Local Signing
  *
  * This example demonstrates a simple autonomous payment flow using:
- * - AgentGatePay REST API (via published SDK v1.1.4+)
+ * - AgentGatePay REST API (via published SDK v1.1.5+)
  * - LangChain.js agent with payment tools
  * - Local transaction signing (private key in .env)
  * - Multi-chain blockchain payments (Base, Ethereum, Polygon, Arbitrum)

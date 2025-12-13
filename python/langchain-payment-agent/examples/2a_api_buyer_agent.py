@@ -20,7 +20,7 @@ Usage:
     python 2a_api_buyer_agent.py
 
 Requirements:
-- pip install agentgatepay-sdk>=1.1.3 langchain langchain-openai web3 python-dotenv
+- pip install agentgatepay-sdk>=1.1.5 langchain langchain-openai web3 python-dotenv
 - .env file with BUYER_API_KEY, BUYER_PRIVATE_KEY, BUYER_WALLET
 - Seller API running on http://localhost:8000
 """

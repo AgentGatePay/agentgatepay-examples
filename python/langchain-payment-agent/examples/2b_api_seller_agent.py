@@ -19,7 +19,7 @@ Usage:
     The buyer agent will discover and purchase resources from this API.
 
 Requirements:
-- pip install agentgatepay-sdk>=1.1.3 flask python-dotenv
+- pip install agentgatepay-sdk>=1.1.5 flask python-dotenv
 - .env file with SELLER_API_KEY and SELLER_WALLET
 """
 
