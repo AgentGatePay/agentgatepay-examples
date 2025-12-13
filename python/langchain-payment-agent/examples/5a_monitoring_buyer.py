@@ -30,7 +30,7 @@ Usage:
     python 5a_monitoring_buyer.py --api-key pk_live_... --wallet 0xABC...
 
 Requirements:
-- pip install agentgatepay-sdk>=1.1.5 python-dotenv requests
+- pip install agentgatepay-sdk>=1.1.6 python-dotenv requests
 - .env file with BUYER_API_KEY and BUYER_WALLET
 """
 

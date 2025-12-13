@@ -67,14 +67,14 @@ The AgentGatePay Python SDK provides a Pythonic, type-safe interface to the REST
 ### Install SDK
 
 ```bash
-pip install agentgatepay-sdk>=1.1.5
+pip install agentgatepay-sdk>=1.1.6
 ```
 
 ### Verify Installation
 
 ```python
 import agentgatepay_sdk
-print(f"SDK Version: {agentgatepay_sdk.__version__}")  # Should be >= 1.1.5
+print(f"SDK Version: {agentgatepay_sdk.__version__}")  # Should be >= 1.1.6
 ```
 
 ### Optional Dependencies
@@ -240,7 +240,7 @@ print(f"   Budget remaining: ${updated_verification['budget_remaining']}")
 
 **Expected Output:**
 ```
-✅ Connected to AgentGatePay v1.1.5
+✅ Connected to AgentGatePay v1.1.6
 ✅ Mandate issued: mandate_abc123
    Budget: $100.0
 ✅ Mandate valid: $100.0 remaining
@@ -1302,7 +1302,7 @@ ModuleNotFoundError: No module named 'agentgatepay_sdk'
 source venv/bin/activate  # or venv\Scripts\activate on Windows
 
 # Install/upgrade SDK
-pip install --upgrade agentgatepay-sdk>=1.1.5
+pip install --upgrade agentgatepay-sdk>=1.1.6
 
 # Verify installation
 python -c "import agentgatepay_sdk; print(agentgatepay_sdk.__version__)"

@@ -23,7 +23,7 @@ Setup Options:
 - Other options: See docs/TX_SIGNING_OPTIONS.md
 
 Requirements:
-- pip install agentgatepay-sdk>=1.1.5 langchain langchain-openai python-dotenv requests
+- pip install agentgatepay-sdk>=1.1.6 langchain langchain-openai python-dotenv requests
 - .env file with TX_SIGNING_SERVICE configured
 
 For Development: See Example 1a (local signing, simpler setup)

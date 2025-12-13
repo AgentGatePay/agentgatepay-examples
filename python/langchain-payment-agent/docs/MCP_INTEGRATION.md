@@ -830,7 +830,7 @@ else:
   "chains": ["base", "ethereum", "polygon", "arbitrum"],
   "tokens": ["USDC", "USDT", "DAI"],
   "uptime_hours": 720,
-  "version": "1.1.5"
+  "version": "1.1.6"
 }
 ```
 

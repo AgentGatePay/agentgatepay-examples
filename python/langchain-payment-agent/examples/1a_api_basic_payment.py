@@ -3,7 +3,7 @@
 AgentGatePay + LangChain Integration - Example 1a: REST API + Local Signing
 
 This example demonstrates a simple autonomous payment flow using:
-- AgentGatePay REST API (via published SDK v1.1.5)
+- AgentGatePay REST API (via published SDK v1.1.6)
 - LangChain agent with payment tools
 - Local transaction signing (private key in .env)
 - Multi-chain blockchain payments (Base, Ethereum, Polygon, Arbitrum)
@@ -17,7 +17,7 @@ Flow:
 5. Verify payment completion and view audit logs
 
 Requirements:
-- pip install agentgatepay-sdk>=1.1.5 langchain langchain-openai web3 python-dotenv
+- pip install agentgatepay-sdk>=1.1.6 langchain langchain-openai web3 python-dotenv
 - .env file with configuration (see .env.example)
 
 Multi-Chain Configuration:

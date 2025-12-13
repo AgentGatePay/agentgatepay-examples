@@ -3,7 +3,7 @@
 
 # Core AgentGatePay SDK (published to PyPI)
 # Use >= to allow future patch versions
-agentgatepay-sdk>=1.1.5
+agentgatepay-sdk>=1.1.6
 
 # LangChain framework (1.x uses LangGraph for agents)
 langchain>=1.0.0

@@ -29,7 +29,7 @@ Usage:
     python 5b_monitoring_seller.py --api-key pk_live_... --wallet 0xDEF...
 
 Requirements:
-- pip install agentgatepay-sdk>=1.1.5 python-dotenv requests
+- pip install agentgatepay-sdk>=1.1.6 python-dotenv requests
 - .env file with SELLER_API_KEY and SELLER_WALLET
 """
 
