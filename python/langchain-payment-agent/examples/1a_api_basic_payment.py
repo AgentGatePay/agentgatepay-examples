@@ -17,7 +17,7 @@ Flow:
 5. Verify payment completion and view audit logs
 
 Requirements:
-- pip install agentgatepay-sdk langchain langchain-openai web3 python-dotenv
+- pip install agentgatepay-sdk>=1.1.5 langchain langchain-openai web3 python-dotenv
 - .env file with configuration (see .env.example)
 
 Multi-Chain Configuration:
