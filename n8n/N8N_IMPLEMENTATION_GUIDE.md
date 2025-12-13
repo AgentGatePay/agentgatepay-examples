@@ -380,7 +380,7 @@ Save your API key: `pk_live_abc123...`
 
 **Step 2: One-Click Deploy**
 
-Click this button: [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/AgentGatePay)
+Click this button: [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
 
 **When prompted, enter:**
 1. **AGENTGATEPAY_API_KEY:** Paste your API key (`pk_live_...`)

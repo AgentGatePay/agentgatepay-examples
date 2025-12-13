@@ -56,7 +56,7 @@ curl -X POST https://api.agentgatepay.com/v1/users/signup \
 ### 2. Deploy Transaction Signing Service (2 minutes)
 
 **One-Click Render Deploy:**
-1. Click: [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/AgentGatePay)
+1. Click: [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AgentGatePay/TX)
 2. Enter:
    - `AGENTGATEPAY_API_KEY`: Your buyer API key
    - `WALLET_PRIVATE_KEY`: Your wallet private key (0x...)
