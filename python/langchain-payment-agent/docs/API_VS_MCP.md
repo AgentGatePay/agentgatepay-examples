@@ -23,7 +23,7 @@ This guide helps you choose between AgentGatePay's **REST API** (via SDK) and **
 #### REST API (SDK)
 ```bash
 # Install SDK from PyPI
-pip install agentgatepay-sdk==1.1.0
+pip install agentgatepay-sdk>=1.1.5
 
 # Import and use
 from agentgatepay_sdk import AgentGatePay
