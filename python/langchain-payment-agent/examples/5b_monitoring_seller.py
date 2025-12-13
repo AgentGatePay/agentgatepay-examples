@@ -523,7 +523,7 @@ if __name__ == "__main__":
 
     # Calculate original amounts
     merchant_received = stats['total_revenue']
-    original_amount = merchant_received / 0.995 if merchant_received > 0 else 0  # Reverse calculate from 99.5%
+    original_amount = merchant_received / 0.995 if merchant_received > 0 else 0
 
     print(f"Unique Buyers: {len(unique_buyers)}")
     print(f"Original Amount (buyer paid): ${original_amount:.2f} USD Coins")

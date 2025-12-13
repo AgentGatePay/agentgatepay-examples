@@ -222,8 +222,8 @@ class SellerAgent:
         """Handle webhook payment notification from AgentGatePay"""
         print(f"\n🔔 [WEBHOOK] Received payment notification")
 
-        # Verify signature (in production, ALWAYS verify)
-        # For local testing without public URL, we'll skip signature verification
+        # Note: Signature verification is commented out for local testing
+        # Enable in production by uncommenting lines 227-229
         # if signature and not self.verify_webhook_signature(str(payload).encode(), signature):
         #     print(f"   ❌ Invalid webhook signature")
         #     return {"error": "Invalid signature"}
@@ -246,13 +246,7 @@ class SellerAgent:
             if resource:
                 print(f"   📦 Auto-delivering resource: {resource['name']}")
 
-                # In production, you would:
-                # - Send email with resource access
-                # - Update database with delivery status
-                # - Trigger fulfillment workflow
-                # - etc.
-
-                # For demo, just log the delivery
+                # Record delivery information
                 delivery_info = {
                     "resource_id": resource_id,
                     "resource_name": resource['name'],
@@ -383,20 +377,17 @@ class SellerAgent:
         print(f"   Commission TX: {tx_hash_commission[:20]}...")
 
         # Verify merchant payment via AgentGatePay API with retry logic
-        # (handles optimistic processing delays for USDT/Ethereum <$1)
         print(f"   📡 Calling AgentGatePay API for verification...")
 
         # Adaptive retry strategy based on payment amount
-        # <$1 (optimistic mode): Wait for background worker (runs every 1 min)
-        # ≥$1 (synchronous mode): Quick retries only (on-chain verification should be instant)
         if resource['price_usd'] < 1.0:
-            max_retries = 6  # More retries for optimistic mode
-            retry_delay = 10  # Longer delays (background worker runs every 1 min)
+            max_retries = 6
+            retry_delay = 10
             print(f"   💨 Optimistic mode expected (payment <$1)")
             print(f"   ⏳ Will retry up to {max_retries} times over ~90 seconds (background verification)")
         else:
-            max_retries = 12  # Extended retries for public RPC propagation
-            retry_delay = 10  # Covers gateway processing time (56s × 2 TXs = 112s)
+            max_retries = 12
+            retry_delay = 10
             print(f"   ✅ Synchronous mode expected (payment ≥$1)")
             print(f"   ⏳ Will retry up to {max_retries} times over ~120 seconds (gateway processing + public RPC)")
 
@@ -407,9 +398,7 @@ class SellerAgent:
             try:
                 verification = self.agentpay.payments.verify(tx_hash_merchant)
 
-                # Check verification result
                 if verification.get('verified'):
-                    # Payment verified successfully
                     status = verification.get('status', 'unknown')
                     if status == 'pending':
                         print(f"   💨 Payment verified (OPTIMISTIC MODE - pending blockchain confirmation)")
@@ -418,21 +407,17 @@ class SellerAgent:
                         print(f"   ✅ Payment verified (ON-CHAIN CONFIRMED)")
                     break
                 elif verification.get('status') == 'pending' and attempt < max_retries - 1:
-                    # Gateway accepted optimistically, still pending background verification
                     print(f"   ⏳ Payment status: PENDING (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                     if resource['price_usd'] >= 1.0:
-                        retry_delay = min(retry_delay * 1.5, 10)  # Cap at 10s for large payments
+                        retry_delay = min(retry_delay * 1.5, 10)
                 elif verification.get('error') == 'Payment not found' and attempt < max_retries - 1:
-                    # Gateway may still be processing (optimistic mode RPC delay)
                     print(f"   ⏳ Payment not found yet (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")
                     time.sleep(retry_delay)
                 else:
-                    # Final attempt failed or different error
                     last_error = verification.get('error', 'Unknown verification error')
                     break
             except Exception as e:
-                # SDK threw exception - retry if not last attempt
                 last_error = str(e)
                 if attempt < max_retries - 1:
                     print(f"   ⏳ Verification error (attempt {attempt + 1}/{max_retries}), retrying in {retry_delay}s...")

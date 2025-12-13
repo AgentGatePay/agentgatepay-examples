@@ -189,8 +189,7 @@ class BuyerAgent:
                     verify_data = verify_response.json()
                     budget_remaining = verify_data.get('budget_remaining', 'Unknown')
                 else:
-                    # Fallback to JWT if verify fails
-                    token_data = self.decode_mandate_token(token)
+                        token_data = self.decode_mandate_token(token)
                     budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
 
                 print(f"♻️  Reusing existing mandate (Budget: ${budget_remaining})")
@@ -219,11 +218,9 @@ class BuyerAgent:
                 verify_data = verify_response.json()
                 budget_remaining = verify_data.get('budget_remaining', budget_usd)
             else:
-                # Fallback to JWT decode
-                token_data = self.decode_mandate_token(token)
+                    token_data = self.decode_mandate_token(token)
                 budget_remaining = token_data.get('budget_remaining', str(budget_usd))
 
-            # Store with decoded budget AND purpose (SDK doesn't return these, so we add them)
             mandate_with_budget = {
                 **mandate,
                 'budget_usd': budget_usd,
@@ -502,7 +499,6 @@ class BuyerAgent:
 
                     if self.current_mandate:
                         self.current_mandate['budget_remaining'] = new_budget
-                        # Also sync budget_usd from gateway (in case SDK created mandate with different amount)
                         budget_allocated = verify_data.get('budget_allocated')
                         if budget_allocated is not None:
                             self.current_mandate['budget_usd'] = budget_allocated
@@ -532,7 +528,7 @@ class BuyerAgent:
 
         # Retry claim up to 12 times with 10-second delays (handles gateway processing time)
         max_retries = 12
-        retry_delay = 10  # seconds (covers gateway 56s × 2 TXs = 112s + buffer)
+        retry_delay = 10
 
         for attempt in range(max_retries):
             try:
@@ -771,7 +767,7 @@ CRITICAL RULES:
 
 Think step by step and complete the workflow for ONE resource."""
 
-    # Create agent (LangChain 1.x with LangGraph backend)
+    # Create LangChain agent
     llm = ChatOpenAI(
         model="gpt-4o-mini",
         temperature=0,

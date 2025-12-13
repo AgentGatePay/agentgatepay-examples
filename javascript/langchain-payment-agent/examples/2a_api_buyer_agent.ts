@@ -203,12 +203,12 @@ class BuyerAgent {
           if (verifyResponse.status === 200) {
             budgetRemaining = verifyResponse.data.budget_remaining;
           } else {
-            // Fallback to JWT
+            
             const tokenData = this.decodeMandateToken(token);
             budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
           }
         } catch {
-          // Fallback to JWT
+          
           const tokenData = this.decodeMandateToken(token);
           budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
         }
@@ -246,12 +246,12 @@ class BuyerAgent {
         if (verifyResponse.status === 200) {
           budgetRemaining = verifyResponse.data.budget_remaining;
         } else {
-          // Fallback to JWT
+          
           const tokenData = this.decodeMandateToken(token);
           budgetRemaining = tokenData.budget_remaining || budgetUsd;
         }
       } catch {
-        // Fallback to JWT
+        
         const tokenData = this.decodeMandateToken(token);
         budgetRemaining = tokenData.budget_remaining || budgetUsd;
       }
@@ -711,12 +711,12 @@ async function main() {
       if (verifyResponse.status === 200) {
         budgetRemaining = verifyResponse.data.budget_remaining;
       } else {
-        // Fallback to JWT
+        
         const tokenData = buyer.decodeMandateToken(token);
         budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
       }
     } catch {
-      // Fallback to JWT
+      
       const tokenData = buyer.decodeMandateToken(token);
       budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
     }

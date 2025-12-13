@@ -170,7 +170,6 @@ def issue_payment_mandate(budget_usd: float) -> str:
                 verify_data = verify_response.json()
                 budget_remaining = verify_data.get('budget_remaining', 'Unknown')
             else:
-                # Fallback to JWT if verify fails
                 token_data = decode_mandate_token(token)
                 budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
 
@@ -420,7 +419,7 @@ IMPORTANT:
 - If any tool returns an error, STOP immediately and report the error
 - Do NOT retry failed operations"""
 
-# Create agent (LangChain 1.x with LangGraph backend)
+# Create LangChain agent
 agent_executor = create_agent(
     llm,
     tools,
@@ -486,7 +485,6 @@ if __name__ == "__main__":
             verify_data = verify_response.json()
             budget_remaining = verify_data.get('budget_remaining', 'Unknown')
         else:
-            # Fallback to JWT decode if verify fails
             token_data = decode_mandate_token(token)
             budget_remaining = token_data.get('budget_remaining', 'Unknown')
 

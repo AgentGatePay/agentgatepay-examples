@@ -143,7 +143,7 @@ const issueMandateTool = tool(
         if (verifyResponse.status === 200) {
           budgetRemaining = verifyResponse.data.budget_remaining;
         } else {
-          // Fallback to JWT
+          
           const tokenData = decodeMandateToken(token);
           budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
         }
@@ -497,7 +497,7 @@ async function main() {
     if (verifyResponse.status === 200) {
       budgetRemaining = verifyResponse.data.budget_remaining;
     } else {
-      // Fallback to JWT
+      
       const tokenData = decodeMandateToken(token);
       budgetRemaining = tokenData.budget_remaining || 'Unknown';
     }

@@ -180,12 +180,12 @@ const mcpIssueMandateTool = tool(
           if (verifyResult.valid) {
             budgetRemaining = verifyResult.budget_remaining;
           } else {
-            // Fallback to JWT decode
+            
             const tokenData = decodeMandateToken(token);
             budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
           }
         } catch {
-          // Fallback to JWT if MCP call fails
+          
           const tokenData = decodeMandateToken(token);
           budgetRemaining = tokenData.budget_remaining || existingMandate.budget_usd || 'Unknown';
         }

@@ -267,8 +267,8 @@ class SellerAgentMCP:
         """Handle webhook payment notification from AgentGatePay"""
         print(f"\n🔔 [WEBHOOK] Received payment notification")
 
-        # Verify signature (in production, ALWAYS verify)
-        # For local testing without public URL, we'll skip signature verification
+        # Note: Signature verification is commented out for local testing
+        # Enable in production by uncommenting lines 272-274
         # if signature and not self.verify_webhook_signature(str(payload).encode(), signature):
         #     print(f"   ❌ Invalid webhook signature")
         #     return {"error": "Invalid signature"}
@@ -291,13 +291,7 @@ class SellerAgentMCP:
             if resource:
                 print(f"   📦 Auto-delivering resource: {resource['name']}")
 
-                # In production, you would:
-                # - Send email with resource access
-                # - Update database with delivery status
-                # - Trigger fulfillment workflow
-                # - etc.
-
-                # For demo, just log the delivery
+                # Record delivery information
                 delivery_info = {
                     "resource_id": resource_id,
                     "resource_name": resource['name'],
@@ -432,7 +426,7 @@ class SellerAgentMCP:
 
         # Adaptive retry strategy based on payment amount
         if resource['price_usd'] < 1.0:
-            max_retries = 6  # More retries for optimistic mode
+            max_retries = 6
             retry_delay = 10  # Longer delays
             print(f"   💨 Optimistic mode expected (payment <$1)")
             print(f"   ⏳ Will retry up to {max_retries} times over ~90 seconds")
