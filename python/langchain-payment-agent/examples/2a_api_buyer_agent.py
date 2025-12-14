@@ -189,7 +189,7 @@ class BuyerAgent:
                     verify_data = verify_response.json()
                     budget_remaining = verify_data.get('budget_remaining', 'Unknown')
                 else:
-                        token_data = self.decode_mandate_token(token)
+                    token_data = self.decode_mandate_token(token)
                     budget_remaining = token_data.get('budget_remaining', existing_mandate.get('budget_usd', 'Unknown'))
 
                 print(f"♻️  Reusing existing mandate (Budget: ${budget_remaining})")
@@ -218,7 +218,7 @@ class BuyerAgent:
                 verify_data = verify_response.json()
                 budget_remaining = verify_data.get('budget_remaining', budget_usd)
             else:
-                    token_data = self.decode_mandate_token(token)
+                token_data = self.decode_mandate_token(token)
                 budget_remaining = token_data.get('budget_remaining', str(budget_usd))
 
             mandate_with_budget = {
