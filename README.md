@@ -143,6 +143,12 @@
   - One-click deployment for transaction signing service
   - Comprehensive documentation with troubleshooting guides
 
+  **Gateway Commission:** 0.5% fee on all payments
+  - Automatically deducted via two-transaction model
+  - Commission TX: 0.5% → AgentGatePay wallet (covers infrastructure costs)
+  - Merchant TX: 99.5% → seller wallet
+  - Both transactions atomic and transparent on-chain
+
   ---
 
   ## Prerequisites
